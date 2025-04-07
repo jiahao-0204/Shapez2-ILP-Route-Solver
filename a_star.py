@@ -56,8 +56,8 @@ def compute_jumppad_location(x, y, dx, dy):
     
     return []
 
-def is_within_bounds(x, y):
-    return 0 <= x < GRID_SIZE and 0 <= y < GRID_SIZE
+def is_within_bounds(node):
+    return 0 <= node[0] < GRID_SIZE and 0 <= node[1] < GRID_SIZE
 
 def is_end_location_clear(x, y, blocked):
     # Check if the end location is clear
@@ -97,18 +97,23 @@ def a_star_route(start, goal, blocked_by_other_nets):
             goal_reached = True
             break
         
+        # compute blocked locations
+        blocked = blocked_by_other_nets.copy()
+        blocked.update(blocked_by_current_net)
+
         # explore 4-connected neighbors
         for delta_x, delta_y in STEP_MOVES:
 
-            # new location
+            # new node
             new_x, new_y = x + delta_x, y + delta_y
+            new_node = (new_x, new_y)
 
             # skip if the new location is already occupied
-            if (new_x, new_y) in blocked_by_current_net or (new_x, new_y) in blocked_by_other_nets:
+            if new_node in blocked:
                 continue
 
             # skip if the new location is out of bounds
-            if not is_within_bounds(new_x, new_y):
+            if not is_within_bounds(new_node):
                 continue
             
             # compute cost to new location
@@ -128,41 +133,42 @@ def a_star_route(start, goal, blocked_by_other_nets):
 
             # new location
             new_x, new_y = x + delta_x, y + delta_y
+            new_node = (new_x, new_y)
 
             # new jumppad location
             jumppad_locations = compute_jumppad_location(x, y, delta_x, delta_y)
 
             # skip if the new location is already occupied
-            if (new_x, new_y) in blocked_by_current_net or (new_x, new_y) in blocked_by_other_nets:
+            if new_node in blocked:
                 continue
 
             # skip if the jumppad location is already occupied
-            if any(loc in blocked_by_current_net for loc in jumppad_locations) or any(loc in blocked_by_other_nets for loc in jumppad_locations):
+            if any(loc in blocked for loc in jumppad_locations):
                 continue
 
             # skip if the new location is out of bounds
-            if not is_within_bounds(new_x, new_y):
+            if not is_within_bounds(new_node):
                 continue
 
             # skip if the jumppad location is out of bounds
-            if any(not is_within_bounds(loc[0], loc[1]) for loc in jumppad_locations):
+            if any(not is_within_bounds(loc) for loc in jumppad_locations):
                 continue
 
             # compute cost to new location
             new_g = g + JUMP_COST
 
             # update and add to heap if this is lower than the previous cost
-            if new_g < g_cost.get((new_x, new_y), float('inf')):
-                g_cost[(new_x, new_y)] = new_g
+            if new_g < g_cost.get(new_node, float('inf')):
+                g_cost[new_node] = new_g
 
                 # add to heap to explore
-                new_f = new_g + heuristic((new_x, new_y), goal)
+                new_f = new_g + heuristic(new_node, goal)
                 new_blocked = blocked_by_current_net + jumppad_locations
                 heapq.heappush(open_heap, (new_f, new_g, new_x, new_y, (x, y), new_blocked))
     
     # Reconstruct path if goal reached
     if not goal_reached:
-        return None  # no path found
+        return None, None  # no path found
     
     path = []
     pads = []
