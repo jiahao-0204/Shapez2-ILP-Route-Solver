@@ -8,7 +8,7 @@ GRID_SIZE = 15
 STEP_MOVES = [(0,1), (0,-1), (1,0), (-1,0)]
 STEP_COST = 1
 
-JUMP_SIZE = 3
+JUMP_SIZE = 4
 JUMP_MOVES = [
     (0,  (JUMP_SIZE + 3)), 
     (0, -(JUMP_SIZE + 3)),
@@ -97,11 +97,10 @@ def a_star_route(start, goal, blocked_by_other_nets):
             goal_reached = True
             break
         
-        # Explore neighbors
         # explore 4-connected neighbors
         for delta_x, delta_y in STEP_MOVES:
 
-            # new proposed location
+            # new location
             new_x, new_y = x + delta_x, y + delta_y
 
             # skip if the new location is already occupied
@@ -115,22 +114,22 @@ def a_star_route(start, goal, blocked_by_other_nets):
             # compute cost to new location
             new_g = g + STEP_COST
 
-            # update record and add to heap if this is lower than the previous cost
+            # update and add to heap if this is lower than the previous cost
             if new_g < g_cost.get((new_x, new_y), float('inf')):
                 g_cost[(new_x, new_y)] = new_g
 
-                # add to heap
+                # add to heap to explore
                 new_f = new_g + heuristic((new_x, new_y), goal)
                 new_blocked = blocked_by_current_net + [(new_x, new_y)]
                 heapq.heappush(open_heap, (new_f, new_g, new_x, new_y, (x, y), new_blocked))
 
-        # by jump
+        # explore jump neighbors
         for delta_x, delta_y in JUMP_MOVES:
 
-            # new proposed location
+            # new location
             new_x, new_y = x + delta_x, y + delta_y
 
-            # new proposed jumppad location
+            # new jumppad location
             jumppad_locations = compute_jumppad_location(x, y, delta_x, delta_y)
 
             # skip if the new location is already occupied
@@ -152,11 +151,11 @@ def a_star_route(start, goal, blocked_by_other_nets):
             # compute cost to new location
             new_g = g + JUMP_COST
 
-            # update record and add to heap if this is lower than the previous cost
+            # update and add to heap if this is lower than the previous cost
             if new_g < g_cost.get((new_x, new_y), float('inf')):
                 g_cost[(new_x, new_y)] = new_g
 
-                # add to heap
+                # add to heap to explore
                 new_f = new_g + heuristic((new_x, new_y), goal)
                 new_blocked = blocked_by_current_net + jumppad_locations
                 heapq.heappush(open_heap, (new_f, new_g, new_x, new_y, (x, y), new_blocked))
