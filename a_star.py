@@ -83,14 +83,14 @@ def a_star_route(start, goal, blocked_by_other_nets):
         # explore 4-connected neighbors
         for delta in STEP_MOVES:
 
-            # new node
+            # new node location
             new_node_location = (current_node_location[0] + delta[0], current_node_location[1] + delta[1])
 
-            # skip if new node is already occupied
+            # skip if new node location is already occupied
             if new_node_location in blocked:
                 continue
 
-            # skip if new node is out of bounds
+            # skip if new node location is out of bounds
             if not is_within_bounds(new_node_location):
                 continue
             
@@ -115,20 +115,15 @@ def a_star_route(start, goal, blocked_by_other_nets):
             # new jumppad location
             jumppad_locations = compute_jumppad_location(current_node_location, delta)
 
-            # skip if the new node location is already occupied
-            if new_node_location in blocked:
+            # all locations
+            all_locations = [new_node_location] + jumppad_locations
+
+            # skip if any of the new locations are already occupied
+            if any(loc in blocked for loc in all_locations):
                 continue
 
-            # skip if the jumppad location is already occupied
-            if any(loc in blocked for loc in jumppad_locations):
-                continue
-
-            # skip if the new location is out of bounds
-            if not is_within_bounds(new_node_location):
-                continue
-
-            # skip if the jumppad location is out of bounds
-            if any(not is_within_bounds(loc) for loc in jumppad_locations):
+            # skip if any of the new locations are out of bounds
+            if any(not is_within_bounds(loc) for loc in all_locations):
                 continue
 
             # compute cost to new node location
