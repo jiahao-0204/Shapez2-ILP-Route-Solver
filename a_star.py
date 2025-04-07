@@ -1,21 +1,5 @@
 import heapq
 import matplotlib.pyplot as plt
-import numpy as np
-
-
-GRID_SIZE = 15
-
-STEP_MOVES = [(0,1), (0,-1), (1,0), (-1,0)]
-STEP_COST = 1
-
-JUMP_SIZE = 4
-JUMP_MOVES = [
-    (0,  (JUMP_SIZE + 3)), 
-    (0, -(JUMP_SIZE + 3)),
-    ( (JUMP_SIZE + 3), 0),
-    (-(JUMP_SIZE + 3), 0),
-    ]
-JUMP_COST = 3
 
 def compute_jumppad_location(node, delta):
     x, y = node
@@ -184,57 +168,70 @@ def a_star_route(start, goal, blocked_by_other_nets):
     # return
     return path, pads
 
+def draw_result(paths, pads):
+    """Draw the grid with paths and jump pads."""
 
+    plt.figure(figsize=(6, 6))
+    plt.grid(True)
+    plt.xlim(-1, GRID_SIZE)
+    plt.ylim(-1, GRID_SIZE)
+    plt.axhline(0, color='black', lw=1)
+    plt.axvline(0, color='black', lw=1)
+    plt.xticks(range(GRID_SIZE))
+    plt.yticks(range(GRID_SIZE))
+    plt.gca().set_aspect('equal')
 
-# Example usage:
-nets = [((5, 0), (5, 5)),   # Net 0: from (1,0) to (1,5)
-        ((0, 3), (9, 3)),   # Net 1: from (0,2) to (5,2)
-        ((4, 4), (9, 9))]   # Net 2: from (4,4) to (9,9)
-blocked_tiles = set()
-paths = []
-pads = []
-for i, (start, goal) in enumerate(nets):
-    path, pad = a_star_route(start, goal, blocked_tiles)
-    if path is None:
-        print(f"Net {i}: no route found")
-    else:
-        paths.append(path)
-        pads.append(pad)
-        # mark this path's tiles as occupied
-        blocked_tiles.update(path)  
-        # mark jump pads as occupied
-        blocked_tiles.update(pad)
-        print(f"Net {i} path (length {len(path)-1}): {path}")
+    colors = ['red', 'green', 'blue', 'orange', 'purple', 'cyan', 'magenta', 'brown', 'gray', 'olive']
 
-
-# Create the grid and mark the paths
-grid = np.zeros((GRID_SIZE, GRID_SIZE))
-
-plt.figure(figsize=(6, 6))
-plt.grid(True)
-plt.xlim(-1, GRID_SIZE)
-plt.ylim(-1, GRID_SIZE)
-plt.axhline(0, color='black', lw=1)
-plt.axvline(0, color='black', lw=1)
-plt.xticks(range(GRID_SIZE))
-plt.yticks(range(GRID_SIZE))
-plt.gca().set_aspect('equal')
-
-# Draw each path
-for i, path in enumerate(paths):
-    xs, ys = zip(*path)
-    plt.plot(xs, ys, marker='o', label=f'Net {i}')
-    for x, y in path:
-        plt.text(x, y, f'{i}', color='black', fontsize=8, ha='center', va='center')
-
-# draw jump pads
-for i, pad in enumerate(pads):
-    if pad:  # Ensure pad is not empty
-        xs, ys = zip(*pad)
-        plt.scatter(xs, ys, marker='x', label=f'Jump Pad {i}', s=100)
-        for x, y in pad:
+    for i, path in enumerate(paths):
+        xs, ys = zip(*path)
+        color = colors[i % len(colors)]  # Ensure cycling if more paths than colors
+        plt.plot(xs, ys, marker='o', color=color, label=f'Net {i}')
+        for x, y in path:
             plt.text(x, y, f'{i}', color='black', fontsize=8, ha='center', va='center')
 
-plt.legend()
-plt.title("Routed Paths Visualization")
-plt.show()
+    for i, pad in enumerate(pads):
+        if pad:
+            xs, ys = zip(*pad)
+            color = colors[i % len(colors)]  # Same color as path with same index
+            plt.scatter(xs, ys, marker='x', s=100, color=color, label=f'Jump Pad {i}')
+            for x, y in pad:
+                plt.text(x, y, f'{i}', color='black', fontsize=8, ha='center', va='center')
+
+    plt.legend()
+    plt.title("Routed Paths Visualization")
+    plt.show()
+
+
+if __name__ == "__main__":
+    GRID_SIZE = 20
+    JUMP_SIZE = 4
+
+    # moves and costs, theese shouldn't be changed
+    STEP_COST = 1
+    JUMP_COST = 3
+    STEP_MOVES = [(0,1), (0,-1), (1,0), (-1,0)]    
+    JUMP_MOVES = [(0,  (JUMP_SIZE + 3)), (0, -(JUMP_SIZE + 3)), ( (JUMP_SIZE + 3), 0), (-(JUMP_SIZE + 3), 0)]
+
+    nets = [((5, 0), (5, 5)),   # Net 0: from (1,0) to (1,5)
+            ((0, 3), (9, 3)),   # Net 1: from (0,2) to (5,2)
+            ((4, 4), (9, 9))]   # Net 2: from (4,4) to (9,9)
+    blocked_tiles = set()
+    paths = []
+    pads = []
+    for i, (start, goal) in enumerate(nets):
+        path, pad = a_star_route(start, goal, blocked_tiles)
+        if path is None:
+            print(f"Net {i}: no route found")
+        else:
+            paths.append(path)
+            pads.append(pad)
+            # mark this path's tiles as occupied
+            blocked_tiles.update(path)  
+            # mark jump pads as occupied
+            blocked_tiles.update(pad)
+            print(f"Net {i} path (length {len(path)-1}): {path}")
+
+
+    # Create the grid and mark the paths
+    draw_result(paths, pads)
