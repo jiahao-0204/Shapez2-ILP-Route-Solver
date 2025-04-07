@@ -146,15 +146,14 @@ def a_star_route(start, goal, blocked_by_other_nets):
                 new_blocked = blocked_by_current_net + jumppad_locations
                 heapq.heappush(heap, (new_f, new_g, new_node_location, current_node_location, new_blocked))
     
-    # Reconstruct path if goal reached
+    # skip if we have not reached the goal
     if not goal_reached:
         return None, None  # no path found
     
+    # Backtrack from goal to start using came_from to reconstruct the path and pads
     path = []
     pads = []
-
     current_node = goal
-    # Backtrack from goal to start using came_from
     while current_node is not None:
         path.append(current_node)
         previous_node_location = came_from[current_node]
@@ -167,15 +166,13 @@ def a_star_route(start, goal, blocked_by_other_nets):
         used_jumppads = abs(current_node[0] - previous_node_location[0]) > 1 or abs(current_node[1] - previous_node_location[1]) > 1
         if used_jumppads:
             # calculate jump pad coordinates
-            x = previous_node_location[0]
-            y = previous_node_location[1]
-            dx = current_node[0] - previous_node_location[0]
-            dy = current_node[1] - previous_node_location[1]
-            jumppad_locations = compute_jumppad_location(previous_node_location, (dx, dy))
+            delta = (current_node[0] - previous_node_location[0], current_node[1] - previous_node_location[1])
+            jumppad_locations = compute_jumppad_location(previous_node_location, delta)
             pads.extend(jumppad_locations)
         current_node = previous_node_location
     path.reverse()
 
+    # return
     return path, pads
 
 
