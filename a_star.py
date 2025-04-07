@@ -103,7 +103,7 @@ def a_star_route(start, goal, blocked_by_other_nets):
             next_cost = current_cost + move_cost
 
             # skip if there are existing lower cost paths to the next node
-            if next_cost > cost_so_far.get(next_node_location, float('inf')):
+            if next_cost >= cost_so_far.get(next_node_location, float('inf')):
                 continue
             
             # update cost_so_far at the next node location
