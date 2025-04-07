@@ -1,5 +1,6 @@
 import heapq
 import matplotlib.pyplot as plt
+import numpy as np
 
 def compute_jumppad_location(node, delta):
     x, y = node
@@ -169,37 +170,40 @@ def a_star_route(start, goal, blocked_by_other_nets):
     return path, pads
 
 def draw_result(paths, pads):
-    """Draw the grid with paths and jump pads."""
+    """Draw the grid with paths and jump pads centered in grid cells."""
 
     plt.figure(figsize=(6, 6))
-    plt.grid(True)
-    plt.xlim(-1, GRID_SIZE)
-    plt.ylim(-1, GRID_SIZE)
-    plt.axhline(0, color='black', lw=1)
-    plt.axvline(0, color='black', lw=1)
-    plt.xticks(range(GRID_SIZE))
-    plt.yticks(range(GRID_SIZE))
+    plt.grid(True, which='both')
+
+    # Draw borders
+    plt.plot([0, GRID_SIZE], [GRID_SIZE, GRID_SIZE], color='black', lw=2)
+    plt.plot([GRID_SIZE, GRID_SIZE], [0, GRID_SIZE], color='black', lw=2)
+    plt.plot([0, 0], [0, GRID_SIZE], color='black', lw=2)
+    plt.plot([0, GRID_SIZE], [0, 0], color='black', lw=2)
+
+    # Set ticks to be at the **center** of grid cells
+    tick_positions = np.arange(GRID_SIZE+1)
+    plt.xticks(tick_positions, labels=[str(i) for i in range(GRID_SIZE+1)])
+    plt.yticks(tick_positions, labels=[str(i) for i in range(GRID_SIZE+1)])
+    plt.xlim(0, GRID_SIZE)
+    plt.ylim(0, GRID_SIZE)
     plt.gca().set_aspect('equal')
 
     colors = ['red', 'green', 'blue', 'orange', 'purple', 'cyan', 'magenta', 'brown', 'gray', 'olive']
 
     for i, path in enumerate(paths):
-        xs, ys = zip(*path)
-        color = colors[i % len(colors)]  # Ensure cycling if more paths than colors
+        xs, ys = zip(*[(x + 0.5, y + 0.5) for x, y in path])  # Shift to center
+        color = colors[i % len(colors)]
         plt.plot(xs, ys, marker='o', color=color, label=f'Net {i}')
-        for x, y in path:
-            plt.text(x, y, f'{i}', color='black', fontsize=8, ha='center', va='center')
 
     for i, pad in enumerate(pads):
         if pad:
-            xs, ys = zip(*pad)
-            color = colors[i % len(colors)]  # Same color as path with same index
+            xs, ys = zip(*[(x + 0.5, y + 0.5) for x, y in pad])
+            color = colors[i % len(colors)]
             plt.scatter(xs, ys, marker='x', s=100, color=color, label=f'Jump Pad {i}')
-            for x, y in pad:
-                plt.text(x, y, f'{i}', color='black', fontsize=8, ha='center', va='center')
 
     plt.legend()
-    plt.title("Routed Paths Visualization")
+    plt.title("Routed Paths Centered in Grid Cells")
     plt.show()
 
 
