@@ -183,7 +183,7 @@ def draw_result(paths, pads):
 
 if __name__ == "__main__":
     GRID_SIZE = 20
-    AVAILABLE_JUMP_SIZE = [2, 3, 4]
+    AVAILABLE_JUMP_SIZE = [1, 2, 3, 4]
 
     # moves and costs, these shouldn't be changed
     STEP_COST = 1
