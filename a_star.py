@@ -76,6 +76,9 @@ def a_star_route(start, goal, blocked_by_other_nets):
         # compute blocked locations
         blocked = blocked_by_other_nets.copy()
         blocked.update(blocked_by_current_net)
+        # remove the start and goal from the blocked list
+        blocked.discard(start)
+        blocked.discard(goal)
 
         # explore 4-connected neighbors
         for delta in STEP_MOVES:
@@ -218,12 +221,16 @@ if __name__ == "__main__":
     JUMP_MOVES = [(0,  (JUMP_SIZE + 3)), (0, -(JUMP_SIZE + 3)), ( (JUMP_SIZE + 3), 0), (-(JUMP_SIZE + 3), 0)]
 
     # problem setup
-    nets = [((3, 0), (12, 5)),
-            ((0, 0), (0, 5)),
+    nets = [((0, 0), (0, 5)),
             ((1, 0), (4, 5)),
-            ((2, 0), (8, 5))]
+            ((2, 0), (8, 5)),
+            ((3, 0), (12, 5))]
+    
+    # put the start and goal into the blocked tiles
     blocked_tiles = set()
-
+    for start, goal in nets:
+        blocked_tiles.add(start)
+        blocked_tiles.add(goal)
 
     # program execution
     paths = []
