@@ -204,6 +204,7 @@ if __name__ == "__main__":
         blocked_tiles.add(start)
         blocked_tiles.add(goal)
     blocked_tiles.add((4, 6))
+    blocked_tiles.add((4, 0))
 
     # program execution
     paths = []
