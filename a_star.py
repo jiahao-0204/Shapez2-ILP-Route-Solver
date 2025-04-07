@@ -75,63 +75,34 @@ def a_star_route(start, goal, blocked_by_other_nets):
         blocked.discard(start)
         blocked.discard(goal)
 
-        # explore 4-connected neighbors
-        for delta in STEP_MOVES:
+        # explore possible next node locations
+        for delta in MOVES:
 
-            # new node location
+            # next node location
             next_node_location = (current_node_location[0] + delta[0], current_node_location[1] + delta[1])
 
-            # skip if next node location is already occupied
-            if next_node_location in blocked:
-                continue
+            # check if require a jumppad
+            require_jumppad = abs(delta[0]) > 1 or abs(delta[1]) > 1
 
-            # skip if next node location is out of bounds
-            if not is_within_bounds(next_node_location):
-                continue
-            
-            # compute cost to new node
-            next_cost = current_cost + STEP_COST
+            # compute all locations required for this move
+            all_locations = [next_node_location]
+            if require_jumppad:
+                jumppad_locations = compute_jumppad_location(current_node_location, delta)
+                all_locations += jumppad_locations
 
-            # skip if there are lower cost paths to this node
-            if next_cost > cost_so_far.get(next_node_location, float('inf')):
-                continue
-
-            # update cost_so_far
-            cost_so_far[next_node_location] = next_cost
-
-            # update came_from
-            came_from[next_node_location] = current_node_location
-
-            # add to heap to explore
-            priority = next_cost + heuristic(next_node_location, goal)
-            new_blocked = blocked_by_current_net + [next_node_location]
-            heapq.heappush(heap, (priority, next_cost, next_node_location, new_blocked))
-            
-
-        # explore jump neighbors
-        for delta in JUMP_MOVES:
-
-            # new node location
-            next_node_location = (current_node_location[0] + delta[0], current_node_location[1] + delta[1])
-
-            # new jumppad location
-            jumppad_locations = compute_jumppad_location(current_node_location, delta)
-
-            # all locations
-            all_locations = [next_node_location] + jumppad_locations
-
-            # skip if any of the new locations are already occupied
+            # skip if any of the locations are already occupied
             if any(loc in blocked for loc in all_locations):
                 continue
 
-            # skip if any of the new locations are out of bounds
+            # skip if any of the locations are out of bounds
             if any(not is_within_bounds(loc) for loc in all_locations):
                 continue
 
             # compute cost to new node location
-            next_cost = current_cost + JUMP_COST
+            move_cost = STEP_COST if not require_jumppad else JUMP_COST
+            next_cost = current_cost + move_cost
 
-            # skip if there are lower cost paths to this node
+            # skip if there are existing lower cost paths to the next node
             if next_cost > cost_so_far.get(next_node_location, float('inf')):
                 continue
             
@@ -141,9 +112,9 @@ def a_star_route(start, goal, blocked_by_other_nets):
             # update came_from to reflect the new cost / path taken
             came_from[next_node_location] = current_node_location
 
-            # add to heap to explore
+            # add next node to heap to explore
             priority = next_cost + heuristic(next_node_location, goal)
-            new_blocked = blocked_by_current_net + jumppad_locations
+            new_blocked = blocked_by_current_net + all_locations
             heapq.heappush(heap, (priority, next_cost, next_node_location, new_blocked))
             
     
@@ -223,6 +194,7 @@ if __name__ == "__main__":
     JUMP_COST = 3
     STEP_MOVES = [(0,1), (0,-1), (1,0), (-1,0)]    
     JUMP_MOVES = [(0,  (JUMP_SIZE + 3)), (0, -(JUMP_SIZE + 3)), ( (JUMP_SIZE + 3), 0), (-(JUMP_SIZE + 3), 0)]
+    MOVES = STEP_MOVES + JUMP_MOVES
 
     # problem setup
     nets = [((0, 0), (0, 5)),
