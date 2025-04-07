@@ -56,16 +56,25 @@ def a_star_route(start, goal, blocked_by_other_nets):
     `blocked` is a set of coordinates that cannot be used (occupied by other nets)."""
     
     # A* search structures
-    heap = []  # heap of (f_score, g_cost, x, y, parent)
-    came_from = {}  # for path reconstruction
+    heap = [] # priority queue for open nodes (which node to explore next using f_score)
+    came_from = {}  # a previous to current node mapping for backtracking
     g_cost = {start: 0} # cost to reach a node
-    f_score = heuristic(start, goal) # cost to reach a node + heuristic to goal
-    heapq.heappush(heap, (f_score, 0, start, None, []))
+
+
+    # initialize the heap with the start node
+    start_f = heuristic(start, goal)
+    start_g = 0
+    previous_node_location = None
+    blocked_by_current_net = []
+    heapq.heappush(heap, (start_f, start_g, start, previous_node_location, blocked_by_current_net))
     
+
     # Perform the search
     goal_reached = False
     while heap:
-        f, g, current_node_location, previous_node_location, blocked_by_current_net = heapq.heappop(heap)
+
+        # get the node with the lowest f_score from the heap and start the search
+        _, current_g, current_node_location, previous_node_location, blocked_by_current_net = heapq.heappop(heap)
 
         # skip if this node has already been visited
         if current_node_location in came_from: 
@@ -98,7 +107,7 @@ def a_star_route(start, goal, blocked_by_other_nets):
                 continue
             
             # compute cost to new node
-            new_g = g + STEP_COST
+            new_g = current_g + STEP_COST
 
             # update and add to heap if this is lower than the previous cost
             if new_g < g_cost.get(new_node_location, float('inf')):
@@ -135,7 +144,7 @@ def a_star_route(start, goal, blocked_by_other_nets):
                 continue
 
             # compute cost to new node location
-            new_g = g + JUMP_COST
+            new_g = current_g + JUMP_COST
 
             # update and add to heap if this is lower than the previous cost
             if new_g < g_cost.get(new_node_location, float('inf')):
@@ -177,8 +186,6 @@ def a_star_route(start, goal, blocked_by_other_nets):
 
 
 
-
-
 # Example usage:
 nets = [((5, 0), (5, 5)),   # Net 0: from (1,0) to (1,5)
         ((0, 3), (9, 3)),   # Net 1: from (0,2) to (5,2)
@@ -202,7 +209,6 @@ for i, (start, goal) in enumerate(nets):
 
 # Create the grid and mark the paths
 grid = np.zeros((GRID_SIZE, GRID_SIZE))
-colors = ['red', 'green', 'blue']
 
 plt.figure(figsize=(6, 6))
 plt.grid(True)
@@ -212,13 +218,12 @@ plt.axhline(0, color='black', lw=1)
 plt.axvline(0, color='black', lw=1)
 plt.xticks(range(GRID_SIZE))
 plt.yticks(range(GRID_SIZE))
-plt.gca().invert_yaxis()
 plt.gca().set_aspect('equal')
 
 # Draw each path
 for i, path in enumerate(paths):
     xs, ys = zip(*path)
-    plt.plot(xs, ys, marker='o', color=colors[i], label=f'Net {i}')
+    plt.plot(xs, ys, marker='o', label=f'Net {i}')
     for x, y in path:
         plt.text(x, y, f'{i}', color='black', fontsize=8, ha='center', va='center')
 
@@ -226,7 +231,7 @@ for i, path in enumerate(paths):
 for i, pad in enumerate(pads):
     if pad:  # Ensure pad is not empty
         xs, ys = zip(*pad)
-        plt.scatter(xs, ys, marker='x', color=colors[i], label=f'Jump Pad {i}', s=100)
+        plt.scatter(xs, ys, marker='x', label=f'Jump Pad {i}', s=100)
         for x, y in pad:
             plt.text(x, y, f'{i}', color='black', fontsize=8, ha='center', va='center')
 
