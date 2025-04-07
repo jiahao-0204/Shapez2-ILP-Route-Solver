@@ -43,24 +43,25 @@ def a_star_route(start, goal, blocked_by_other_nets):
     # A* search structures
     heap = [] # priority queue for open nodes (which node to explore next using f_score)
     came_from = {}  # a previous to current node mapping for backtracking
-    cost_so_far = {start: 0} # cost to reach a node
+    cost_so_far = {} # cost to reach a node
 
-
-    # initialize the heap with the start node
-    start_f = heuristic(start, goal)
-    start_g = 0
+    # start node
+    priority = heuristic(start, goal)
+    cost = 0
     previous_node_location = None
-    blocked_by_current_net = [start]
-    heapq.heappush(heap, (start_f, start_g, start, previous_node_location, blocked_by_current_net))
-    came_from[start] = None
-    
+    blocked_by_current_net = []
+
+    # add start node to heap
+    heapq.heappush(heap, (priority, cost, start, blocked_by_current_net))
+    came_from[start] = previous_node_location
+    cost_so_far[start] = cost
 
     # Perform the search
     goal_reached = False
     while heap:
 
-        # get the node with the lowest f_score from the heap and start the search
-        _, current_cost, current_node_location, previous_node_location, blocked_by_current_net = heapq.heappop(heap)
+        # get the node with the lowest f_score / highest priority from the heap and explore its neighbors
+        _, current_cost, current_node_location, blocked_by_current_net = heapq.heappop(heap)
 
         # skip if we have reached the goal
         if current_node_location == goal:
@@ -78,40 +79,46 @@ def a_star_route(start, goal, blocked_by_other_nets):
         for delta in STEP_MOVES:
 
             # new node location
-            new_node_location = (current_node_location[0] + delta[0], current_node_location[1] + delta[1])
+            next_node_location = (current_node_location[0] + delta[0], current_node_location[1] + delta[1])
 
-            # skip if new node location is already occupied
-            if new_node_location in blocked:
+            # skip if next node location is already occupied
+            if next_node_location in blocked:
                 continue
 
-            # skip if new node location is out of bounds
-            if not is_within_bounds(new_node_location):
+            # skip if next node location is out of bounds
+            if not is_within_bounds(next_node_location):
                 continue
             
             # compute cost to new node
-            new_cost = current_cost + STEP_COST
+            next_cost = current_cost + STEP_COST
 
-            # update and add to heap if this is lower than the previous cost
-            if new_cost < cost_so_far.get(new_node_location, float('inf')):
-                cost_so_far[new_node_location] = new_cost
+            # skip if there are lower cost paths to this node
+            if next_cost > cost_so_far.get(next_node_location, float('inf')):
+                continue
 
-                # add to heap to explore
-                priority = new_cost + heuristic(new_node_location, goal)
-                new_blocked = blocked_by_current_net + [new_node_location]
-                heapq.heappush(heap, (priority, new_cost, new_node_location, current_node_location, new_blocked))
-                came_from[new_node_location] = current_node_location
+            # update cost_so_far
+            cost_so_far[next_node_location] = next_cost
+
+            # update came_from
+            came_from[next_node_location] = current_node_location
+
+            # add to heap to explore
+            priority = next_cost + heuristic(next_node_location, goal)
+            new_blocked = blocked_by_current_net + [next_node_location]
+            heapq.heappush(heap, (priority, next_cost, next_node_location, new_blocked))
+            
 
         # explore jump neighbors
         for delta in JUMP_MOVES:
 
             # new node location
-            new_node_location = (current_node_location[0] + delta[0], current_node_location[1] + delta[1])
+            next_node_location = (current_node_location[0] + delta[0], current_node_location[1] + delta[1])
 
             # new jumppad location
             jumppad_locations = compute_jumppad_location(current_node_location, delta)
 
             # all locations
-            all_locations = [new_node_location] + jumppad_locations
+            all_locations = [next_node_location] + jumppad_locations
 
             # skip if any of the new locations are already occupied
             if any(loc in blocked for loc in all_locations):
@@ -122,17 +129,23 @@ def a_star_route(start, goal, blocked_by_other_nets):
                 continue
 
             # compute cost to new node location
-            new_cost = current_cost + JUMP_COST
+            next_cost = current_cost + JUMP_COST
 
-            # update and add to heap if this is lower than the previous cost
-            if new_cost < cost_so_far.get(new_node_location, float('inf')):
-                cost_so_far[new_node_location] = new_cost
+            # skip if there are lower cost paths to this node
+            if next_cost > cost_so_far.get(next_node_location, float('inf')):
+                continue
+            
+            # update cost_so_far at the next node location
+            cost_so_far[next_node_location] = next_cost
 
-                # add to heap to explore
-                priority = new_cost + heuristic(new_node_location, goal)
-                new_blocked = blocked_by_current_net + jumppad_locations
-                heapq.heappush(heap, (priority, new_cost, new_node_location, current_node_location, new_blocked))
-                came_from[new_node_location] = current_node_location
+            # update came_from to reflect the new cost / path taken
+            came_from[next_node_location] = current_node_location
+
+            # add to heap to explore
+            priority = next_cost + heuristic(next_node_location, goal)
+            new_blocked = blocked_by_current_net + jumppad_locations
+            heapq.heappush(heap, (priority, next_cost, next_node_location, new_blocked))
+            
     
     # skip if we have not reached the goal
     if not goal_reached:
@@ -222,6 +235,7 @@ if __name__ == "__main__":
     for start, goal in nets:
         blocked_tiles.add(start)
         blocked_tiles.add(goal)
+    blocked_tiles.add((4, 6))
 
     # program execution
     paths = []
