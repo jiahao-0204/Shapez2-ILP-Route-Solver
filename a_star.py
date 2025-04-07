@@ -90,12 +90,8 @@ def a_star_route(start, goal, blocked_by_other_nets):
                 jumppad_locations = compute_jumppad_location(current_node_location, delta)
                 all_locations += jumppad_locations
 
-            # skip if any of the locations are already occupied
-            if any(loc in blocked for loc in all_locations):
-                continue
-
-            # skip if any of the locations are out of bounds
-            if any(not is_within_bounds(loc) for loc in all_locations):
+            # skip if any of the locations are already occupied or out of bounds
+            if any(loc in blocked or not is_within_bounds(loc) for loc in all_locations):
                 continue
 
             # compute cost to new node location
