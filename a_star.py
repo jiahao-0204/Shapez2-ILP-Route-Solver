@@ -183,14 +183,14 @@ def draw_result(paths, pads):
 
 if __name__ == "__main__":
     GRID_SIZE = 20
-    JUMP_SIZE = 4
+    AVAILABLE_JUMP_SIZE = [2, 3, 4]
 
-    # moves and costs, theese shouldn't be changed
+    # moves and costs, these shouldn't be changed
     STEP_COST = 1
     JUMP_COST = 3
-    STEP_MOVES = [(0,1), (0,-1), (1,0), (-1,0)]    
-    JUMP_MOVES = [(0,  (JUMP_SIZE + 3)), (0, -(JUMP_SIZE + 3)), ( (JUMP_SIZE + 3), 0), (-(JUMP_SIZE + 3), 0)]
-    MOVES = STEP_MOVES + JUMP_MOVES
+    MOVES = [(0,1), (0,-1), (1,0), (-1,0)]
+    for jump_size in AVAILABLE_JUMP_SIZE:
+        MOVES += [(0,  (jump_size + 3)), (0, -(jump_size + 3)), ( (jump_size + 3), 0), (-(jump_size + 3), 0)]    
 
     # problem setup
     nets = [((0, 0), (0, 5)),
