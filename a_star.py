@@ -45,13 +45,13 @@ def compute_jumppad_location(x, y, dx, dy):
     if horizontal_jump: 
         direction = 1 if dx > 0 else -1
         jumppad_start_x = x + direction * 1
-        jumppad_end_x = x + direction * (JUMP_SIZE + 2)
+        jumppad_end_x = x + direction * (dx - 1)
         return [(jumppad_start_x, y), (jumppad_end_x, y)]
 
     if vertical_jump:
         direction = 1 if dy > 0 else -1
         jumppad_start_y = y + direction * 1
-        jumppad_end_y = y + direction * (JUMP_SIZE + 2)
+        jumppad_end_y = y + direction * (dy - 1)
         return [(x, jumppad_start_y), (x, jumppad_end_y)]
     
     return []
@@ -69,7 +69,7 @@ def is_end_location_clear(x, y, blocked):
 def heuristic(p, q):
     return abs(p[0]-q[0]) + abs(p[1]-q[1])
 
-def a_star_route(start, goal, global_blocked):
+def a_star_route(start, goal, blocked_by_other_nets):
     """Find shortest path from start to goal on a grid of given size using A*.
     `blocked` is a set of coordinates that cannot be used (occupied by other nets)."""
     
@@ -83,40 +83,83 @@ def a_star_route(start, goal, global_blocked):
     # Perform the search
     goal_reached = False
     while open_heap:
-        f, g, x, y, parent, blocked = heapq.heappop(open_heap)
+        f, g, x, y, parent, blocked_by_current_net = heapq.heappop(open_heap)
+
+        # skip if this node has already been visited
         if (x, y) in came_from: 
-            # Already expanded this node with a lower cost
             continue
+
+        # update came_from
         came_from[(x, y)] = parent
+
+        # skip if we have reached the goal
         if (x, y) == goal:
             goal_reached = True
             break
         
         # Explore neighbors
-        # by step
+        # explore 4-connected neighbors
         for delta_x, delta_y in STEP_MOVES:
+
+            # new proposed location
             new_x, new_y = x + delta_x, y + delta_y
-            if is_within_bounds(new_x, new_y) and is_end_location_clear(new_x, new_y, global_blocked) and is_end_location_clear(new_x, new_y, blocked):
-                new_g = g + STEP_COST
+
+            # skip if the new location is already occupied
+            if (new_x, new_y) in blocked_by_current_net or (new_x, new_y) in blocked_by_other_nets:
+                continue
+
+            # skip if the new location is out of bounds
+            if not is_within_bounds(new_x, new_y):
+                continue
+            
+            # compute cost to new location
+            new_g = g + STEP_COST
+
+            # update record and add to heap if this is lower than the previous cost
+            if new_g < g_cost.get((new_x, new_y), float('inf')):
+                g_cost[(new_x, new_y)] = new_g
+
+                # add to heap
                 new_f = new_g + heuristic((new_x, new_y), goal)
-                new_blocked = blocked + [(new_x, new_y)]
-                # If we have not seen this neighbor or found a cheaper path to it
-                if new_g < g_cost.get((new_x, new_y), float('inf')):
-                    g_cost[(new_x, new_y)] = new_g
-                    heapq.heappush(open_heap, (new_f, new_g, new_x, new_y, (x, y), new_blocked))
+                new_blocked = blocked_by_current_net + [(new_x, new_y)]
+                heapq.heappush(open_heap, (new_f, new_g, new_x, new_y, (x, y), new_blocked))
 
         # by jump
         for delta_x, delta_y in JUMP_MOVES:
+
+            # new proposed location
             new_x, new_y = x + delta_x, y + delta_y
-            if is_within_bounds(new_x, new_y) and is_jumppad_location_clear(x, y, delta_x, delta_y, blocked) and is_jumppad_location_clear(x, y, delta_x, delta_y, global_blocked) and is_end_location_clear(new_x, new_y, blocked) and is_end_location_clear(new_x, new_y, global_blocked):
-                new_g = g + JUMP_COST
+
+            # new proposed jumppad location
+            jumppad_locations = compute_jumppad_location(x, y, delta_x, delta_y)
+
+            # skip if the new location is already occupied
+            if (new_x, new_y) in blocked_by_current_net or (new_x, new_y) in blocked_by_other_nets:
+                continue
+
+            # skip if the jumppad location is already occupied
+            if any(loc in blocked_by_current_net for loc in jumppad_locations) or any(loc in blocked_by_other_nets for loc in jumppad_locations):
+                continue
+
+            # skip if the new location is out of bounds
+            if not is_within_bounds(new_x, new_y):
+                continue
+
+            # skip if the jumppad location is out of bounds
+            if any(not is_within_bounds(loc[0], loc[1]) for loc in jumppad_locations):
+                continue
+
+            # compute cost to new location
+            new_g = g + JUMP_COST
+
+            # update record and add to heap if this is lower than the previous cost
+            if new_g < g_cost.get((new_x, new_y), float('inf')):
+                g_cost[(new_x, new_y)] = new_g
+
+                # add to heap
                 new_f = new_g + heuristic((new_x, new_y), goal)
-                # compute jumppad location
-                jumppad_locations = compute_jumppad_location(x, y, delta_x, delta_y)
-                new_blocked = blocked + jumppad_locations
-                if new_g < g_cost.get((new_x, new_y), float('inf')):
-                    g_cost[(new_x, new_y)] = new_g
-                    heapq.heappush(open_heap, (new_f, new_g, new_x, new_y, (x, y), new_blocked))
+                new_blocked = blocked_by_current_net + jumppad_locations
+                heapq.heappush(open_heap, (new_f, new_g, new_x, new_y, (x, y), new_blocked))
     
     # Reconstruct path if goal reached
     if not goal_reached:
@@ -139,25 +182,12 @@ def a_star_route(start, goal, global_blocked):
         used_jumppads = abs(current_node[0] - previous_node[0]) > 1 or abs(current_node[1] - previous_node[1]) > 1
         if used_jumppads:
             # calculate jump pad coordinates
-            if previous_node[0] == current_node[0]:
-                # vertical jump
-                start_pad_x = current_node[0]
-                direction = 1 if previous_node[1] < current_node[1] else -1
-                start_pad_y = previous_node[1] + direction * 1
-                end_pad_x = current_node[0]
-                end_pad_y = current_node[1] - direction * 1
-                pads.append((start_pad_x, start_pad_y))
-                pads.append((end_pad_x, end_pad_y))
-            else:
-                # horizontal jump
-                start_pad_y = current_node[1]
-                direction = 1 if previous_node[0] < current_node[0] else -1
-                start_pad_x = previous_node[0] + direction * 1
-                end_pad_y = current_node[1]
-                end_pad_x = current_node[0] - direction * 1
-                pads.append((start_pad_x, start_pad_y))
-                pads.append((end_pad_x, end_pad_y))
-
+            x = previous_node[0]
+            y = previous_node[1]
+            dx = current_node[0] - previous_node[0]
+            dy = current_node[1] - previous_node[1]
+            jumppad_locations = compute_jumppad_location(x, y, dx, dy)
+            pads.extend(jumppad_locations)
         current_node = previous_node
     path.reverse()
 
