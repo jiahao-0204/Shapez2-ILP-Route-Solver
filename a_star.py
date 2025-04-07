@@ -50,7 +50,7 @@ def a_star_route(start, goal, blocked_by_other_nets):
     start_f = heuristic(start, goal)
     start_g = 0
     previous_node_location = None
-    blocked_by_current_net = []
+    blocked_by_current_net = [start]
     heapq.heappush(heap, (start_f, start_g, start, previous_node_location, blocked_by_current_net))
     
 
@@ -217,10 +217,15 @@ if __name__ == "__main__":
     STEP_MOVES = [(0,1), (0,-1), (1,0), (-1,0)]    
     JUMP_MOVES = [(0,  (JUMP_SIZE + 3)), (0, -(JUMP_SIZE + 3)), ( (JUMP_SIZE + 3), 0), (-(JUMP_SIZE + 3), 0)]
 
-    nets = [((5, 0), (5, 5)),   # Net 0: from (1,0) to (1,5)
-            ((0, 3), (9, 3)),   # Net 1: from (0,2) to (5,2)
-            ((4, 4), (9, 9))]   # Net 2: from (4,4) to (9,9)
+    # problem setup
+    nets = [((3, 0), (12, 5)),
+            ((0, 0), (0, 5)),
+            ((1, 0), (4, 5)),
+            ((2, 0), (8, 5))]
     blocked_tiles = set()
+
+
+    # program execution
     paths = []
     pads = []
     for i, (start, goal) in enumerate(nets):
