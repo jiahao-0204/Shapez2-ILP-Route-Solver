@@ -43,7 +43,7 @@ def a_star_route(start, goal, blocked_by_other_nets):
     # A* search structures
     heap = [] # priority queue for open nodes (which node to explore next using f_score)
     came_from = {}  # a previous to current node mapping for backtracking
-    g_cost = {start: 0} # cost to reach a node
+    cost_so_far = {start: 0} # cost to reach a node
 
 
     # initialize the heap with the start node
@@ -52,6 +52,7 @@ def a_star_route(start, goal, blocked_by_other_nets):
     previous_node_location = None
     blocked_by_current_net = [start]
     heapq.heappush(heap, (start_f, start_g, start, previous_node_location, blocked_by_current_net))
+    came_from[start] = None
     
 
     # Perform the search
@@ -59,14 +60,7 @@ def a_star_route(start, goal, blocked_by_other_nets):
     while heap:
 
         # get the node with the lowest f_score from the heap and start the search
-        _, current_g, current_node_location, previous_node_location, blocked_by_current_net = heapq.heappop(heap)
-
-        # skip if this node has already been visited
-        if current_node_location in came_from: 
-            continue
-
-        # update came_from
-        came_from[current_node_location] = previous_node_location
+        _, current_cost, current_node_location, previous_node_location, blocked_by_current_net = heapq.heappop(heap)
 
         # skip if we have reached the goal
         if current_node_location == goal:
@@ -95,16 +89,17 @@ def a_star_route(start, goal, blocked_by_other_nets):
                 continue
             
             # compute cost to new node
-            new_g = current_g + STEP_COST
+            new_cost = current_cost + STEP_COST
 
             # update and add to heap if this is lower than the previous cost
-            if new_g < g_cost.get(new_node_location, float('inf')):
-                g_cost[new_node_location] = new_g
+            if new_cost < cost_so_far.get(new_node_location, float('inf')):
+                cost_so_far[new_node_location] = new_cost
 
                 # add to heap to explore
-                new_f = new_g + heuristic(new_node_location, goal)
+                priority = new_cost + heuristic(new_node_location, goal)
                 new_blocked = blocked_by_current_net + [new_node_location]
-                heapq.heappush(heap, (new_f, new_g, new_node_location, current_node_location, new_blocked))
+                heapq.heappush(heap, (priority, new_cost, new_node_location, current_node_location, new_blocked))
+                came_from[new_node_location] = current_node_location
 
         # explore jump neighbors
         for delta in JUMP_MOVES:
@@ -127,16 +122,17 @@ def a_star_route(start, goal, blocked_by_other_nets):
                 continue
 
             # compute cost to new node location
-            new_g = current_g + JUMP_COST
+            new_cost = current_cost + JUMP_COST
 
             # update and add to heap if this is lower than the previous cost
-            if new_g < g_cost.get(new_node_location, float('inf')):
-                g_cost[new_node_location] = new_g
+            if new_cost < cost_so_far.get(new_node_location, float('inf')):
+                cost_so_far[new_node_location] = new_cost
 
                 # add to heap to explore
-                new_f = new_g + heuristic(new_node_location, goal)
+                priority = new_cost + heuristic(new_node_location, goal)
                 new_blocked = blocked_by_current_net + jumppad_locations
-                heapq.heappush(heap, (new_f, new_g, new_node_location, current_node_location, new_blocked))
+                heapq.heappush(heap, (priority, new_cost, new_node_location, current_node_location, new_blocked))
+                came_from[new_node_location] = current_node_location
     
     # skip if we have not reached the goal
     if not goal_reached:
