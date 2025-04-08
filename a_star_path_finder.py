@@ -132,12 +132,12 @@ def pathfinder_route(nets, blocked_by_global_settings):
             break
 
     if not path_is_possible:
-        return None, None
+        return None, None, None
     else:
-        return paths, pads
+        return paths, pads, congestion_cost_map
 
 
-def draw_result(paths, pads):
+def draw_result(paths, pads, congestion_cost_map):
     """Visualize paths and jump pads on a grid."""
     plt.figure(figsize=(6, 6))
     plt.grid(True)
@@ -157,6 +157,12 @@ def draw_result(paths, pads):
             color = colors[i % len(colors)]
             xs, ys = zip(*[(x + 0.5, y + 0.5) for x, y in pad])
             plt.scatter(xs, ys, color=color, s=100, marker='x', label=f'Jump Pad {i}')
+    
+    for tile, count in congestion_cost_map.items():
+        if count > 0:
+            x, y = tile
+            plt.text(x + 0.5, y + 0.5, str(count), fontsize=8, ha='center', va='center', color='black')
+
     plt.legend()
     plt.title("A* Routed Paths with Fixed Jumps")
     plt.show()
@@ -171,8 +177,8 @@ if __name__ == "__main__":
     blocked_tiles = {start for start, end in nets} | {end for start, end in nets}
     blocked_tiles.update({(4, 6), (4, 0)})
 
-    paths, pads = pathfinder_route(nets, blocked_tiles)
+    paths, pads, congestion_cost_map = pathfinder_route(nets, blocked_tiles)
     if paths is None:
         print(f"No route found")
 
-    draw_result(paths, pads)
+    draw_result(paths, pads, congestion_cost_map)
