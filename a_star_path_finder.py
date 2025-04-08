@@ -1,6 +1,7 @@
 import heapq
 import matplotlib.pyplot as plt
 import numpy as np
+from collections import defaultdict
 
 # Configuration
 GRID_SIZE = 20
@@ -11,7 +12,7 @@ MOVES = [(0, 1), (0, -1), (1, 0), (-1, 0)]
 for jump_size in AVAILABLE_JUMP_SIZE:
     MOVES += [(0, jump_size + 3), (0, -(jump_size + 3)),
               (jump_size + 3, 0), (-(jump_size + 3), 0)]
-
+MAX_ITERATIONS = 10
 
 def compute_jumppad_location(node, delta):
     """Return the jumper pad tiles between two nodes if it's a jump."""
@@ -32,7 +33,7 @@ def is_within_bounds(node):
 def heuristic(p, q):
     return abs(p[0] - q[0]) + abs(p[1] - q[1])
 
-def a_star_route(start, goal, blocked_by_other_nets):
+def route_with_congestion_cost(start, goal, blocked_by_global_settings, congestion_cost_map):
     """A* pathfinding with fixed jump support and blocked tile constraints."""
     open_heap = []
     came_from = {}
@@ -48,7 +49,7 @@ def a_star_route(start, goal, blocked_by_other_nets):
         if current == goal:
             break
 
-        blocked = blocked_by_other_nets | set(blocked_by_current_net)
+        blocked = blocked_by_global_settings | set(blocked_by_current_net)
         blocked.discard(start)
         blocked.discard(goal)
 
@@ -61,7 +62,8 @@ def a_star_route(start, goal, blocked_by_other_nets):
                 continue
 
             move_cost = JUMP_COST if is_jump else STEP_COST
-            new_cost = current_cost + move_cost
+            congestion_cost = sum(congestion_cost_map.get(loc, 0) for loc in required_tiles)
+            new_cost = current_cost + move_cost + congestion_cost
 
             if new_cost < cost_so_far.get(next_node, float('inf')):
                 cost_so_far[next_node] = new_cost
@@ -87,6 +89,39 @@ def a_star_route(start, goal, blocked_by_other_nets):
         current = prev
     path.reverse()
     return path, pads
+
+def pathfinder_route(nets, blocked_by_global_settings):
+    paths = [None] * len(nets)
+    pads = [None] * len(nets)
+    congestion_cost_map = defaultdict(int)
+
+    path_is_possible = True
+    for iteration in range(MAX_ITERATIONS):
+        tile_usage_count = {}
+        for i, (start, goal) in enumerate(nets):
+            path, pad = route_with_congestion_cost(start, goal, blocked_by_global_settings, congestion_cost_map)
+
+            if path is None:
+                print(f"Iteration {iteration}, Net {i}: No path is possible, ending pathfinder routing.")
+                path_is_possible = False
+                break
+
+            paths[i] = path
+            pads[i] = pad
+
+            # add to tile usage count
+            for tile in path + pad:
+                tile_usage_count[tile] = tile_usage_count.get(tile, 0) + 1
+
+        # update congestion cost map 
+        for tile, count in tile_usage_count.items():
+            if count > 1:
+                congestion_cost_map[tile] += count - 1
+
+    if not path_is_possible:
+        return None, None
+    else:
+        return paths, pads
 
 
 def draw_result(paths, pads):
@@ -123,17 +158,8 @@ if __name__ == "__main__":
     blocked_tiles = {start for start, end in nets} | {end for start, end in nets}
     blocked_tiles.update({(4, 6), (4, 0)})
 
-    paths = []
-    pads = []
-    for i, (start, goal) in enumerate(nets):
-        path, pad = a_star_route(start, goal, blocked_tiles)
-        if path is None:
-            print(f"Net {i}: no route found")
-        else:
-            paths.append(path)
-            pads.append(pad)
-            blocked_tiles.update(path)
-            blocked_tiles.update(pad)
-            print(f"Net {i} path (length {len(path) - 1}): {path}")
+    paths, pads = pathfinder_route(nets, blocked_tiles)
+    if paths is None:
+        print(f"No route found")
 
     draw_result(paths, pads)
