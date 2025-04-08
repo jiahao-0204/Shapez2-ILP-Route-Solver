@@ -97,7 +97,10 @@ def pathfinder_route(nets, blocked_by_global_settings):
 
     path_is_possible = True
     for iteration in range(MAX_ITERATIONS):
-        tile_usage_count = {}
+        # keep iterating?
+        keep_going = False
+
+        tile_usage_count = defaultdict(int)
         for i, (start, goal) in enumerate(nets):
             path, pad = route_with_congestion_cost(start, goal, blocked_by_global_settings, congestion_cost_map)
 
@@ -105,7 +108,9 @@ def pathfinder_route(nets, blocked_by_global_settings):
                 print(f"Iteration {iteration}, Net {i}: No path is possible, ending pathfinder routing.")
                 path_is_possible = False
                 break
-
+            
+            if path != paths[i] or pad != pads[i]:
+                keep_going = True
             paths[i] = path
             pads[i] = pad
 
@@ -116,7 +121,9 @@ def pathfinder_route(nets, blocked_by_global_settings):
         # update congestion cost map 
         for tile, count in tile_usage_count.items():
             if count > 1:
-                congestion_cost_map[tile] += count - 1
+        if not keep_going:
+            print(f"Iteration {iteration}: No further updates, ending pathfinder routing.")
+            break
 
     if not path_is_possible:
         return None, None
