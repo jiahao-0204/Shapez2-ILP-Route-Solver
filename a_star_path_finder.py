@@ -13,6 +13,8 @@ for jump_size in AVAILABLE_JUMP_SIZE:
     MOVES += [(0, jump_size + 3), (0, -(jump_size + 3)),
               (jump_size + 3, 0), (-(jump_size + 3), 0)]
 MAX_ITERATIONS = 10
+CONGESTION_GROW_RATE = 1
+CONGESTION_DECAY_RATE = 1
 
 def compute_jumppad_location(node, delta):
     """Return the jumper pad tiles between two nodes if it's a jump."""
@@ -121,6 +123,10 @@ def pathfinder_route(nets, blocked_by_global_settings):
         # update congestion cost map 
         for tile, count in tile_usage_count.items():
             if count > 1:
+                congestion_cost_map[tile] += (count - 1) * CONGESTION_GROW_RATE
+            else:
+                congestion_cost_map[tile] *= CONGESTION_DECAY_RATE
+
         if not keep_going:
             print(f"Iteration {iteration}: No further updates, ending pathfinder routing.")
             break
