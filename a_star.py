@@ -19,28 +19,34 @@ class Action:
         return f"Action (direction={self.direction}, is_jump={self.is_jump}, jump_size={self.jump_size}, is_immediate_jump={self.is_immediate_jump}), cost={self.get_cost()}"
 
     def get_end_location(self, start): 
-        if self.is_jump:
-            if self.is_immediate_jump:
-                end_location = start + self.direction * (self.jump_size + 2)
-            else:
-                end_location = start + self.direction * (self.jump_size + 3)
+        if self.is_immediate_jump:
+            move_vector = self.direction * (self.jump_size + 2)
+        elif self.is_jump:
+            move_vector = self.direction * (self.jump_size + 3)            
         else:
-            end_location = start + self.direction * STEP_SIZE
+            move_vector = self.direction * STEP_SIZE
+        end_location = start + move_vector
         
         # convert to tuple
+        end_location = tuple(end_location)
+
+        # return
         return tuple(end_location)
     
     def get_pad_location(self, start):
         if self.is_immediate_jump:
             pad_locations = [start, start + self.direction * (self.jump_size + 1)]
-        else:
+        elif self.is_jump:
             pad_locations = [start + self.direction * 1, start + self.direction * (self.jump_size + 2)]
+        else:
+            pad_locations = []
         
         # convert to tuples
         pad_locations = [tuple(tile) for tile in pad_locations]
+
+        # return
         return pad_locations
         
-    
     def get_required_tiles(self, start):
         # list of numpy arrays
         required_tiles = self.get_pad_location(start) + [self.get_end_location(start)]
@@ -50,11 +56,10 @@ class Action:
         return required_tiles
 
     def get_cost(self):
-        if self.is_jump:
-            if self.is_immediate_jump:
+        if self.is_immediate_jump:
                 return JUMP_COST - 1
-            else:
-                return JUMP_COST
+        elif self.is_jump:
+            return JUMP_COST
         else:
             return STEP_COST
 
