@@ -118,7 +118,7 @@ def pathfinder_route(nets, blocked_by_global_settings):
 
             # add to tile usage count
             for tile in path + pad:
-                tile_usage_count[tile] = tile_usage_count.get(tile, 0) + 1
+                tile_usage_count[tile] += 1
 
         # update congestion cost map 
         for tile, count in tile_usage_count.items():
