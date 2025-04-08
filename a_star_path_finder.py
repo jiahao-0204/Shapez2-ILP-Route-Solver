@@ -134,10 +134,28 @@ def a_star_route_with_congestion_cost(start, goal, blocked_by_global_settings, c
             new_cost = current_cost + move_cost + congestion_cost
 
             if new_cost < cost_so_far.get(next_node, float('inf')):
-                cost_so_far[next_node] = new_cost
+                
+                # the problem is, due to possibility of jump, the cost at this location is lower than not using jump, but jump can not actually get here.
+                # don't update cost if the move is jump
+                if is_jump:
+                    cost_so_far[next_node] = new_cost
                 came_from[next_node] = current
                 new_blocked = blocked_by_current_net + required_tiles
-                priority = new_cost + heuristic(next_node, goal)
+                
+                if (is_jump):
+                    # compute direction
+                    # from delta compute direction vector allowing delta to be zero
+                    if delta[0] > 0:
+                        direction = (1, 0)
+                    elif delta[0] < 0:
+                        direction = (-1, 0)
+                    elif delta[1] > 0:
+                        direction = (0, 1)
+                    elif delta[1] < 0:
+                        direction = (0, -1)
+                    priority = new_cost + heuristic_jump(next_node, goal, direction)
+                else:
+                    priority = new_cost + heuristic_belt(next_node, goal)
                 heapq.heappush(open_heap, (priority, new_cost, next_node, new_blocked))
 
     if goal not in came_from:
@@ -242,7 +260,7 @@ if __name__ == "__main__":
     #         ((1, 0), (4, 5)),
     #         ((2, 0), (8, 5)),
     #         ((3, 0), (12, 5))]
-    nets = [((0, 0), (18, 18))]
+    nets = [((0, 0), (0, 7))]
 
     blocked_tiles = {start for start, end in nets} | {end for start, end in nets}
     blocked_tiles.update({(4, 6), (4, 0)})
@@ -252,3 +270,5 @@ if __name__ == "__main__":
         print(f"No route found")
 
     draw_result(paths, pads, congestion_cost_map)
+
+# print(heuristic((0, 0), (4, 10)))
