@@ -9,68 +9,77 @@ STEP_COST = 1
 JUMP_COST = 3
 
 class Action:
-    def __init__(self, direction, is_jump = False, jump_size = 0, is_immediate_jump = False):
+    def __init__(self, direction):
         self.direction = direction
-        self.is_jump = is_jump
-        self.jump_size = jump_size
-        self.is_immediate_jump = is_immediate_jump
 
     def __str__(self):
-        return f"Action (direction={self.direction}, is_jump={self.is_jump}, jump_size={self.jump_size}, is_immediate_jump={self.is_immediate_jump}), cost={self.get_cost()}"
+        return (f"{self.__class__.__name__} (direction={self.direction}), "
+                f"cost={self.get_cost()}")
 
-    def get_end_location(self, start): 
-        if self.is_immediate_jump:
-            move_vector = self.direction * (self.jump_size + 2)
-        elif self.is_jump:
-            move_vector = self.direction * (self.jump_size + 3)            
-        else:
-            move_vector = self.direction * STEP_SIZE
-        end_location = start + move_vector
-        
-        # convert to tuple
-        end_location = tuple(end_location)
+    def get_end_location(self, start):
+        raise NotImplementedError
 
-        # return
-        return tuple(end_location)
-    
     def get_pad_location(self, start):
-        if self.is_immediate_jump:
-            pad_locations = [start, start + self.direction * (self.jump_size + 1)]
-        elif self.is_jump:
-            pad_locations = [start + self.direction * 1, start + self.direction * (self.jump_size + 2)]
-        else:
-            pad_locations = []
-        
-        # convert to tuples
-        pad_locations = [tuple(tile) for tile in pad_locations]
+        raise NotImplementedError
 
-        # return
-        return pad_locations
-        
     def get_required_tiles(self, start):
-        # list of numpy arrays
-        required_tiles = self.get_pad_location(start) + [self.get_end_location(start)]
-        
-        # convert to tuples
-        required_tiles = [tuple(tile) for tile in required_tiles]
-        return required_tiles
+        return self.get_pad_location(start) + [self.get_end_location(start)]
 
     def get_cost(self):
-        if self.is_immediate_jump:
-                return JUMP_COST - 1
-        elif self.is_jump:
-            return JUMP_COST
-        else:
-            return STEP_COST
+        raise NotImplementedError
+
+class StepAction(Action):
+    def get_end_location(self, start):
+        return tuple(start + self.direction * STEP_SIZE)
+
+    def get_pad_location(self, start):
+        return []
+
+    def get_cost(self):
+        return STEP_COST
+
+class JumpAction(Action):
+    def __init__(self, direction, jump_size):
+        super().__init__(direction)
+        self.jump_size = jump_size
+
+    def get_end_location(self, start):
+        return tuple(start + self.direction * (self.jump_size + 3))
+
+    def get_pad_location(self, start):
+        pads = [
+            start + self.direction * 1,
+            start + self.direction * (self.jump_size + 2)
+        ]
+        return [tuple(p) for p in pads]
+
+    def get_cost(self):
+        return JUMP_COST
+
+class ImmediateJumpAction(JumpAction):
+    def get_end_location(self, start):
+        return tuple(start + self.direction * (self.jump_size + 2))
+
+    def get_pad_location(self, start):
+        pads = [
+            start,
+            start + self.direction * (self.jump_size + 1)
+        ]
+        return [tuple(p) for p in pads]
+
+    def get_cost(self):
+        return JUMP_COST - 1
 
 
 AVAILABLE_JUMP_SIZE = [1, 2, 3, 4]
 DIRECTIONS = [np.array([1, 0]), np.array([-1, 0]), np.array([0, 1]), np.array([0, -1])]
+
 DEFAULT_ACTION_LIST = []
 for direction in DIRECTIONS:
-    DEFAULT_ACTION_LIST.append(Action(direction, False))
+    DEFAULT_ACTION_LIST.append(StepAction(direction))
     for jump_size in AVAILABLE_JUMP_SIZE:
-        DEFAULT_ACTION_LIST.append(Action(direction, True, jump_size))
+        DEFAULT_ACTION_LIST.append(JumpAction(direction, jump_size))
+        DEFAULT_ACTION_LIST.append(ImmediateJumpAction(direction, jump_size))
 
 
 def compute_jumppad_location(node, delta):
