@@ -7,12 +7,12 @@ from collections import defaultdict
 GRID_SIZE = 20
 AVAILABLE_JUMP_SIZE = [1, 2, 3, 4]
 STEP_COST = 1
-JUMP_COST = 3
+JUMP_COST = 30
 MOVES = [(0, 1), (0, -1), (1, 0), (-1, 0)]
 for jump_size in AVAILABLE_JUMP_SIZE:
     MOVES += [(0, jump_size + 3), (0, -(jump_size + 3)),
               (jump_size + 3, 0), (-(jump_size + 3), 0)]
-MAX_ITERATIONS = 10
+MAX_ITERATIONS = 5
 CONGESTION_GROW_RATE = 1
 CONGESTION_DECAY_RATE = 1
 
@@ -35,7 +35,7 @@ def is_within_bounds(node):
 def heuristic(p, q):
     return abs(p[0] - q[0]) + abs(p[1] - q[1])
 
-def route_with_congestion_cost(start, goal, blocked_by_global_settings, congestion_cost_map):
+def route_with_congestion_cost_and_path_sharing_reward(start, goal, blocked_by_global_settings, congestion_cost_map, path_sharing_reward_map):
     """A* pathfinding with fixed jump support and blocked tile constraints."""
     open_heap = []
     came_from = {}
@@ -65,7 +65,9 @@ def route_with_congestion_cost(start, goal, blocked_by_global_settings, congesti
 
             move_cost = JUMP_COST if is_jump else STEP_COST
             congestion_cost = sum(congestion_cost_map.get(loc, 0) for loc in required_tiles)
-            new_cost = current_cost + move_cost + congestion_cost
+            path_sharing_reward = sum(path_sharing_reward_map.get(loc, 0) for loc in required_tiles)
+            new_cost = current_cost + move_cost + congestion_cost - path_sharing_reward
+            new_cost = max(new_cost, 0)  # Ensure cost is non-negative
 
             if new_cost < cost_so_far.get(next_node, float('inf')):
                 cost_so_far[next_node] = new_cost
@@ -96,6 +98,7 @@ def pathfinder_route(nets, blocked_by_global_settings):
     paths = [None] * len(nets)
     pads = [None] * len(nets)
     congestion_cost_map = defaultdict(int)
+    path_sharing_reward_map = defaultdict(lambda: defaultdict(int))
 
     path_is_possible = True
     for iteration in range(MAX_ITERATIONS):
@@ -103,8 +106,10 @@ def pathfinder_route(nets, blocked_by_global_settings):
         keep_going = False
 
         tile_usage_count = defaultdict(int)
+        # dict of index to dict
+        tile_usage_count_by_other_nets = defaultdict(lambda: defaultdict(int))        
         for i, (start, goal) in enumerate(nets):
-            path, pad = route_with_congestion_cost(start, goal, blocked_by_global_settings, congestion_cost_map)
+            path, pad = route_with_congestion_cost_and_path_sharing_reward(start, goal, blocked_by_global_settings, congestion_cost_map, path_sharing_reward_map[i])
 
             if path is None:
                 print(f"Iteration {iteration}, Net {i}: No path is possible, ending pathfinder routing.")
@@ -116,20 +121,50 @@ def pathfinder_route(nets, blocked_by_global_settings):
             paths[i] = path
             pads[i] = pad
 
-            # add to tile usage count
-            for tile in path + pad:
-                tile_usage_count[tile] += 1
-
-        # update congestion cost map 
-        for tile, count in tile_usage_count.items():
-            if count > 1:
-                congestion_cost_map[tile] += (count - 1) * CONGESTION_GROW_RATE
-            else:
-                congestion_cost_map[tile] *= CONGESTION_DECAY_RATE
-
         if not keep_going:
             print(f"Iteration {iteration}: No further updates, ending pathfinder routing.")
             break
+    
+        # compute global tile usage count
+        for path, pad in zip(paths, pads):
+            if path is None:
+                continue
+            for tile in path:
+                tile_usage_count[tile] += 1
+            if pad is None:
+                continue
+            for tile in pad:
+                tile_usage_count[tile] += 1
+        
+        # # update congestion cost map 
+        # for tile, count in tile_usage_count.items():
+        #     if count > 1:
+        #         congestion_cost_map[tile] += (count - 1) * CONGESTION_GROW_RATE
+        #     else:
+        #         congestion_cost_map[tile] *= CONGESTION_DECAY_RATE
+
+        # compute tile usage by other nets
+        for i in range(len(nets)):
+            for j in range(len(nets)):
+                if j == i:
+                    continue
+                path, pad = paths[j], pads[j]
+                if path is None:
+                    continue
+                for tile in path:
+                    tile_usage_count_by_other_nets[i][tile] += 1
+                if pad is None:
+                    continue
+                for tile in pad:
+                    tile_usage_count_by_other_nets[i][tile] += 1
+        
+        # update path sharing reward map for each net
+        for i in range(len(nets)):
+            for tile, count in tile_usage_count_by_other_nets[i].items():
+                if count > 0:
+                    path_sharing_reward_map[i][tile] = 1
+
+        draw_result(paths, pads, congestion_cost_map)
 
     if not path_is_possible:
         return None, None, None
@@ -169,10 +204,10 @@ def draw_result(paths, pads, congestion_cost_map):
 
 
 if __name__ == "__main__":
-    nets = [((0, 0), (0, 5)),
-            ((1, 0), (4, 5)),
-            ((2, 0), (8, 5)),
-            ((3, 0), (12, 5))]
+    nets = [((0, 0), (0, 15)),
+            ((1, 0), (4, 15)),
+            ((2, 0), (8, 15)),
+            ((3, 0), (12, 15))]
 
     blocked_tiles = {start for start, end in nets} | {end for start, end in nets}
     blocked_tiles.update({(4, 6), (4, 0)})
