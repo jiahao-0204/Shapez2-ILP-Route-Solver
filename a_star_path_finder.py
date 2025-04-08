@@ -35,7 +35,7 @@ def is_within_bounds(node):
 def heuristic(p, q):
     return abs(p[0] - q[0]) + abs(p[1] - q[1])
 
-def route_with_congestion_cost(start, goal, blocked_by_global_settings, congestion_cost_map):
+def a_star_route_with_congestion_cost(start, goal, blocked_by_global_settings, congestion_cost_map):
     """A* pathfinding with fixed jump support and blocked tile constraints."""
     open_heap = []
     came_from = {}
@@ -104,7 +104,7 @@ def pathfinder_route(nets, blocked_by_global_settings):
 
         tile_usage_count = defaultdict(int)
         for i, (start, goal) in enumerate(nets):
-            path, pad = route_with_congestion_cost(start, goal, blocked_by_global_settings, congestion_cost_map)
+            path, pad = a_star_route_with_congestion_cost(start, goal, blocked_by_global_settings, congestion_cost_map)
 
             if path is None:
                 print(f"Iteration {iteration}, Net {i}: No path is possible, ending pathfinder routing.")
