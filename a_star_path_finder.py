@@ -169,10 +169,11 @@ def draw_result(paths, pads, congestion_cost_map):
 
 
 if __name__ == "__main__":
-    nets = [((0, 0), (0, 5)),
-            ((1, 0), (4, 5)),
-            ((2, 0), (8, 5)),
-            ((3, 0), (12, 5))]
+    # nets = [((0, 0), (0, 5)),
+    #         ((1, 0), (4, 5)),
+    #         ((2, 0), (8, 5)),
+    #         ((3, 0), (12, 5))]
+    nets = [((0, 0), (0, 19))]
 
     blocked_tiles = {start for start, end in nets} | {end for start, end in nets}
     blocked_tiles.update({(4, 6), (4, 0)})
