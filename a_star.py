@@ -56,7 +56,11 @@ class JumpAction(Action):
     def get_cost(self):
         return JUMP_COST
 
-class ImmediateJumpAction(JumpAction):
+class ImmediateJumpAction(Action):
+    def __init__(self, direction, jump_size):
+        super().__init__(direction)
+        self.jump_size = jump_size
+        
     def get_end_location(self, start):
         return tuple(start + self.direction * (self.jump_size + 2))
 
