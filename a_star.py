@@ -4,13 +4,68 @@ import numpy as np
 
 # Configuration
 GRID_SIZE = 20
-AVAILABLE_JUMP_SIZE = [1, 2, 3, 4]
+STEP_SIZE = 1
 STEP_COST = 1
 JUMP_COST = 3
-MOVES = [(0, 1), (0, -1), (1, 0), (-1, 0)]
-for jump_size in AVAILABLE_JUMP_SIZE:
-    MOVES += [(0, jump_size + 3), (0, -(jump_size + 3)),
-              (jump_size + 3, 0), (-(jump_size + 3), 0)]
+
+class Action:
+    def __init__(self, direction, is_jump = False, jump_size = 0, is_immediate_jump = False):
+        self.direction = direction
+        self.is_jump = is_jump
+        self.jump_size = jump_size
+        self.is_immediate_jump = is_immediate_jump
+
+    def __str__(self):
+        return f"Action (direction={self.direction}, is_jump={self.is_jump}, jump_size={self.jump_size}, is_immediate_jump={self.is_immediate_jump}), cost={self.get_cost()}"
+
+    def get_end_location(self, start): 
+        if self.is_jump:
+            if self.is_immediate_jump:
+                end_location = start + self.direction * (self.jump_size + 2)
+            else:
+                end_location = start + self.direction * (self.jump_size + 3)
+        else:
+            end_location = start + self.direction * STEP_SIZE
+        
+        # convert to tuple
+        return tuple(end_location)
+    
+    def get_pad_location(self, start):
+        if self.is_immediate_jump:
+            pad_locations = [start, start + self.direction * (self.jump_size + 1)]
+        else:
+            pad_locations = [start + self.direction * 1, start + self.direction * (self.jump_size + 2)]
+        
+        # convert to tuples
+        pad_locations = [tuple(tile) for tile in pad_locations]
+        return pad_locations
+        
+    
+    def get_required_tiles(self, start):
+        # list of numpy arrays
+        required_tiles = self.get_pad_location(start) + [self.get_end_location(start)]
+        
+        # convert to tuples
+        required_tiles = [tuple(tile) for tile in required_tiles]
+        return required_tiles
+
+    def get_cost(self):
+        if self.is_jump:
+            if self.is_immediate_jump:
+                return JUMP_COST - 1
+            else:
+                return JUMP_COST
+        else:
+            return STEP_COST
+
+
+AVAILABLE_JUMP_SIZE = [1, 2, 3, 4]
+DIRECTIONS = [np.array([1, 0]), np.array([-1, 0]), np.array([0, 1]), np.array([0, -1])]
+DEFAULT_ACTION_LIST = []
+for direction in DIRECTIONS:
+    DEFAULT_ACTION_LIST.append(Action(direction, False))
+    for jump_size in AVAILABLE_JUMP_SIZE:
+        DEFAULT_ACTION_LIST.append(Action(direction, True, jump_size))
 
 
 def compute_jumppad_location(node, delta):
@@ -52,16 +107,14 @@ def a_star_route(start, goal, blocked_by_other_nets):
         blocked.discard(start)
         blocked.discard(goal)
 
-        for delta in MOVES:
-            next_node = (current[0] + delta[0], current[1] + delta[1])
-            is_jump = abs(delta[0]) > 1 or abs(delta[1]) > 1
-            required_tiles = [next_node] + compute_jumppad_location(current, delta) if is_jump else [next_node]
+        for action in DEFAULT_ACTION_LIST:
+            next_node = action.get_end_location(current)
+            required_tiles = action.get_required_tiles(current)
 
             if any(not is_within_bounds(loc) or loc in blocked for loc in required_tiles):
                 continue
 
-            move_cost = JUMP_COST if is_jump else STEP_COST
-            new_cost = current_cost + move_cost
+            new_cost = current_cost + action.get_cost()
 
             if new_cost < cost_so_far.get(next_node, float('inf')):
                 cost_so_far[next_node] = new_cost
