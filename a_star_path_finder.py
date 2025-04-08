@@ -32,8 +32,49 @@ def is_within_bounds(node):
     x, y = node
     return 0 <= x < GRID_SIZE and 0 <= y < GRID_SIZE
 
-def heuristic(p, q):
-    return abs(p[0] - q[0]) + abs(p[1] - q[1])
+# heuristic is different if current node is a jump vs belt
+def heuristic_belt(p, q):
+    # if they are not on the same row or column, at least one cost will incur
+    cost = 0
+    delta_x = abs(p[0] - q[0])
+    delta_y = abs(p[1] - q[1])
+
+    # compute cost to move in x and y direction separately
+    required_space = [x + 2 for x in AVAILABLE_JUMP_SIZE]
+    required_space.sort(reverse=True)
+    if delta_x > 0:
+        gap_x = delta_x - 1
+        cost += 1
+
+        for space in required_space:
+            while True:
+                if gap_x >= space:
+                    gap_x -= space
+                    cost += 2
+                    continue
+                else:
+                    break
+        cost += gap_x
+    
+    if delta_y > 0:
+        gap_y = delta_y - 1
+        cost += 1
+
+        for space in required_space:
+            while True:
+                if gap_y >= space:
+                    gap_y -= space
+                    cost += 2
+                    continue
+                else:
+                    break
+        cost += gap_y
+
+    return cost
+
+def heuristic_jump(p, q, direction):
+    new_p = (p[0] + direction[0], p[1] + direction[1])
+    return 1 + heuristic_belt(new_p, q)
 
 def a_star_route_with_congestion_cost(start, goal, blocked_by_global_settings, congestion_cost_map):
     """A* pathfinding with fixed jump support and blocked tile constraints."""
@@ -41,7 +82,7 @@ def a_star_route_with_congestion_cost(start, goal, blocked_by_global_settings, c
     came_from = {}
     cost_so_far = {}
 
-    heapq.heappush(open_heap, (heuristic(start, goal), 0, start, []))
+    heapq.heappush(open_heap, (heuristic_belt(start, goal), 0, start, []))
     cost_so_far[start] = 0
     came_from[start] = None
 
