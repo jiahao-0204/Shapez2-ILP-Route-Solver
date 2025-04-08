@@ -107,14 +107,19 @@ def heuristic(p, q):
 
 def a_star_route(start, goal, blocked_by_other_nets):
     """A* pathfinding with fixed jump support and blocked tile constraints."""
+
+    # initialize a* variable
     open_heap = []
     came_from = {}
+    action_taken_to_reach_this_node = {}
     cost_so_far = {}
 
+    # add the start node
     heapq.heappush(open_heap, (heuristic(start, goal), 0, start, []))
     cost_so_far[start] = 0
     came_from[start] = None
 
+    # a* search
     while open_heap:
         _, current_cost, current, blocked_by_current_net = heapq.heappop(open_heap)
 
@@ -137,26 +142,45 @@ def a_star_route(start, goal, blocked_by_other_nets):
             if new_cost < cost_so_far.get(next_node, float('inf')):
                 cost_so_far[next_node] = new_cost
                 came_from[next_node] = current
+                action_taken_to_reach_this_node[next_node] = action
                 new_blocked = blocked_by_current_net + required_tiles
                 priority = new_cost + heuristic(next_node, goal)
                 heapq.heappush(open_heap, (priority, new_cost, next_node, new_blocked))
 
+    # return none if goal is not reachable
     if goal not in came_from:
+        print("Goal not reachable")
         return None, None
 
-    # Reconstruct path and jump pads
+    # compute path
     path = []
-    pads = []
     current = goal
     while current:
         path.append(current)
-        prev = came_from[current]
-        if prev:
-            dx, dy = current[0] - prev[0], current[1] - prev[1]
-            if abs(dx) > 1 or abs(dy) > 1:
-                pads.extend(compute_jumppad_location(prev, (dx, dy)))
-        current = prev
+        current = came_from[current]
     path.reverse()
+
+    # compute jump pads
+    pads = []
+    current = goal
+    while current:
+        prev = came_from[current]
+        action = action_taken_to_reach_this_node.get(current)
+        if action:
+            pads.extend(action.get_pad_location(prev))
+        current = prev
+    
+    # compute cost
+    cost = 0
+    current = goal
+    while current:
+        action = action_taken_to_reach_this_node.get(current)
+        if action:
+            cost += action.get_cost()
+        current = came_from[current]
+    print(f"Total cost: {cost}")
+
+    # return
     return path, pads
 
 
@@ -190,7 +214,7 @@ if __name__ == "__main__":
     #         ((1, 0), (4, 5)),
     #         ((2, 0), (8, 5)),
     #         ((3, 0), (12, 5))]
-    nets = [((0, 0), (0, 15))]
+    nets = [((0, 0), (0, 1))]
 
     blocked_tiles = {start for start, end in nets} | {end for start, end in nets}
 
