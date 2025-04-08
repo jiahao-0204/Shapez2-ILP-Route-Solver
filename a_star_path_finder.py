@@ -7,11 +7,11 @@ from collections import defaultdict
 GRID_SIZE = 20
 AVAILABLE_JUMP_SIZE = [1, 2, 3, 4]
 STEP_COST = 1
-JUMP_COST = 3
+JUMP_COST = 2
 MOVES = [(0, 1), (0, -1), (1, 0), (-1, 0)]
 for jump_size in AVAILABLE_JUMP_SIZE:
-    MOVES += [(0, jump_size + 3), (0, -(jump_size + 3)),
-              (jump_size + 3, 0), (-(jump_size + 3), 0)]
+    MOVES += [(0, jump_size + 2), (0, -(jump_size + 2)),
+              (jump_size + 2, 0), (-(jump_size + 2), 0)]
 MAX_ITERATIONS = 10
 CONGESTION_GROW_RATE = 1
 CONGESTION_DECAY_RATE = 1
@@ -22,10 +22,10 @@ def compute_jumppad_location(node, delta):
     dx, dy = delta
     if dx:
         direction = 1 if dx > 0 else -1
-        return [(x + direction, y), (x + direction * (abs(dx) - 1), y)]
+        return [(x + direction, y), (x + direction * (abs(dx)), y)]
     elif dy:
         direction = 1 if dy > 0 else -1
-        return [(x, y + direction), (x, y + direction * (abs(dy) - 1))]
+        return [(x, y + direction), (x, y + direction * (abs(dy)))]
     return []
 
 def is_within_bounds(node):
@@ -48,14 +48,39 @@ def a_star_route_with_congestion_cost(start, goal, blocked_by_global_settings, c
     while open_heap:
         _, current_cost, current, blocked_by_current_net = heapq.heappop(open_heap)
 
-        if current == goal:
-            break
+        # came from jump
+        last_move = (current[0] - came_from[current][0], current[1] - came_from[current][1]) if came_from[current] else (0, 0)
+        came_from_jump = last_move[0] > 1 or last_move[1] > 1
+
+        if came_from_jump:
+            # compute possible moves
+            possible_moves = []
+            if last_move[0] > 0:
+                possible_moves.append((1, 0))
+                for jump_size in AVAILABLE_JUMP_SIZE:
+                    possible_moves.append((jump_size + 2, 0))
+            elif last_move[0] < 0:
+                possible_moves.append((-1, 0))
+                for jump_size in AVAILABLE_JUMP_SIZE:
+                    possible_moves.append((-(jump_size + 2), 0))
+            if last_move[1] > 0:
+                possible_moves.append((0, 1))
+                for jump_size in AVAILABLE_JUMP_SIZE:
+                    possible_moves.append((0, jump_size + 2))
+            elif last_move[1] < 0:
+                possible_moves.append((0, -1))
+                for jump_size in AVAILABLE_JUMP_SIZE:
+                    possible_moves.append((0, -(jump_size + 2)))
+        else:
+            if current == goal:
+                break
+            possible_moves = MOVES    
 
         blocked = blocked_by_global_settings | set(blocked_by_current_net)
         blocked.discard(start)
         blocked.discard(goal)
 
-        for delta in MOVES:
+        for delta in possible_moves:
             next_node = (current[0] + delta[0], current[1] + delta[1])
             is_jump = abs(delta[0]) > 1 or abs(delta[1]) > 1
             required_tiles = [next_node] + compute_jumppad_location(current, delta) if is_jump else [next_node]
@@ -82,12 +107,15 @@ def a_star_route_with_congestion_cost(start, goal, blocked_by_global_settings, c
     pads = []
     current = goal
     while current:
-        path.append(current)
         prev = came_from[current]
         if prev:
             dx, dy = current[0] - prev[0], current[1] - prev[1]
             if abs(dx) > 1 or abs(dy) > 1:
                 pads.extend(compute_jumppad_location(prev, (dx, dy)))
+            else:
+                path.append(current)
+        else:
+            path.append(current)
         current = prev
     path.reverse()
     return path, pads
@@ -173,7 +201,7 @@ if __name__ == "__main__":
     #         ((1, 0), (4, 5)),
     #         ((2, 0), (8, 5)),
     #         ((3, 0), (12, 5))]
-    nets = [((0, 0), (0, 19))]
+    nets = [((0, 0), (18, 18))]
 
     blocked_tiles = {start for start, end in nets} | {end for start, end in nets}
     blocked_tiles.update({(4, 6), (4, 0)})
