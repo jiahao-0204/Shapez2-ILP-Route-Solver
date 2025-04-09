@@ -160,10 +160,10 @@ def a_star_route(start, goal, blocked_by_other_nets):
     print(f"Path cost: {cost}")
     
     # return
-    return path, pads
+    return path, belts, pads
 
 
-def draw_result(paths, pads):
+def draw_result(paths, belts, pads):
     """Visualize paths and jump pads on a grid."""
     plt.figure(figsize=(6, 6))
     plt.grid(True)
@@ -177,7 +177,12 @@ def draw_result(paths, pads):
     for i, path in enumerate(paths):
         color = colors[i % len(colors)]
         xs, ys = zip(*[(x + 0.5, y + 0.5) for x, y in path])
-        plt.plot(xs, ys, marker='o', color=color, label=f'Net {i}')
+        plt.plot(xs, ys, color=color, label=f'Net {i}')
+    for i, belt in enumerate(belts):
+        if belt:
+            color = colors[i % len(colors)]
+            xs, ys = zip(*[(x + 0.5, y + 0.5) for x, y in belt])
+            plt.scatter(xs, ys, color=color, s=50, marker='o', label=f'Belt {i}')
     for i, pad in enumerate(pads):
         if pad:
             color = colors[i % len(colors)]
@@ -198,16 +203,18 @@ if __name__ == "__main__":
     blocked_tiles = {start for start, end in nets} | {end for start, end in nets}
 
     paths = []
+    belts = []
     pads = []
     for i, (start, goal) in enumerate(nets):
-        path, pad = a_star_route(start, goal, blocked_tiles)
+        path, belt, pad = a_star_route(start, goal, blocked_tiles)
         if path is None:
             print(f"Net {i}: no route found")
         else:
             paths.append(path)
+            belts.append(belt)
             pads.append(pad)
-            blocked_tiles.update(path)
+            blocked_tiles.update(belt)
             blocked_tiles.update(pad)
             print(f"Net {i} path (length {len(path) - 1}): {path}")
 
-    draw_result(paths, pads)
+    draw_result(paths, belts, pads)
