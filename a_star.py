@@ -1,6 +1,7 @@
 import heapq
 import matplotlib.pyplot as plt
 import numpy as np
+from typing import List
 
 # Configuration
 GRID_SIZE = 20
@@ -9,47 +10,46 @@ STEP_COST = 1
 JUMP_COST = 3
 
 class Action:
-    def __init__(self, direction):
-        self.direction = direction
+    def __init__(self, direction: tuple) -> None:
+        self.direction = np.array(direction)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return (f"{self.__class__.__name__} (direction={self.direction}), "
                 f"cost={self.get_cost()}")
-
-    def get_end_location(self, start):
+                
+    def get_end_location(self, start: tuple) -> tuple:
         raise NotImplementedError
 
-    def get_pad_location(self, start):
+    def get_pad_locations(self, start: tuple) -> List[tuple]:
         raise NotImplementedError
 
-    def get_path_location(self, start):
+    def get_path_locations(self, start: tuple) -> List[tuple]:
         raise NotImplementedError
 
-    def get_blocked_tiles(self, start):
+    def get_blocked_tiles(self, start: tuple) -> List[tuple]:
         raise NotImplementedError
     
-    def get_required_free_tiles(self, start):
-        raise NotImplementedError    
+    def get_required_free_tiles(self, start: tuple) -> List[tuple]:
+        raise NotImplementedError
 
-    def get_cost(self):
+    def get_cost(self) -> int:
         raise NotImplementedError
 
 class StepAction(Action):
-    def get_end_location(self, start):
-        return tuple(start + self.direction * STEP_SIZE)
+    def get_end_location(self, start: tuple) -> tuple:
+        return tuple(np.array(start) + self.direction * 1)
 
-    def get_pad_location(self, start):
+    def get_pad_locations(self, start: tuple) -> List[tuple]:
         return []
     
-    def get_path_location(self, start):
-        return tuple(start)
+    def get_path_locations(self, start: tuple) -> List[tuple]:
+        return [start]
     
-    def get_required_free_tiles(self, start):
-        required_free_tiles = [self.get_path_location(start), self.get_end_location(start)]
-        return required_free_tiles
+    def get_required_free_tiles(self, start: tuple) -> List[tuple]:
+        return self.get_path_locations(start) + [self.get_end_location(start)]
 
-    def get_blocked_tiles(self, start):
-        return [self.get_path_location(start)]
+    def get_blocked_tiles(self, start: tuple) -> List[tuple]:
+        return self.get_path_locations(start)
 
     def get_cost(self):
         return 1
@@ -60,25 +60,22 @@ class ImmediateJumpAction(Action):
         super().__init__(direction)
         self.jump_size = jump_size
         
-    def get_end_location(self, start):
-        return tuple(start + self.direction * (self.jump_size + 2))
+    def get_end_location(self, start: tuple) -> tuple:
+        return tuple(np.array(start) + self.direction * (self.jump_size + 2))
 
-    def get_pad_location(self, start):
-        pads = [
-            start,
-            start + self.direction * (self.jump_size + 1)
-        ]
-        return [tuple(p) for p in pads]
+    def get_pad_locations(self, start: tuple) -> List[tuple]:
+        pads = [start, tuple(np.array(start) + self.direction * (self.jump_size + 1))]
+        return pads
 
-    def get_path_location(self, start):
-        return None
+    def get_path_locations(self, start: tuple) -> List[tuple]:
+        return []
     
-    def get_required_free_tiles(self, start):
-        required_free_tiles = [self.get_pad_location(start)[0], self.get_end_location(start)]
+    def get_required_free_tiles(self, start: tuple) -> List[tuple]:
+        required_free_tiles = self.get_pad_locations(start) + [self.get_end_location(start)]
         return required_free_tiles
 
-    def get_blocked_tiles(self, start):
-        return self.get_pad_location(start)
+    def get_blocked_tiles(self, start: tuple) -> List[tuple]:
+        return self.get_pad_locations(start)
 
     def get_cost(self):
         return 2
@@ -156,8 +153,8 @@ def a_star_route(start, goal, blocked_by_other_nets):
         prev = came_from[current]
         action = action_taken_to_reach_this_node.get(current)
         if action:
-            if action.get_path_location(prev) is not None:
-                path.append(action.get_path_location(prev))
+            if action.get_path_locations(prev) is not None:
+                path += action.get_path_locations(prev)
         current = prev
     path.append(start)
     path.reverse()
@@ -169,7 +166,7 @@ def a_star_route(start, goal, blocked_by_other_nets):
         prev = came_from[current]
         action = action_taken_to_reach_this_node.get(current)
         if action:
-            pads.extend(action.get_pad_location(prev))
+            pads += action.get_pad_locations(prev)
             print(f"{prev} to {current}: {action}")
         current = prev
     
@@ -217,7 +214,7 @@ if __name__ == "__main__":
     #         ((1, 0), (4, 5)),
     #         ((2, 0), (8, 5)),
     #         ((3, 0), (12, 5))]
-    nets = [((0, 0), (0, 1))]
+    nets = [((0, 0), (0, 13)),]
 
     blocked_tiles = {start for start, end in nets} | {end for start, end in nets}
 
