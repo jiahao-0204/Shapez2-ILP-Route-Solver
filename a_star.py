@@ -97,19 +97,6 @@ for direction in DIRECTIONS:
         DEFAULT_ACTION_LIST.append(JumpAction(direction, jump_size))
         DEFAULT_ACTION_LIST.append(ImmediateJumpAction(direction, jump_size))
 
-
-def compute_jumppad_location(node, delta):
-    """Return the jumper pad tiles between two nodes if it's a jump."""
-    x, y = node
-    dx, dy = delta
-    if dx:
-        direction = 1 if dx > 0 else -1
-        return [(x + direction, y), (x + direction * (abs(dx) - 1), y)]
-    elif dy:
-        direction = 1 if dy > 0 else -1
-        return [(x, y + direction), (x, y + direction * (abs(dy) - 1))]
-    return []
-
 def is_within_bounds(node):
     x, y = node
     return 0 <= x < GRID_SIZE and 0 <= y < GRID_SIZE
@@ -166,10 +153,16 @@ def a_star_route(start, goal, blocked_by_other_nets):
 
     # compute path
     path = []
+    path.append(goal)
     current = goal
     while current:
-        path.append(current)
-        current = came_from[current]
+        prev = came_from[current]
+        action = action_taken_to_reach_this_node.get(current)
+        if action:
+            if action.get_path_location(prev) is not None:
+                path.append(action.get_path_location(prev))
+        current = prev
+    path.append(start)
     path.reverse()
 
     # compute jump pads
@@ -180,6 +173,7 @@ def a_star_route(start, goal, blocked_by_other_nets):
         action = action_taken_to_reach_this_node.get(current)
         if action:
             pads.extend(action.get_pad_location(prev))
+            print(f"{prev} to {current}: {action}")
         current = prev
     
     # compute cost
