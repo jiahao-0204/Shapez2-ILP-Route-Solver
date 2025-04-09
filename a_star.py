@@ -25,8 +25,11 @@ class Action:
     def get_path_location(self, start):
         raise NotImplementedError
 
-    def get_required_tiles(self, start):
-        return self.get_pad_location(start) + [self.get_end_location(start)]
+    def get_blocked_tiles(self, start):
+        raise NotImplementedError
+    
+    def get_required_free_tiles(self, start):
+        raise NotImplementedError    
 
     def get_cost(self):
         raise NotImplementedError
@@ -40,30 +43,17 @@ class StepAction(Action):
     
     def get_path_location(self, start):
         return tuple(start)
-
-    def get_cost(self):
-        return STEP_COST
-
-class JumpAction(Action):
-    def __init__(self, direction, jump_size):
-        super().__init__(direction)
-        self.jump_size = jump_size
-
-    def get_end_location(self, start):
-        return tuple(start + self.direction * (self.jump_size + 3))
-
-    def get_pad_location(self, start):
-        pads = [
-            start + self.direction * 1,
-            start + self.direction * (self.jump_size + 2)
-        ]
-        return [tuple(p) for p in pads]
     
-    def get_path_location(self, start):
-        return tuple(start)
+    def get_required_free_tiles(self, start):
+        required_free_tiles = [self.get_path_location(start), self.get_end_location(start)]
+        return required_free_tiles
+
+    def get_blocked_tiles(self, start):
+        return [self.get_path_location(start)]
 
     def get_cost(self):
-        return 2
+        return 1
+    
 
 class ImmediateJumpAction(Action):
     def __init__(self, direction, jump_size):
@@ -82,9 +72,17 @@ class ImmediateJumpAction(Action):
 
     def get_path_location(self, start):
         return None
+    
+    def get_required_free_tiles(self, start):
+        required_free_tiles = [self.get_pad_location(start)[0], self.get_end_location(start)]
+        return required_free_tiles
+
+    def get_blocked_tiles(self, start):
+        return self.get_pad_location(start)
 
     def get_cost(self):
-        return 1
+        return 2
+
 
 
 AVAILABLE_JUMP_SIZE = [1, 2, 3, 4]
@@ -94,7 +92,6 @@ DEFAULT_ACTION_LIST = []
 for direction in DIRECTIONS:
     DEFAULT_ACTION_LIST.append(StepAction(direction))
     for jump_size in AVAILABLE_JUMP_SIZE:
-        DEFAULT_ACTION_LIST.append(JumpAction(direction, jump_size))
         DEFAULT_ACTION_LIST.append(ImmediateJumpAction(direction, jump_size))
 
 def is_within_bounds(node):
@@ -131,7 +128,7 @@ def a_star_route(start, goal, blocked_by_other_nets):
 
         for action in DEFAULT_ACTION_LIST:
             next_node = action.get_end_location(current)
-            required_tiles = action.get_required_tiles(current)
+            required_tiles = action.get_required_free_tiles(current)
 
             if any(not is_within_bounds(loc) or loc in blocked for loc in required_tiles):
                 continue
@@ -142,7 +139,7 @@ def a_star_route(start, goal, blocked_by_other_nets):
                 cost_so_far[next_node] = new_cost
                 came_from[next_node] = current
                 action_taken_to_reach_this_node[next_node] = action
-                new_blocked = blocked_by_current_net + required_tiles
+                new_blocked = blocked_by_current_net + action.get_blocked_tiles(current)
                 priority = new_cost + heuristic(next_node, goal)
                 heapq.heappush(open_heap, (priority, new_cost, next_node, new_blocked))
 
