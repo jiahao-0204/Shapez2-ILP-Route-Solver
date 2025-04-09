@@ -23,14 +23,14 @@ class Action:
     def get_pad_locations(self, start: tuple) -> List[tuple]:
         raise NotImplementedError
 
-    def get_path_locations(self, start: tuple) -> List[tuple]:
+    def get_belt_locations(self, start: tuple) -> List[tuple]:
         raise NotImplementedError
 
     def get_blocked_tiles(self, start: tuple) -> List[tuple]:
-        return self.get_pad_locations(start) + self.get_path_locations(start)
+        return self.get_pad_locations(start) + self.get_belt_locations(start)
     
     def get_required_free_tiles(self, start: tuple) -> List[tuple]:
-        return self.get_pad_locations(start) + self.get_path_locations(start) + [self.get_end_location(start)]
+        return self.get_pad_locations(start) + self.get_belt_locations(start) + [self.get_end_location(start)]
 
     def get_cost(self) -> int:
         raise NotImplementedError
@@ -42,7 +42,7 @@ class StepAction(Action):
     def get_pad_locations(self, start: tuple) -> List[tuple]:
         return []
     
-    def get_path_locations(self, start: tuple) -> List[tuple]:
+    def get_belt_locations(self, start: tuple) -> List[tuple]:
         return [start]
     
     def get_cost(self):
@@ -61,7 +61,7 @@ class ImmediateJumpAction(Action):
         pads = [start, tuple(np.array(start) + self.direction * (self.jump_size + 1))]
         return pads
 
-    def get_path_locations(self, start: tuple) -> List[tuple]:
+    def get_belt_locations(self, start: tuple) -> List[tuple]:
         return []
 
     def get_cost(self):
@@ -111,7 +111,7 @@ def a_star_route(start, goal, blocked_by_other_nets):
         blocked.discard(goal)
 
         for action in DEFAULT_ACTION_LIST:
-            
+
             # skip if action is jump and is not in the same direction as the previous action
             if isinstance(action, ImmediateJumpAction):
                 prev_action = action_taken_to_reach_this_node.get(current)
@@ -139,41 +139,26 @@ def a_star_route(start, goal, blocked_by_other_nets):
         print("Goal not reachable")
         return None, None
 
-    # compute path
-    path = []
-    path.append(goal)
-    current = goal
-    while current:
-        prev = came_from[current]
-        action = action_taken_to_reach_this_node.get(current)
-        if action:
-            if action.get_path_locations(prev) is not None:
-                path += action.get_path_locations(prev)
-        current = prev
-    path.append(start)
-    path.reverse()
-
-    # compute jump pads
+    # compute path, belts and pads
+    path = [goal]
+    belts = []
     pads = []
-    current = goal
-    while current:
-        prev = came_from[current]
-        action = action_taken_to_reach_this_node.get(current)
-        if action:
-            pads += action.get_pad_locations(prev)
-            print(f"{prev} to {current}: {action}")
-        current = prev
-    
-    # compute cost
     cost = 0
     current = goal
     while current:
-        action = action_taken_to_reach_this_node.get(current)
-        if action:
-            cost += action.get_cost()
-        current = came_from[current]
-    print(f"Total cost: {cost}")
+        prev = came_from[current]
+        prev_action = action_taken_to_reach_this_node.get(current)
+        if prev:
+            path.append(prev)
+            belts += prev_action.get_belt_locations(prev)
+            pads += prev_action.get_pad_locations(prev)
+            cost += prev_action.get_cost()
+        current = prev
+    path.reverse()
 
+    # print
+    print(f"Path cost: {cost}")
+    
     # return
     return path, pads
 
