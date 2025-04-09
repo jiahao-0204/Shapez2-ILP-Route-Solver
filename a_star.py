@@ -1,5 +1,6 @@
 import heapq
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 import numpy as np
 from typing import List, Optional
 from collections import defaultdict
@@ -309,8 +310,15 @@ def draw_result(nets, paths, belts, pads, congestion_cost_map: Optional[dict] = 
             if cost > 0:
                 x, y = tile
                 plt.text(x + 0.5, y + 0.5, str(cost), ha='center', va='center', fontsize=8, color='black')
+    # legend    
+    custom_legend = [
+        Line2D([0], [0], marker='*', color='grey', markersize=12, linestyle='None', label='Goal'),
+        Line2D([0], [0], marker='x', color='grey', markersize=8, linestyle='None', label='Jump Pad'),
+        Line2D([0], [0], marker='o', color='grey', markerfacecolor='grey', markersize=6, linestyle='None', label='Belt'),
+        Line2D([0], [0], color='grey', label='Path'),
+    ]
+    plt.legend(handles=custom_legend)
 
-    plt.legend()
     plt.title("Sequential Dijkstra (Single Terminal Nets)")
     plt.show()
 
