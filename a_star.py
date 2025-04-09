@@ -2,6 +2,7 @@ import heapq
 import matplotlib.pyplot as plt
 import numpy as np
 from typing import List, Optional
+from collections import defaultdict
 
 # Configuration
 GRID_SIZE = 20
@@ -114,7 +115,7 @@ def is_within_bounds(node):
 def heuristic(p, q):
     return abs(p[0] - q[0]) + abs(p[1] - q[1])
 
-def a_star_route(start: Keypoint, goal: Keypoint, blocked_by_other_nets: set):
+def a_star_route(start: Keypoint, goal: Keypoint, blocked_by_other_nets: set, congestion_cost_map: Optional[dict] = None):
     """A* pathfinding with fixed jump support and blocked tile constraints."""
 
     # initialize a* variable
@@ -163,6 +164,12 @@ def a_star_route(start: Keypoint, goal: Keypoint, blocked_by_other_nets: set):
 
             new_cost = current_cost + action.get_cost()
 
+            # if congestion cost map is provided, add congestion cost
+            if congestion_cost_map is not None:
+                # add congestion cost for each blocked tile
+                congestion_cost = sum(congestion_cost_map.get(tile, 0) for tile in action.get_blocked_tiles(current))
+                new_cost += congestion_cost
+
             if new_cost < cost_so_far.get(next_node, float('inf')):
                 cost_so_far[next_node] = new_cost
                 came_from[next_node] = current
@@ -193,9 +200,6 @@ def a_star_route(start: Keypoint, goal: Keypoint, blocked_by_other_nets: set):
         current = prev
     path.reverse()
 
-    # print
-    print(f"Path cost: {cost}")
-    
     # return
     return path, belts, pads
 
@@ -219,8 +223,41 @@ def sequential_routing(nets, blocked_by_other_nets: set):
 
     return paths, belts, pads
 
+def pathfinder_routing(nets, num_of_iterations: int, blocked_by_other_nets: set):
+    paths = [None] * len(nets)
+    pads = [None] * len(nets)
+    belts = [None] * len(nets)
+    blocked_by_other_nets = set(blocked_by_other_nets) # shallow copy
 
-def draw_result(nets, paths, belts, pads):
+    congestion_cost_map = defaultdict(float)
+    for _ in range(num_of_iterations):
+
+        for i, (start, goal) in enumerate(nets):
+            path, belt, pad = a_star_route(start, goal, blocked_by_other_nets, congestion_cost_map)
+            paths[i] = path
+            belts[i] = belt
+            pads[i] = pad
+        
+        # update tile usage count
+        tile_usage_count = defaultdict(int)
+        for belt in belts:
+            if belt:
+                for tile in belt:
+                    tile_usage_count[tile] += 1
+        for pad in pads:
+            if pad:
+                for tile in pad:
+                    tile_usage_count[tile] += 1
+        
+        # update congestion cost map
+        for tile, count in tile_usage_count.items():
+            if count > 1:
+                congestion_cost_map[tile] += count - 1
+
+        draw_result(nets, paths, belts, pads, congestion_cost_map)
+    return paths, belts, pads
+
+def draw_result(nets, paths, belts, pads, congestion_cost_map: Optional[dict] = None):
     """Visualize paths and jump pads on a grid."""
     plt.figure(figsize=(6, 6))
     plt.grid(True)
@@ -264,6 +301,13 @@ def draw_result(nets, paths, belts, pads):
         plt.scatter(goal.position[0] + 0.5, goal.position[1] + 0.5,
             color=color, s=100, marker='*', edgecolors='black', linewidths=0.8, label=f'Goal {i}', zorder=2)
 
+    # draw congestion cost map
+    if congestion_cost_map:
+        for tile, cost in congestion_cost_map.items():
+            if cost > 0:
+                x, y = tile
+                plt.text(x + 0.5, y + 0.5, str(cost), ha='center', va='center', fontsize=8, color='black')
+
     plt.legend()
     plt.title("A* Routed Paths with Fixed Jumps")
     plt.show()
@@ -276,14 +320,15 @@ if __name__ == "__main__":
     #         ((3, 0), (12, 5))]
 
     nets = [
-        (Keypoint((0, 0)), Keypoint((0, 5), acceptable_belt_directions=[UP])),
-        (Keypoint((1, 0)), Keypoint((4, 5), acceptable_belt_directions=[UP])),
-        (Keypoint((2, 0)), Keypoint((8, 5), acceptable_belt_directions=[UP])),
-        (Keypoint((3, 0)), Keypoint((12, 5), acceptable_belt_directions=[UP])),
+        (Keypoint((0, 0)), Keypoint((0, 5), acceptable_belt_directions=[UP, LEFT, RIGHT])),
+        (Keypoint((1, 0)), Keypoint((4, 5), acceptable_belt_directions=[UP, LEFT, RIGHT])),
+        (Keypoint((2, 0)), Keypoint((8, 5), acceptable_belt_directions=[UP, LEFT, RIGHT])),
+        (Keypoint((3, 0)), Keypoint((12, 5), acceptable_belt_directions=[UP, LEFT, RIGHT])),
     ]
 
     blocked_tiles = {start.position for start, end in nets} | {end.position for start, end in nets}
 
+    # paths, belts, pads = pathfinder_routing(nets, num_of_iterations=5, blocked_by_other_nets=blocked_tiles)
     paths, belts, pads = sequential_routing(nets, blocked_by_other_nets=blocked_tiles)
 
     draw_result(nets, paths, belts, pads)
