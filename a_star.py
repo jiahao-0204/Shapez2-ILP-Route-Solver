@@ -9,6 +9,8 @@ BOARD_DIMENSION = (15, 6)
 STEP_SIZE = 1
 STEP_COST = 1
 JUMP_COST = 3
+# AVAILABLE_JUMP_SIZE = [1, 2, 3, 4]
+AVAILABLE_JUMP_SIZE = [4]
 
 UP = np.array([0, 1])
 DOWN = np.array([0, -1])
@@ -99,7 +101,6 @@ class Keypoint:
         else:
             raise TypeError(f"Unsupported action type: {type(action)}")
 
-AVAILABLE_JUMP_SIZE = [1, 2, 3, 4]
 DIRECTIONS = [UP, DOWN, LEFT, RIGHT]
 
 DEFAULT_ACTION_LIST = []
