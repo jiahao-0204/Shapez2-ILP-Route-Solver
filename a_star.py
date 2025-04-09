@@ -1,7 +1,7 @@
 import heapq
 import matplotlib.pyplot as plt
 import numpy as np
-from typing import List
+from typing import List, Optional
 
 # Configuration
 GRID_SIZE = 20
@@ -73,21 +73,30 @@ class ImmediateJumpAction(Action):
         return 2
 
 class Keypoint:
-    def __init__(self, position: tuple[int, int], acceptable_pad_directions: List[np.ndarray] = [UP], acceptable_belt_direction: List[np.ndarray] = [UP, DOWN, LEFT, RIGHT]) -> None:
+    def __init__(self,
+                 position: tuple[int, int],
+                 acceptable_pad_directions: Optional[List[np.ndarray]] = None,
+                 acceptable_belt_directions: Optional[List[np.ndarray]] = None) -> None:
         self.position = position
-        self.acceptable_pad_directions = acceptable_pad_directions
-        self.acceptable_belt_direction = acceptable_belt_direction
-
+        self.acceptable_pad_directions = acceptable_pad_directions if acceptable_pad_directions is not None else [UP]
+        self.acceptable_belt_directions = acceptable_belt_directions if acceptable_belt_directions is not None else [UP, DOWN, LEFT, RIGHT]
+    
+    def __repr__(self):
+        return f"Keypoint(position={self.position})"
+    
     def matches_position(self, other: tuple[int, int]) -> bool:
         return self.position == other
 
-    def allows_action(self, action: Action) -> bool:
+    def _direction_allowed(self, direction: np.ndarray, allowed: List[np.ndarray]) -> bool:
+        return any(np.array_equal(direction, d) for d in allowed)
+
+    def is_valid_action(self, action: Action) -> bool:
         if isinstance(action, StepAction):
-            return any(np.array_equal(action.direction, belt_direction) for belt_direction in self.acceptable_belt_direction)
-        if isinstance(action, ImmediateJumpAction):
-            return any(np.array_equal(action.direction, pad_direction) for pad_direction in self.acceptable_pad_directions)
+            return self._direction_allowed(action.direction, self.acceptable_belt_directions)
+        elif isinstance(action, ImmediateJumpAction):
+            return self._direction_allowed(action.direction, self.acceptable_pad_directions)
         else:
-            raise ValueError("Unknown action type")
+            raise TypeError(f"Unsupported action type: {type(action)}")
 
 AVAILABLE_JUMP_SIZE = [1, 2, 3, 4]
 DIRECTIONS = [UP, DOWN, LEFT, RIGHT]
@@ -145,11 +154,11 @@ def a_star_route(start: Keypoint, goal: Keypoint, blocked_by_other_nets: set):
                 continue
                 
             # skip if location is at start and direction is not up
-            if start.matches_position(current) and not start.allows_action(action):
+            if start.matches_position(current) and not start.is_valid_action(action):
                 continue
 
             # skip if next node is at goal but direction is not up
-            if goal.matches_position(next_node) and not goal.allows_action(action):
+            if goal.matches_position(next_node) and not goal.is_valid_action(action):
                 continue
 
             new_cost = current_cost + action.get_cost()
@@ -247,10 +256,10 @@ if __name__ == "__main__":
     #         ((3, 0), (12, 5))]
 
     nets = [
-        (Keypoint((0, 0)), Keypoint((0, 5), acceptable_belt_direction=[UP])),
-        (Keypoint((1, 0)), Keypoint((4, 5), acceptable_belt_direction=[UP])),
-        (Keypoint((2, 0)), Keypoint((8, 5), acceptable_belt_direction=[UP])),
-        (Keypoint((3, 0)), Keypoint((12, 5), acceptable_belt_direction=[UP])),
+        (Keypoint((0, 0)), Keypoint((0, 5), acceptable_belt_directions=[UP])),
+        (Keypoint((1, 0)), Keypoint((4, 5), acceptable_belt_directions=[UP])),
+        (Keypoint((2, 0)), Keypoint((8, 5), acceptable_belt_directions=[UP])),
+        (Keypoint((3, 0)), Keypoint((12, 5), acceptable_belt_directions=[UP])),
     ]
 
     blocked_tiles = {start.position for start, end in nets} | {end.position for start, end in nets}
