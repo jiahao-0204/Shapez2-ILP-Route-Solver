@@ -137,7 +137,7 @@ def a_star_route(start, goal, blocked_by_other_nets):
     # return none if goal is not reachable
     if goal not in came_from:
         print("Goal not reachable")
-        return None, None
+        return None, None, None
 
     # compute path, belts and pads
     path = [goal]
