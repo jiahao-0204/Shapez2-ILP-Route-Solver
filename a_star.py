@@ -27,10 +27,10 @@ class Action:
         raise NotImplementedError
 
     def get_blocked_tiles(self, start: tuple) -> List[tuple]:
-        raise NotImplementedError
+        return self.get_pad_locations(start) + self.get_path_locations(start)
     
     def get_required_free_tiles(self, start: tuple) -> List[tuple]:
-        raise NotImplementedError
+        return self.get_pad_locations(start) + self.get_path_locations(start) + [self.get_end_location(start)]
 
     def get_cost(self) -> int:
         raise NotImplementedError
@@ -45,12 +45,6 @@ class StepAction(Action):
     def get_path_locations(self, start: tuple) -> List[tuple]:
         return [start]
     
-    def get_required_free_tiles(self, start: tuple) -> List[tuple]:
-        return self.get_path_locations(start) + [self.get_end_location(start)]
-
-    def get_blocked_tiles(self, start: tuple) -> List[tuple]:
-        return self.get_path_locations(start)
-
     def get_cost(self):
         return 1
     
@@ -69,13 +63,6 @@ class ImmediateJumpAction(Action):
 
     def get_path_locations(self, start: tuple) -> List[tuple]:
         return []
-    
-    def get_required_free_tiles(self, start: tuple) -> List[tuple]:
-        required_free_tiles = self.get_pad_locations(start) + [self.get_end_location(start)]
-        return required_free_tiles
-
-    def get_blocked_tiles(self, start: tuple) -> List[tuple]:
-        return self.get_pad_locations(start)
 
     def get_cost(self):
         return 2
