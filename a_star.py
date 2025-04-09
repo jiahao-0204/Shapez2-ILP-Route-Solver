@@ -310,7 +310,7 @@ def draw_result(nets, paths, belts, pads, congestion_cost_map: Optional[dict] = 
                 plt.text(x + 0.5, y + 0.5, str(cost), ha='center', va='center', fontsize=8, color='black')
 
     plt.legend()
-    plt.title("A* Routed Paths with Fixed Jumps")
+    plt.title("Sequential Dijkstra (Single Terminal Nets)")
     plt.show()
 
 
