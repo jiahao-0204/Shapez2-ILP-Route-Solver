@@ -9,6 +9,11 @@ STEP_SIZE = 1
 STEP_COST = 1
 JUMP_COST = 3
 
+UP = np.array([0, 1])
+DOWN = np.array([0, -1])
+LEFT = np.array([-1, 0])
+RIGHT = np.array([1, 0])
+
 class Action:
     def __init__(self, direction: tuple) -> None:
         self.direction = np.array(direction)
@@ -84,7 +89,7 @@ class Keypoint:
             raise ValueError("Unknown action type")
 
 AVAILABLE_JUMP_SIZE = [1, 2, 3, 4]
-DIRECTIONS = [np.array([1, 0]), np.array([-1, 0]), np.array([0, 1]), np.array([0, -1])]
+DIRECTIONS = [UP, DOWN, LEFT, RIGHT]
 
 DEFAULT_ACTION_LIST = []
 for direction in DIRECTIONS:
@@ -234,9 +239,11 @@ if __name__ == "__main__":
     #         ((2, 0), (8, 5)),
     #         ((3, 0), (12, 5))]
 
-    up = np.array([0, 1])
     nets = [
-        (Keypoint((0, 0), [up]), Keypoint((18, 18), [up]))
+        (Keypoint((0, 0), [UP]), Keypoint((0, 5), [UP])),
+        (Keypoint((1, 0), [UP]), Keypoint((4, 5), [UP])),
+        (Keypoint((2, 0), [UP]), Keypoint((8, 5), [UP])),
+        (Keypoint((3, 0), [UP]), Keypoint((12, 5), [UP])),
     ]
 
     blocked_tiles = {start.position for start, end in nets} | {end.position for start, end in nets}
