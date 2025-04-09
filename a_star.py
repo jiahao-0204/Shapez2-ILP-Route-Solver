@@ -175,7 +175,8 @@ def a_star_route(start: Keypoint, goal: Keypoint, blocked_by_other_nets: set, co
                 came_from[next_node] = current
                 action_taken_to_reach_this_node[next_node] = action
                 new_blocked = blocked_by_current_net + action.get_blocked_tiles(current)
-                priority = new_cost + heuristic(next_node, goal.position)
+                # priority = new_cost + heuristic(next_node, goal.position)
+                priority = new_cost
                 heapq.heappush(open_heap, (priority, new_cost, next_node, new_blocked))
 
     # return none if goal is not reachable
