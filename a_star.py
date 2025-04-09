@@ -202,18 +202,11 @@ def draw_result(nets, paths, belts, pads):
 
     colors = ['red', 'green', 'blue', 'orange', 'purple', 'cyan', 'magenta', 'brown', 'gray', 'olive']
 
-    # draw goal
-    for i, (start, goal) in enumerate(nets):
-        color = colors[i % len(colors)]
-
-        # draw goal as star
-        plt.scatter(goal.position[0] + 0.5, goal.position[1] + 0.5, color=color, s=100, marker='*', label=f'Goal {i}')
-
     # draw paths
     for i, path in enumerate(paths):
         color = colors[i % len(colors)]
         xs, ys = zip(*[(x + 0.5, y + 0.5) for x, y in path])
-        plt.plot(xs, ys, color=color, label=f'Net {i}')
+        plt.plot(xs, ys, color=color, label=f'Net {i}', zorder=1)
 
     # draw belts
     for i, belt in enumerate(belts):
@@ -228,6 +221,19 @@ def draw_result(nets, paths, belts, pads):
             color = colors[i % len(colors)]
             xs, ys = zip(*[(x + 0.5, y + 0.5) for x, y in pad])
             plt.scatter(xs, ys, color=color, s=100, marker='x', label=f'Jump Pad {i}')
+    
+    # draw keypoint
+    for i, (start, goal) in enumerate(nets):
+        color = colors[i % len(colors)]
+
+        # # draw start as square
+        # plt.scatter(start.position[0] + 0.5, start.position[1] + 0.5,
+        #     color=color, s=20, marker='s', edgecolors='black', linewidths=0.8, label=f'Start {i}', zorder=2)
+
+        # draw goal as star
+        plt.scatter(goal.position[0] + 0.5, goal.position[1] + 0.5,
+            color=color, s=100, marker='*', edgecolors='black', linewidths=0.8, label=f'Goal {i}', zorder=2)
+
     plt.legend()
     plt.title("A* Routed Paths with Fixed Jumps")
     plt.show()
