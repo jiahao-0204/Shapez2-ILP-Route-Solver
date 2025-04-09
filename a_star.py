@@ -319,7 +319,7 @@ def draw_result(nets, paths, belts, pads, congestion_cost_map: Optional[dict] = 
     ]
     plt.legend(handles=custom_legend)
 
-    plt.title("Sequential Dijkstra (Single Terminal Nets)")
+    plt.title("Shapez2: Sequential Dijkstra Routing -- Jiahao")
     plt.show()
 
 
