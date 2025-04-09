@@ -77,10 +77,10 @@ class Keypoint:
         self.position = position
         self.acceptable_pad_directions = acceptable_pad_directions
 
-    def has_same_position_as(self, other: tuple[int, int]) -> bool:
+    def matches_position(self, other: tuple[int, int]) -> bool:
         return self.position == other
 
-    def allow_action(self, action: Action) -> bool:
+    def allows_action(self, action: Action) -> bool:
         if isinstance(action, StepAction):
             return True
         if isinstance(action, ImmediateJumpAction):
@@ -122,7 +122,7 @@ def a_star_route(start: Keypoint, goal: Keypoint, blocked_by_other_nets: set):
     while open_heap:
         _, current_cost, current, blocked_by_current_net = heapq.heappop(open_heap)
 
-        if goal.has_same_position_as(current):
+        if goal.matches_position(current):
             break
 
         blocked = blocked_by_other_nets | set(blocked_by_current_net)
@@ -144,11 +144,11 @@ def a_star_route(start: Keypoint, goal: Keypoint, blocked_by_other_nets: set):
                 continue
                 
             # skip if location is at start and direction is not up
-            if start.has_same_position_as(current) and not start.allow_action(action):
+            if start.matches_position(current) and not start.allows_action(action):
                 continue
 
             # skip if next node is at goal but direction is not up
-            if goal.has_same_position_as(next_node) and not goal.allow_action(action):
+            if goal.matches_position(next_node) and not goal.allows_action(action):
                 continue
 
             new_cost = current_cost + action.get_cost()
