@@ -67,7 +67,21 @@ class ImmediateJumpAction(Action):
     def get_cost(self):
         return 2
 
+class Keypoint:
+    def __init__(self, position: tuple[int, int], acceptable_pad_directions: List[np.ndarray]) -> None:
+        self.position = position
+        self.acceptable_pad_directions = acceptable_pad_directions
 
+    def has_same_position_as(self, other: tuple[int, int]) -> bool:
+        return self.position == other
+
+    def allow_action(self, action: Action) -> bool:
+        if isinstance(action, StepAction):
+            return True
+        if isinstance(action, ImmediateJumpAction):
+            return any(np.array_equal(action.direction, pad_direction) for pad_direction in self.acceptable_pad_directions)
+        else:
+            raise ValueError("Unknown action type")
 
 AVAILABLE_JUMP_SIZE = [1, 2, 3, 4]
 DIRECTIONS = [np.array([1, 0]), np.array([-1, 0]), np.array([0, 1]), np.array([0, -1])]
@@ -85,7 +99,7 @@ def is_within_bounds(node):
 def heuristic(p, q):
     return abs(p[0] - q[0]) + abs(p[1] - q[1])
 
-def a_star_route(start, goal, blocked_by_other_nets):
+def a_star_route(start: Keypoint, goal: Keypoint, blocked_by_other_nets: set):
     """A* pathfinding with fixed jump support and blocked tile constraints."""
 
     # initialize a* variable
@@ -95,20 +109,20 @@ def a_star_route(start, goal, blocked_by_other_nets):
     cost_so_far = {}
 
     # add the start node
-    heapq.heappush(open_heap, (heuristic(start, goal), 0, start, []))
-    cost_so_far[start] = 0
-    came_from[start] = None
+    heapq.heappush(open_heap, (heuristic(start.position, goal.position), 0, start.position, []))
+    cost_so_far[start.position] = 0
+    came_from[start.position] = None
 
     # a* search
     while open_heap:
         _, current_cost, current, blocked_by_current_net = heapq.heappop(open_heap)
 
-        if current == goal:
+        if goal.has_same_position_as(current):
             break
 
         blocked = blocked_by_other_nets | set(blocked_by_current_net)
-        blocked.discard(start)
-        blocked.discard(goal)
+        blocked.discard(start.position)
+        blocked.discard(goal.position)
 
         for action in DEFAULT_ACTION_LIST:
 
@@ -123,6 +137,14 @@ def a_star_route(start, goal, blocked_by_other_nets):
 
             if any(not is_within_bounds(loc) or loc in blocked for loc in required_tiles):
                 continue
+                
+            # skip if location is at start and direction is not up
+            if start.has_same_position_as(current) and not start.allow_action(action):
+                continue
+
+            # skip if next node is at goal but direction is not up
+            if goal.has_same_position_as(next_node) and not goal.allow_action(action):
+                continue
 
             new_cost = current_cost + action.get_cost()
 
@@ -131,20 +153,20 @@ def a_star_route(start, goal, blocked_by_other_nets):
                 came_from[next_node] = current
                 action_taken_to_reach_this_node[next_node] = action
                 new_blocked = blocked_by_current_net + action.get_blocked_tiles(current)
-                priority = new_cost + heuristic(next_node, goal)
+                priority = new_cost + heuristic(next_node, goal.position)
                 heapq.heappush(open_heap, (priority, new_cost, next_node, new_blocked))
 
     # return none if goal is not reachable
-    if goal not in came_from:
+    if goal.position not in came_from:
         print("Goal not reachable")
         return None, None, None
 
     # compute path, belts and pads
-    path = [goal]
+    path = [goal.position]
     belts = []
     pads = []
     cost = 0
-    current = goal
+    current = goal.position
     while current:
         prev = came_from[current]
         prev_action = action_taken_to_reach_this_node.get(current)
@@ -180,7 +202,7 @@ def draw_result(nets, paths, belts, pads):
         color = colors[i % len(colors)]
 
         # draw goal as star
-        plt.scatter(goal[0] + 0.5, goal[1] + 0.5, color=color, s=100, marker='*', label=f'Goal {i}')
+        plt.scatter(goal.position[0] + 0.5, goal.position[1] + 0.5, color=color, s=100, marker='*', label=f'Goal {i}')
 
     # draw paths
     for i, path in enumerate(paths):
@@ -211,9 +233,13 @@ if __name__ == "__main__":
     #         ((1, 0), (4, 5)),
     #         ((2, 0), (8, 5)),
     #         ((3, 0), (12, 5))]
-    nets = [((0, 0), (18, 18)),]
 
-    blocked_tiles = {start for start, end in nets} | {end for start, end in nets}
+    up = np.array([0, 1])
+    nets = [
+        (Keypoint((0, 0), [up]), Keypoint((18, 18), [up]))
+    ]
+
+    blocked_tiles = {start.position for start, end in nets} | {end.position for start, end in nets}
 
     paths = []
     belts = []
