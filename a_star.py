@@ -73,16 +73,17 @@ class ImmediateJumpAction(Action):
         return 2
 
 class Keypoint:
-    def __init__(self, position: tuple[int, int], acceptable_pad_directions: List[np.ndarray]) -> None:
+    def __init__(self, position: tuple[int, int], acceptable_pad_directions: List[np.ndarray] = [UP], acceptable_belt_direction: List[np.ndarray] = [UP, DOWN, LEFT, RIGHT]) -> None:
         self.position = position
         self.acceptable_pad_directions = acceptable_pad_directions
+        self.acceptable_belt_direction = acceptable_belt_direction
 
     def matches_position(self, other: tuple[int, int]) -> bool:
         return self.position == other
 
     def allows_action(self, action: Action) -> bool:
         if isinstance(action, StepAction):
-            return True
+            return any(np.array_equal(action.direction, belt_direction) for belt_direction in self.acceptable_belt_direction)
         if isinstance(action, ImmediateJumpAction):
             return any(np.array_equal(action.direction, pad_direction) for pad_direction in self.acceptable_pad_directions)
         else:
@@ -246,10 +247,10 @@ if __name__ == "__main__":
     #         ((3, 0), (12, 5))]
 
     nets = [
-        (Keypoint((0, 0), [UP]), Keypoint((0, 5), [UP])),
-        (Keypoint((1, 0), [UP]), Keypoint((4, 5), [UP])),
-        (Keypoint((2, 0), [UP]), Keypoint((8, 5), [UP])),
-        (Keypoint((3, 0), [UP]), Keypoint((12, 5), [UP])),
+        (Keypoint((0, 0)), Keypoint((0, 5), acceptable_belt_direction=[UP])),
+        (Keypoint((1, 0)), Keypoint((4, 5), acceptable_belt_direction=[UP])),
+        (Keypoint((2, 0)), Keypoint((8, 5), acceptable_belt_direction=[UP])),
+        (Keypoint((3, 0)), Keypoint((12, 5), acceptable_belt_direction=[UP])),
     ]
 
     blocked_tiles = {start.position for start, end in nets} | {end.position for start, end in nets}
