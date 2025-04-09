@@ -111,6 +111,13 @@ def a_star_route(start, goal, blocked_by_other_nets):
         blocked.discard(goal)
 
         for action in DEFAULT_ACTION_LIST:
+            
+            # skip if action is jump and is not in the same direction as the previous action
+            if isinstance(action, ImmediateJumpAction):
+                prev_action = action_taken_to_reach_this_node.get(current)
+                if prev_action and not np.array_equal(prev_action.direction, action.direction):
+                    continue
+
             next_node = action.get_end_location(current)
             required_tiles = action.get_required_free_tiles(current)
 
@@ -201,7 +208,7 @@ if __name__ == "__main__":
     #         ((1, 0), (4, 5)),
     #         ((2, 0), (8, 5)),
     #         ((3, 0), (12, 5))]
-    nets = [((0, 0), (0, 13)),]
+    nets = [((0, 0), (18, 18)),]
 
     blocked_tiles = {start for start, end in nets} | {end for start, end in nets}
 
