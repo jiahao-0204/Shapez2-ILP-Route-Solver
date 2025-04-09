@@ -199,6 +199,26 @@ def a_star_route(start: Keypoint, goal: Keypoint, blocked_by_other_nets: set):
     # return
     return path, belts, pads
 
+def sequential_routing(nets, blocked_by_other_nets: set):
+    paths = []
+    belts = []
+    pads = []
+    blocked_by_other_nets = set(blocked_by_other_nets) # shallow copy
+
+    for i, (start, goal) in enumerate(nets):
+        path, belt, pad = a_star_route(start, goal, blocked_tiles)
+        if path is None:
+            print(f"Net {i}: no route found")
+        else:
+            paths.append(path)
+            belts.append(belt)
+            pads.append(pad)
+            blocked_tiles.update(belt)
+            blocked_tiles.update(pad)
+            print(f"Net {i} path (length {len(path) - 1}): {path}")
+
+    return paths, belts, pads
+
 
 def draw_result(nets, paths, belts, pads):
     """Visualize paths and jump pads on a grid."""
@@ -264,19 +284,6 @@ if __name__ == "__main__":
 
     blocked_tiles = {start.position for start, end in nets} | {end.position for start, end in nets}
 
-    paths = []
-    belts = []
-    pads = []
-    for i, (start, goal) in enumerate(nets):
-        path, belt, pad = a_star_route(start, goal, blocked_tiles)
-        if path is None:
-            print(f"Net {i}: no route found")
-        else:
-            paths.append(path)
-            belts.append(belt)
-            pads.append(pad)
-            blocked_tiles.update(belt)
-            blocked_tiles.update(pad)
-            print(f"Net {i} path (length {len(path) - 1}): {path}")
+    paths, belts, pads = sequential_routing(nets, blocked_by_other_nets=blocked_tiles)
 
     draw_result(nets, paths, belts, pads)
