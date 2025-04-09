@@ -22,6 +22,9 @@ class Action:
     def get_pad_location(self, start):
         raise NotImplementedError
 
+    def get_path_location(self, start):
+        raise NotImplementedError
+
     def get_required_tiles(self, start):
         return self.get_pad_location(start) + [self.get_end_location(start)]
 
@@ -34,6 +37,9 @@ class StepAction(Action):
 
     def get_pad_location(self, start):
         return []
+    
+    def get_path_location(self, start):
+        return tuple(start)
 
     def get_cost(self):
         return STEP_COST
@@ -52,9 +58,12 @@ class JumpAction(Action):
             start + self.direction * (self.jump_size + 2)
         ]
         return [tuple(p) for p in pads]
+    
+    def get_path_location(self, start):
+        return tuple(start)
 
     def get_cost(self):
-        return JUMP_COST
+        return 2
 
 class ImmediateJumpAction(Action):
     def __init__(self, direction, jump_size):
@@ -71,8 +80,11 @@ class ImmediateJumpAction(Action):
         ]
         return [tuple(p) for p in pads]
 
+    def get_path_location(self, start):
+        return None
+
     def get_cost(self):
-        return JUMP_COST - 1
+        return 1
 
 
 AVAILABLE_JUMP_SIZE = [1, 2, 3, 4]
