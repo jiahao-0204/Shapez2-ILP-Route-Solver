@@ -5,7 +5,7 @@ from typing import List, Optional
 from collections import defaultdict
 
 # Configuration
-GRID_SIZE = 20
+BOARD_DIMENSION = (15, 6)
 STEP_SIZE = 1
 STEP_COST = 1
 JUMP_COST = 3
@@ -110,7 +110,7 @@ for direction in DIRECTIONS:
 
 def is_within_bounds(node):
     x, y = node
-    return 0 <= x < GRID_SIZE and 0 <= y < GRID_SIZE
+    return 0 <= x < BOARD_DIMENSION[0] and 0 <= y < BOARD_DIMENSION[1]
 
 def heuristic(p, q):
     return abs(p[0] - q[0]) + abs(p[1] - q[1])
@@ -262,10 +262,10 @@ def draw_result(nets, paths, belts, pads, congestion_cost_map: Optional[dict] = 
     """Visualize paths and jump pads on a grid."""
     plt.figure(figsize=(6, 6))
     plt.grid(True)
-    plt.xticks(np.arange(GRID_SIZE + 1))
-    plt.yticks(np.arange(GRID_SIZE + 1))
-    plt.xlim(0, GRID_SIZE)
-    plt.ylim(0, GRID_SIZE)
+    plt.xticks(np.arange(BOARD_DIMENSION[0] + 1))
+    plt.yticks(np.arange(BOARD_DIMENSION[1] + 1))
+    plt.xlim(0, BOARD_DIMENSION[0])
+    plt.ylim(0, BOARD_DIMENSION[1])
     plt.gca().set_aspect('equal')
 
     colors = ['red', 'green', 'blue', 'orange', 'purple', 'cyan', 'magenta', 'brown', 'gray', 'olive']
