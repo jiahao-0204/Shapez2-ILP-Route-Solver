@@ -433,11 +433,13 @@ if __name__ == "__main__":
     #         ((2, 0), (8, 5)),
     #         ((3, 0), (12, 5))]
 
+    acceptable_belt_directions = [UP, LEFT, RIGHT]
+
     nets = [
-        (Keypoint((0, 0)), Keypoint((0, 5), acceptable_belt_directions=[UP, LEFT, RIGHT])),
-        (Keypoint((1, 0)), Keypoint((4, 5), acceptable_belt_directions=[UP, LEFT, RIGHT])),
-        (Keypoint((2, 0)), Keypoint((8, 5), acceptable_belt_directions=[UP, LEFT, RIGHT])),
-        (Keypoint((3, 0)), Keypoint((12, 5), acceptable_belt_directions=[UP, LEFT, RIGHT])),
+        (Keypoint((3, 0)), Keypoint((12, 5), acceptable_belt_directions=acceptable_belt_directions)),
+        (Keypoint((2, 0)), Keypoint((8, 5), acceptable_belt_directions=acceptable_belt_directions)),
+        (Keypoint((1, 0)), Keypoint((4, 5), acceptable_belt_directions=acceptable_belt_directions)),
+        (Keypoint((0, 0)), Keypoint((0, 5), acceptable_belt_directions=acceptable_belt_directions)),
     ]
 
     blocked_tiles = {start.position for start, end in nets} | {end.position for start, end in nets}
