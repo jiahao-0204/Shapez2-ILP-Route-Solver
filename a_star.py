@@ -160,12 +160,7 @@ def a_star_route(start: Keypoint, goal: Keypoint, blocked_by_other_nets: set, co
             # skip if action is not valid from previous action
             if not action.is_valid_from(action_taken_to_reach_this_node[current]):
                 continue
-            
-            # skip if required tiles are blocked
-            required_tiles = action.get_required_free_tiles(current)
-            if any(not is_within_bounds(loc) or loc in blocked for loc in required_tiles):
-                continue
-                
+
             # skip if action is not valid at given location
             if start.matches_position(current) and not start.is_valid_action(action):
                 continue
@@ -175,7 +170,12 @@ def a_star_route(start: Keypoint, goal: Keypoint, blocked_by_other_nets: set, co
             if goal.matches_position(next_node) and not goal.is_valid_action(action):
                 continue
             
-            # if congestion cost map is provided, compute congestion cost
+            # skip if action required tiles are blocked
+            required_tiles = action.get_required_free_tiles(current)
+            if any(not is_within_bounds(loc) or loc in blocked for loc in required_tiles):
+                continue
+            
+            # compute congestion cost if congestion cost map is provided
             congestion_cost = 0
             if congestion_cost_map is not None:
                 # add congestion cost for each blocked tile
