@@ -287,23 +287,33 @@ def draw_result(nets, paths, belts, pads, congestion_cost_map: Optional[dict] = 
 
     # draw paths
     for i, path in enumerate(paths):
+        # skip if path is None
+        if path is None:
+            continue
+        
         color = colors[i % len(colors)]
         xs, ys = zip(*[(x + 0.5, y + 0.5) for x, y in path])
         plt.plot(xs, ys, color=color, label=f'Net {i}', zorder=1)
 
     # draw belts
     for i, belt in enumerate(belts):
-        if belt:
-            color = colors[i % len(colors)]
-            xs, ys = zip(*[(x + 0.5, y + 0.5) for x, y in belt])
-            plt.scatter(xs, ys, color=color, s=50, marker='o', label=f'Belt {i}')
+        # skip if belt is None
+        if belt is None:
+            continue
+        
+        color = colors[i % len(colors)]
+        xs, ys = zip(*[(x + 0.5, y + 0.5) for x, y in belt])
+        plt.scatter(xs, ys, color=color, s=50, marker='o', label=f'Belt {i}')
         
     # draw pads
     for i, pad in enumerate(pads):
-        if pad:
-            color = colors[i % len(colors)]
-            xs, ys = zip(*[(x + 0.5, y + 0.5) for x, y in pad])
-            plt.scatter(xs, ys, color=color, s=100, marker='x', label=f'Jump Pad {i}')
+        # skip if pad is None
+        if pad is None:
+            continue
+        
+        color = colors[i % len(colors)]
+        xs, ys = zip(*[(x + 0.5, y + 0.5) for x, y in pad])
+        plt.scatter(xs, ys, color=color, s=100, marker='x', label=f'Jump Pad {i}')
     
     # draw keypoint
     for i, (start, goal) in enumerate(nets):
