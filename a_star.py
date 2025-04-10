@@ -219,6 +219,87 @@ def a_star_route(start: Keypoint, goal: Keypoint, blocked_by_other_nets: set, co
     # return
     return path, belts, pads
 
+def compute_overlaped_tiles(belts1: Optional[List[tuple]], pads1: Optional[List[tuple]],
+                           belts2: Optional[List[tuple]], pads2: Optional[List[tuple]]) -> set:
+    """Compute overlaped tiles between two sets of belts and pads."""
+    overlaped_tiles = set()
+    if belts1:
+        if belts2:
+            overlaped_tiles.update(set(belts1) & set(belts2))
+        if pads2:
+            overlaped_tiles.update(set(belts1) & set(pads2))
+    if pads1:
+        if pads2:
+            overlaped_tiles.update(set(pads1) & set(pads2))
+        if belts2:
+            overlaped_tiles.update(set(pads1) & set(belts2))
+    return overlaped_tiles
+
+def custom_routing(nets):
+    paths = [None] * len(nets)
+    belts = [None] * len(nets)
+    pads = [None] * len(nets)
+    blocked_tiles = set()
+
+    # add start and end position for blocked tiles
+    blocked_tiles = blocked_tiles | {start.position for start, end in nets} | {end.position for start, end in nets}
+
+    # compute extra cost map
+    extra_cost_map = defaultdict(lambda: defaultdict(float))
+    
+    penalize_amount = 1
+    decay_amount = 1
+
+    for iteration in range(20):
+        for i, (start, goal) in enumerate(nets):
+
+            # update extra cost map for the current net
+
+            # penalize tiles taken by other nets
+            tiles_taken_by_other_nets = set()
+            for j in range(len(nets)):
+                if j == i:
+                    continue
+                # compute tiles taken by other nets
+                if belts[j]:
+                    tiles_taken_by_other_nets.update(belts[j])
+                if pads[j]:
+                    tiles_taken_by_other_nets.update(pads[j])
+            for tile in tiles_taken_by_other_nets:
+                extra_cost_map[i][tile] = penalize_amount
+
+            # penalize overlaped tiles
+            all_overlaped_tiles = set()
+            for j in range(len(nets)):
+                if j == i:
+                    continue
+
+                # compute overlaped tiles
+                overlaped_tiles = compute_overlaped_tiles(belts[i], pads[i], belts[j], pads[j])
+                all_overlaped_tiles.update(overlaped_tiles)
+                for tile in overlaped_tiles:
+                    extra_cost_map[i][tile] += penalize_amount
+            
+            # decay tiles not taken by other nets
+            for tile, cost in extra_cost_map[i].items():
+                if tile not in tiles_taken_by_other_nets:
+                    extra_cost_map[i][tile] = max(0, cost - decay_amount)
+            
+            # decay non overlaped tiles
+            for tile, cost in extra_cost_map[i].items():
+                if tile not in all_overlaped_tiles:
+                    extra_cost_map[i][tile] = max(0, cost - decay_amount)
+
+            path, belt, pad = a_star_route(start, goal, blocked_tiles, extra_cost_map[i])
+            
+            paths[i] = path
+            belts[i] = belt
+            pads[i] = pad
+        
+            draw_result(nets, paths, belts, pads, extra_cost_map[i])
+
+    return paths, belts, pads
+
 def sequential_routing(nets, blocked_by_other_nets: set):
     paths = []
     belts = []
