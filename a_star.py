@@ -235,27 +235,20 @@ def compute_overlaped_tiles(belts1: Optional[List[tuple]], pads1: Optional[List[
             overlaped_tiles.update(set(pads1) & set(belts2))
     return overlaped_tiles
 
-def custom_routing(nets):
+def custom_routing(nets, num_of_iterations: int = 10):
     paths = [None] * len(nets)
-    belts = [None] * len(nets)
     pads = [None] * len(nets)
+    belts = [None] * len(nets)
     blocked_tiles = set()
-
     # add start and end position for blocked tiles
     blocked_tiles = blocked_tiles | {start.position for start, end in nets} | {end.position for start, end in nets}
 
-    # compute extra cost map
-    extra_cost_map = defaultdict(lambda: defaultdict(float))
-    
-    penalize_amount = 1
-    decay_amount = 1
+    congestion_cost_map = defaultdict(float)
+    for _ in range(num_of_iterations):
 
-    for iteration in range(20):
         for i, (start, goal) in enumerate(nets):
-
-            # update extra cost map for the current net
-
-            # penalize tiles taken by other nets
+            blocked_tile_cost_map = defaultdict(float)
+            # compute tiles taken by other nets
             tiles_taken_by_other_nets = set()
             for j in range(len(nets)):
                 if j == i:
@@ -266,38 +259,42 @@ def custom_routing(nets):
                 if pads[j]:
                     tiles_taken_by_other_nets.update(pads[j])
             for tile in tiles_taken_by_other_nets:
-                extra_cost_map[i][tile] = penalize_amount
+                blocked_tile_cost_map[tile] = 1
 
-            # penalize overlaped tiles
-            all_overlaped_tiles = set()
-            for j in range(len(nets)):
-                if j == i:
-                    continue
+            # combine blocked tile cost map with congestion cost map
+            final_cost_map = defaultdict(float)
+            for tile, cost in congestion_cost_map.items():
+                final_cost_map[tile] += cost
+            for tile, cost in blocked_tile_cost_map.items():
+                final_cost_map[tile] += cost
 
-                # compute overlaped tiles
-                overlaped_tiles = compute_overlaped_tiles(belts[i], pads[i], belts[j], pads[j])
-                all_overlaped_tiles.update(overlaped_tiles)
-                for tile in overlaped_tiles:
-                    extra_cost_map[i][tile] += penalize_amount
-            
-            # decay tiles not taken by other nets
-            for tile, cost in extra_cost_map[i].items():
-                if tile not in tiles_taken_by_other_nets:
-                    extra_cost_map[i][tile] = max(0, cost - decay_amount)
-            
-            # decay non overlaped tiles
-            for tile, cost in extra_cost_map[i].items():
-                if tile not in all_overlaped_tiles:
-                    extra_cost_map[i][tile] = max(0, cost - decay_amount)
-
-            path, belt, pad = a_star_route(start, goal, blocked_tiles, extra_cost_map[i])
-            
+            path, belt, pad = a_star_route(start, goal, blocked_tiles, final_cost_map)
             paths[i] = path
             belts[i] = belt
             pads[i] = pad
-        
-            draw_result(nets, paths, belts, pads, extra_cost_map[i])
 
+            # draw_result(nets, paths, belts, pads, final_cost_map)
+        
+        # compute overlaped tiles
+        all_overlaped_tiles = set()
+        for i in range(len(nets)):
+            for j in range(len(nets)):
+                if i == j:
+                    continue
+                # compute overlaped tiles
+                overlaped_tiles = compute_overlaped_tiles(belts[i], pads[i], belts[j], pads[j])
+                all_overlaped_tiles.update(overlaped_tiles)
+
+        # penalize overlaped tiles
+        for tile in all_overlaped_tiles:
+            congestion_cost_map[tile] += 1
+
+        # decay non overlaped tiles
+        for tile, cost in congestion_cost_map.items():
+            if tile not in all_overlaped_tiles:
+                congestion_cost_map[tile] = max(0, cost - 0.1)
+
+        draw_result(nets, paths, belts, pads)
     return paths, belts, pads
 
 def sequential_routing(nets):
@@ -438,16 +435,17 @@ if __name__ == "__main__":
     #         ((3, 0), (12, 5))]
 
     acceptable_belt_directions = [UP, LEFT, RIGHT]
+    # acceptable_belt_directions = [UP]
 
     nets = [
-        (Keypoint((3, 0)), Keypoint((12, 5), acceptable_belt_directions=acceptable_belt_directions)),
         (Keypoint((2, 0)), Keypoint((8, 5), acceptable_belt_directions=acceptable_belt_directions)),
+        (Keypoint((3, 0)), Keypoint((12, 5), acceptable_belt_directions=acceptable_belt_directions)),
         (Keypoint((1, 0)), Keypoint((4, 5), acceptable_belt_directions=acceptable_belt_directions)),
         (Keypoint((0, 0)), Keypoint((0, 5), acceptable_belt_directions=acceptable_belt_directions)),
     ]
 
-    # paths, belts, pads = pathfinder_routing(nets, num_of_iterations=5)
-    paths, belts, pads = sequential_routing(nets)
-    # paths, belts, pads = custom_routing(nets)
+    # paths, belts, pads = pathfinder_routing(nets, num_of_iterations=10)
+    # paths, belts, pads = sequential_routing(nets)
+    paths, belts, pads = custom_routing(nets)
 
     draw_result(nets, paths, belts, pads)
