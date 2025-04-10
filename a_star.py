@@ -355,7 +355,7 @@ def pathfinder_routing(nets, num_of_iterations: int):
 
 def draw_result(nets, paths, belts, pads, congestion_cost_map: Optional[dict] = None):
     """Visualize paths and jump pads on a grid."""
-    plt.figure(figsize=(6, 6))
+    plt.figure(figsize=(10, 5))
     plt.grid(True)
     plt.xticks(np.arange(BOARD_DIMENSION[0] + 1))
     plt.yticks(np.arange(BOARD_DIMENSION[1] + 1))
@@ -433,7 +433,7 @@ if __name__ == "__main__":
     #     (Keypoint((7, 0)), Keypoint((4, 5), acceptable_belt_directions=acceptable_belt_directions)),
     #     (Keypoint((8, 0)), Keypoint((0, 5), acceptable_belt_directions=acceptable_belt_directions)),
     # ]
-    
+
     # acceptable_belt_directions = [UP, LEFT, RIGHT]
     acceptable_belt_directions = [UP]
 
