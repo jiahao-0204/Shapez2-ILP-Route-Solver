@@ -130,7 +130,7 @@ def is_within_bounds(node):
 def heuristic(p, q):
     return abs(p[0] - q[0]) + abs(p[1] - q[1])
 
-def a_star_route(start: Keypoint, goal: Keypoint, blocked_by_other_nets: set, congestion_cost_map: Optional[dict] = None):
+def a_star_route(start: Keypoint, goal: Keypoint, blocked_by_other_nets: set, congestion_cost_map: Optional[dict] = None, reusable_action_map: Optional[dict[List[Action]]] = None):
     """A* pathfinding with fixed jump support and blocked tile constraints."""
 
     # initialize a* variable
@@ -181,8 +181,26 @@ def a_star_route(start: Keypoint, goal: Keypoint, blocked_by_other_nets: set, co
                 # add congestion cost for each blocked tile
                 congestion_cost = sum(congestion_cost_map.get(tile, 0) for tile in action.get_blocked_tiles(current))
             
+            # compute action cost
+            action_cost = action.get_cost()
+            if reusable_action_map is not None:
+                reusable_actions = reusable_action_map.get(current)
+                if reusable_actions is not None:    
+                    if action in reusable_actions:
+                        # if action is reusable, do not add cost
+                        action_cost = 0.5 * action.get_cost()
+            
+            # compute penalize cost for taking jump when others have taken step or vice versa
+            if reusable_action_map is not None:
+                if isinstance(action, StepAction):
+                    if any(isinstance(a, ImmediateJumpAction) for a in reusable_action_map.get(current, [])):
+                        action_cost += 1
+                elif isinstance(action, ImmediateJumpAction):
+                    if any(isinstance(a, StepAction) for a in reusable_action_map.get(current, [])):
+                        action_cost += 1
+
             # compute new cost
-            new_cost = current_cost + action.get_cost() + congestion_cost
+            new_cost = current_cost + action_cost + congestion_cost
 
             # if new cost is less than the cost so far, update the cost and add to open heap
             if new_cost < cost_so_far.get(next_node, float('inf')):
@@ -236,6 +254,71 @@ def compute_overlaped_tiles(belts1: Optional[List[tuple]], pads1: Optional[List[
         if belts2:
             overlaped_tiles.update(set(pads1) & set(belts2))
     return overlaped_tiles
+
+def share_routing(nets, num_of_iterations: int = 10):
+    paths = [None] * len(nets)
+    pads = [None] * len(nets)
+    belts = [None] * len(nets)
+    action_maps = [None] * len(nets)
+    blocked_tiles = set()
+    # add start and end position for blocked tiles
+    blocked_tiles = blocked_tiles | {start.position for start, end in nets} | {end.position for start, end in nets}
+
+    congestion_cost_map = defaultdict(float)
+
+    for _ in range(num_of_iterations):
+
+        for i, (start, goal) in enumerate(nets):
+
+            # compute reusable action map
+            reusable_action_map = {}
+            for j in range(len(nets)):
+                if j == i:
+                    continue
+                # construct reusable action map
+                if action_maps[j]:
+                    for tile, action in action_maps[j].items():
+                        if tile not in reusable_action_map:
+                            reusable_action_map[tile] = []
+                        reusable_action_map[tile].append(action)
+            
+            # but also penalize using different action when than other's have taken
+                
+            path, belt, pad, action_map = a_star_route(start, goal, blocked_tiles, congestion_cost_map, reusable_action_map=reusable_action_map)
+            paths[i] = path
+            belts[i] = belt
+            pads[i] = pad
+            action_maps[i] = action_map
+
+            # draw_result(nets, paths, belts, pads, congestion_cost_map)
+        
+        # compute step and jump action tiles
+        step_action_tiles = set()
+        jump_action_tiles = set()
+        for i in range(len(nets)):
+            for tile, action in action_maps[i].items():
+                if isinstance(action, StepAction):
+                    step_action_tiles.update(action.get_blocked_tiles(tile))
+                elif isinstance(action, ImmediateJumpAction):
+                    jump_action_tiles.update(action.get_blocked_tiles(tile))
+        # this does not consider action direction
+        # this does not consider different jump size
+
+        # compute mismatched tiles
+        # mismatched tiles are tiles 
+        all_mismatched_tiles = step_action_tiles.intersection(jump_action_tiles)
+
+        # penalize mismatched tiles
+        for tile in all_mismatched_tiles:
+            congestion_cost_map[tile] += 1
+
+        # decay non mismatched tiles
+        for tile, cost in congestion_cost_map.items():
+            if tile not in all_mismatched_tiles:
+                congestion_cost_map[tile] = cost * 0.9
+        
+        # draw_result(nets, paths, belts, pads)
+    return paths, belts, pads
 
 def custom_routing(nets, num_of_iterations: int = 10):
     paths = [None] * len(nets)
@@ -443,11 +526,12 @@ if __name__ == "__main__":
         (Keypoint((5, 0)), Keypoint((8, 5), acceptable_belt_directions=acceptable_belt_directions)),
         (Keypoint((5, 0)), Keypoint((12, 5), acceptable_belt_directions=acceptable_belt_directions)),
         (Keypoint((5, 0)), Keypoint((4, 5), acceptable_belt_directions=acceptable_belt_directions)),
-        (Keypoint((5, 0)), Keypoint((0, 5), acceptable_belt_directions=acceptable_belt_directions)),
+        # (Keypoint((5, 0)), Keypoint((0, 5), acceptable_belt_directions=acceptable_belt_directions)),
     ]
 
     # paths, belts, pads = pathfinder_routing(nets, num_of_iterations=10)
     # paths, belts, pads = sequential_routing(nets)
-    paths, belts, pads = custom_routing(nets)
+    # paths, belts, pads = custom_routing(nets)
+    paths, belts, pads = share_routing(nets, num_of_iterations = 30)
 
     draw_result(nets, paths, belts, pads)
