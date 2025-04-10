@@ -6,12 +6,9 @@ from typing import List, Optional
 from collections import defaultdict
 
 # Configuration
-BOARD_DIMENSION = (15, 6)
 STEP_SIZE = 1
 STEP_COST = 1
 JUMP_COST = 3
-AVAILABLE_JUMP_SIZE = [1, 2, 3, 4]
-# AVAILABLE_JUMP_SIZE = [4]
 
 UP = np.array([0, 1])
 DOWN = np.array([0, -1])
@@ -427,19 +424,18 @@ def draw_result(nets, paths, belts, pads, congestion_cost_map: Optional[dict] = 
 
 
 if __name__ == "__main__":
-    # nets = [((0, 0), (0, 5)),
-    #         ((1, 0), (4, 5)),
-    #         ((2, 0), (8, 5)),
-    #         ((3, 0), (12, 5))]
+    BOARD_DIMENSION = (34, 14)
+    AVAILABLE_JUMP_SIZE = [1, 2, 3, 4]
+    # AVAILABLE_JUMP_SIZE = [4]
 
-    acceptable_belt_directions = [UP, LEFT, RIGHT]
-    # acceptable_belt_directions = [UP]
+    # acceptable_belt_directions = [UP, LEFT, RIGHT]
+    acceptable_belt_directions = [UP]
 
     nets = [
-        (Keypoint((2, 0)), Keypoint((8, 5), acceptable_belt_directions=acceptable_belt_directions)),
-        (Keypoint((3, 0)), Keypoint((12, 5), acceptable_belt_directions=acceptable_belt_directions)),
-        (Keypoint((1, 0)), Keypoint((4, 5), acceptable_belt_directions=acceptable_belt_directions)),
-        (Keypoint((0, 0)), Keypoint((0, 5), acceptable_belt_directions=acceptable_belt_directions)),
+        (Keypoint((5, 0)), Keypoint((8, 5), acceptable_belt_directions=acceptable_belt_directions)),
+        (Keypoint((6, 0)), Keypoint((12, 5), acceptable_belt_directions=acceptable_belt_directions)),
+        (Keypoint((7, 0)), Keypoint((4, 5), acceptable_belt_directions=acceptable_belt_directions)),
+        (Keypoint((8, 0)), Keypoint((0, 5), acceptable_belt_directions=acceptable_belt_directions)),
     ]
 
     # paths, belts, pads = pathfinder_routing(nets, num_of_iterations=10)
