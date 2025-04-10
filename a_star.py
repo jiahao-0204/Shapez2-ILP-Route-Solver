@@ -14,6 +14,14 @@ UP = np.array([0, 1])
 DOWN = np.array([0, -1])
 LEFT = np.array([-1, 0])
 RIGHT = np.array([1, 0])
+DIRECTIONS = [UP, DOWN, LEFT, RIGHT]
+
+BOARD_DIMENSION = (34, 14)
+AVAILABLE_JUMP_SIZE = [1, 2, 3, 4]
+# AVAILABLE_JUMP_SIZE = [4]
+
+# acceptable_belt_directions = [UP, LEFT, RIGHT]
+acceptable_belt_directions = [UP]
 
 class Action:
     def __init__(self, direction: tuple) -> None:
@@ -86,6 +94,12 @@ class ImmediateJumpAction(Action):
         # jump must have same direction as previous action
         return np.array_equal(prev_action.direction, self.direction)
 
+DEFAULT_ACTION_LIST = []
+for direction in DIRECTIONS:
+    DEFAULT_ACTION_LIST.append(StepAction(direction))
+    for jump_size in AVAILABLE_JUMP_SIZE:
+        DEFAULT_ACTION_LIST.append(ImmediateJumpAction(direction, jump_size))
+        
 class Keypoint:
     def __init__(self,
                  position: tuple[int, int],
@@ -111,14 +125,6 @@ class Keypoint:
             return self._direction_allowed(action.direction, self.acceptable_pad_directions)
         else:
             raise TypeError(f"Unsupported action type: {type(action)}")
-
-DIRECTIONS = [UP, DOWN, LEFT, RIGHT]
-
-DEFAULT_ACTION_LIST = []
-for direction in DIRECTIONS:
-    DEFAULT_ACTION_LIST.append(StepAction(direction))
-    for jump_size in AVAILABLE_JUMP_SIZE:
-        DEFAULT_ACTION_LIST.append(ImmediateJumpAction(direction, jump_size))
 
 def is_within_bounds(node):
     x, y = node
@@ -424,13 +430,6 @@ def draw_result(nets, paths, belts, pads, congestion_cost_map: Optional[dict] = 
 
 
 if __name__ == "__main__":
-    BOARD_DIMENSION = (34, 14)
-    AVAILABLE_JUMP_SIZE = [1, 2, 3, 4]
-    # AVAILABLE_JUMP_SIZE = [4]
-
-    # acceptable_belt_directions = [UP, LEFT, RIGHT]
-    acceptable_belt_directions = [UP]
-
     nets = [
         (Keypoint((5, 0)), Keypoint((8, 5), acceptable_belt_directions=acceptable_belt_directions)),
         (Keypoint((6, 0)), Keypoint((12, 5), acceptable_belt_directions=acceptable_belt_directions)),
