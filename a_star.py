@@ -369,7 +369,7 @@ def draw_result(nets, paths, belts, pads, congestion_cost_map: Optional[dict] = 
     # draw paths
     for i, path in enumerate(paths):
         # skip if path is None
-        if path is None:
+        if path is None or len(path) == 0:
             continue
         
         color = colors[i % len(colors)]
@@ -379,7 +379,7 @@ def draw_result(nets, paths, belts, pads, congestion_cost_map: Optional[dict] = 
     # draw belts
     for i, belt in enumerate(belts):
         # skip if belt is None
-        if belt is None:
+        if belt is None or len(belt) == 0:
             continue
         
         color = colors[i % len(colors)]
@@ -389,7 +389,7 @@ def draw_result(nets, paths, belts, pads, congestion_cost_map: Optional[dict] = 
     # draw pads
     for i, pad in enumerate(pads):
         # skip if pad is None
-        if pad is None:
+        if pad is None or len(pad) == 0:
             continue
         
         color = colors[i % len(colors)]
