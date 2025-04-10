@@ -275,12 +275,10 @@ def custom_routing(nets, num_of_iterations: int = 10):
 
             # draw_result(nets, paths, belts, pads, final_cost_map)
         
-        # compute overlaped tiles
+        # compute overlaped tiles (symmetrical thus i < j)
         all_overlaped_tiles = set()
         for i in range(len(nets)):
-            for j in range(len(nets)):
-                if i == j:
-                    continue
+            for j in range(i + 1, len(nets)): 
                 # compute overlaped tiles
                 overlaped_tiles = compute_overlaped_tiles(belts[i], pads[i], belts[j], pads[j])
                 all_overlaped_tiles.update(overlaped_tiles)
@@ -292,9 +290,9 @@ def custom_routing(nets, num_of_iterations: int = 10):
         # decay non overlaped tiles
         for tile, cost in congestion_cost_map.items():
             if tile not in all_overlaped_tiles:
-                congestion_cost_map[tile] = max(0, cost - 0.1)
+                congestion_cost_map[tile] = cost * 0.9
 
-        draw_result(nets, paths, belts, pads)
+        # draw_result(nets, paths, belts, pads)
     return paths, belts, pads
 
 def sequential_routing(nets):
