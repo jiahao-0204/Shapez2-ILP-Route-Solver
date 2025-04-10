@@ -264,6 +264,20 @@ def share_routing(nets, num_of_iterations: int = 10):
     # add start and end position for blocked tiles
     blocked_tiles = blocked_tiles | {start.position for start, end in nets} | {end.position for start, end in nets}
 
+    # todo below:
+    # i need to modify both the a_star_routing, i need to pass in a modifiable state variable, 
+    # i need to pass in all the information of existing routes to each net
+    # during each routing
+    # 1. use soft constraint (cost) to penelize unacceptable action (e.g. step when jump is taken in a sharable net, any action that occupies non shareable nets), which either this net
+    # should make compramise or the other net should make compromise (the change could happen by any of them), by increasing the cost for both nets at this location gradually, 
+    # until one of them gives up and finds a better route with just slightly higher cost
+    # 2. use hard constraint (blocked) to block the tiles that only this net could make comprimise by rerouting (obstacles) 
+
+    # repeatedly route all nets for multiple rounds, each time incooporating immediate new information from the existing routes
+
+    # the gradual cost grow of a certain tile / action for a net should be specific to that net
+    # end todo
+
     congestion_cost_map = defaultdict(float)
 
     for _ in range(num_of_iterations):
