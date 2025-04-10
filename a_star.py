@@ -10,8 +10,8 @@ BOARD_DIMENSION = (15, 6)
 STEP_SIZE = 1
 STEP_COST = 1
 JUMP_COST = 3
-# AVAILABLE_JUMP_SIZE = [1, 2, 3, 4]
-AVAILABLE_JUMP_SIZE = [4]
+AVAILABLE_JUMP_SIZE = [1, 2, 3, 4]
+# AVAILABLE_JUMP_SIZE = [4]
 
 UP = np.array([0, 1])
 DOWN = np.array([0, -1])
@@ -160,29 +160,31 @@ def a_star_route(start: Keypoint, goal: Keypoint, blocked_by_other_nets: set, co
             # skip if action is not valid from previous action
             if not action.is_valid_from(action_taken_to_reach_this_node[current]):
                 continue
-
-            next_node = action.get_end_location(current)
+            
+            # skip if required tiles are blocked
             required_tiles = action.get_required_free_tiles(current)
-
             if any(not is_within_bounds(loc) or loc in blocked for loc in required_tiles):
                 continue
                 
-            # skip if location is at start and direction is not up
+            # skip if action is not valid at given location
             if start.matches_position(current) and not start.is_valid_action(action):
                 continue
 
-            # skip if next node is at goal but direction is not up
+            # skip if action is not valid towards given location
+            next_node = action.get_end_location(current)
             if goal.matches_position(next_node) and not goal.is_valid_action(action):
                 continue
-
-            new_cost = current_cost + action.get_cost()
-
-            # if congestion cost map is provided, add congestion cost
+            
+            # if congestion cost map is provided, compute congestion cost
+            congestion_cost = 0
             if congestion_cost_map is not None:
                 # add congestion cost for each blocked tile
                 congestion_cost = sum(congestion_cost_map.get(tile, 0) for tile in action.get_blocked_tiles(current))
-                new_cost += congestion_cost
+            
+            # compute new cost
+            new_cost = current_cost + action.get_cost() + congestion_cost
 
+            # if new cost is less than the cost so far, update the cost and add to open heap
             if new_cost < cost_so_far.get(next_node, float('inf')):
                 cost_so_far[next_node] = new_cost
                 came_from[next_node] = current
