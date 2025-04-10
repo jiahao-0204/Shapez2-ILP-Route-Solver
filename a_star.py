@@ -43,6 +43,9 @@ class Action:
 
     def get_cost(self) -> int:
         raise NotImplementedError
+    
+    def is_valid_from(self, prev_action) -> bool:
+        raise NotImplementedError
 
 class StepAction(Action):
     def get_end_location(self, start: tuple) -> tuple:
@@ -57,6 +60,8 @@ class StepAction(Action):
     def get_cost(self):
         return 1
     
+    def is_valid_from(self, prev_action: Action) -> bool:
+        return True
 
 class ImmediateJumpAction(Action):
     def __init__(self, direction, jump_size):
@@ -75,6 +80,14 @@ class ImmediateJumpAction(Action):
 
     def get_cost(self):
         return 2
+    
+    def is_valid_from(self, prev_action: Action) -> bool:
+        # If there is no previous action, this is the first move (from the start)
+        if prev_action is None:
+            return True
+
+        # jump must have same direction as previous action
+        return np.array_equal(prev_action.direction, self.direction)
 
 class Keypoint:
     def __init__(self,
@@ -123,7 +136,7 @@ def a_star_route(start: Keypoint, goal: Keypoint, blocked_by_other_nets: set, co
     # initialize a* variable
     open_heap = []
     came_from = {}
-    action_taken_to_reach_this_node = {}
+    action_taken_to_reach_this_node = defaultdict(lambda: None)
     cost_so_far = {}
 
     # add the start node
@@ -144,11 +157,9 @@ def a_star_route(start: Keypoint, goal: Keypoint, blocked_by_other_nets: set, co
 
         for action in DEFAULT_ACTION_LIST:
 
-            # skip if action is jump and is not in the same direction as the previous action
-            if isinstance(action, ImmediateJumpAction):
-                prev_action = action_taken_to_reach_this_node.get(current)
-                if prev_action and not np.array_equal(prev_action.direction, action.direction):
-                    continue
+            # skip if action is not valid from previous action
+            if not action.is_valid_from(action_taken_to_reach_this_node[current]):
+                continue
 
             next_node = action.get_end_location(current)
             required_tiles = action.get_required_free_tiles(current)
