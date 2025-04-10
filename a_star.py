@@ -300,11 +300,13 @@ def custom_routing(nets):
 
     return paths, belts, pads
 
-def sequential_routing(nets, blocked_by_other_nets: set):
+def sequential_routing(nets):
     paths = []
     belts = []
     pads = []
-    blocked_by_other_nets = set(blocked_by_other_nets) # shallow copy
+    blocked_tiles = set()
+    # add start and end position for blocked tiles
+    blocked_tiles = blocked_tiles | {start.position for start, end in nets} | {end.position for start, end in nets}
 
     for i, (start, goal) in enumerate(nets):
         path, belt, pad = a_star_route(start, goal, blocked_tiles)
@@ -320,17 +322,19 @@ def sequential_routing(nets, blocked_by_other_nets: set):
 
     return paths, belts, pads
 
-def pathfinder_routing(nets, num_of_iterations: int, blocked_by_other_nets: set):
+def pathfinder_routing(nets, num_of_iterations: int):
     paths = [None] * len(nets)
     pads = [None] * len(nets)
     belts = [None] * len(nets)
-    blocked_by_other_nets = set(blocked_by_other_nets) # shallow copy
+    blocked_tiles = set()
+    # add start and end position for blocked tiles
+    blocked_tiles = blocked_tiles | {start.position for start, end in nets} | {end.position for start, end in nets}
 
     congestion_cost_map = defaultdict(float)
     for _ in range(num_of_iterations):
 
         for i, (start, goal) in enumerate(nets):
-            path, belt, pad = a_star_route(start, goal, blocked_by_other_nets, congestion_cost_map)
+            path, belt, pad = a_star_route(start, goal, blocked_tiles, congestion_cost_map)
             paths[i] = path
             belts[i] = belt
             pads[i] = pad
@@ -442,9 +446,8 @@ if __name__ == "__main__":
         (Keypoint((0, 0)), Keypoint((0, 5), acceptable_belt_directions=acceptable_belt_directions)),
     ]
 
-    blocked_tiles = {start.position for start, end in nets} | {end.position for start, end in nets}
-
-    # paths, belts, pads = pathfinder_routing(nets, num_of_iterations=5, blocked_by_other_nets=blocked_tiles)
-    paths, belts, pads = sequential_routing(nets, blocked_by_other_nets=blocked_tiles)
+    # paths, belts, pads = pathfinder_routing(nets, num_of_iterations=5)
+    paths, belts, pads = sequential_routing(nets)
+    # paths, belts, pads = custom_routing(nets)
 
     draw_result(nets, paths, belts, pads)
