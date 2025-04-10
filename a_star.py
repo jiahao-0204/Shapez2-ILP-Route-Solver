@@ -203,6 +203,7 @@ def a_star_route(start: Keypoint, goal: Keypoint, blocked_by_other_nets: set, co
     path = [goal.position]
     belts = []
     pads = []
+    action_map = {}
     cost = 0
     current = goal.position
     while current:
@@ -213,11 +214,12 @@ def a_star_route(start: Keypoint, goal: Keypoint, blocked_by_other_nets: set, co
             belts += prev_action.get_belt_locations(prev)
             pads += prev_action.get_pad_locations(prev)
             cost += prev_action.get_cost()
+            action_map[prev] = prev_action
         current = prev
     path.reverse()
 
     # return
-    return path, belts, pads
+    return path, belts, pads, action_map
 
 def compute_overlaped_tiles(belts1: Optional[List[tuple]], pads1: Optional[List[tuple]],
                            belts2: Optional[List[tuple]], pads2: Optional[List[tuple]]) -> set:
@@ -268,7 +270,7 @@ def custom_routing(nets, num_of_iterations: int = 10):
             for tile, cost in blocked_tile_cost_map.items():
                 final_cost_map[tile] += cost
 
-            path, belt, pad = a_star_route(start, goal, blocked_tiles, final_cost_map)
+            path, belt, pad, _ = a_star_route(start, goal, blocked_tiles, final_cost_map)
             paths[i] = path
             belts[i] = belt
             pads[i] = pad
@@ -304,7 +306,7 @@ def sequential_routing(nets):
     blocked_tiles = blocked_tiles | {start.position for start, end in nets} | {end.position for start, end in nets}
 
     for i, (start, goal) in enumerate(nets):
-        path, belt, pad = a_star_route(start, goal, blocked_tiles)
+        path, belt, pad, _ = a_star_route(start, goal, blocked_tiles)
         if path is None:
             print(f"Net {i}: no route found")
         else:
@@ -329,7 +331,7 @@ def pathfinder_routing(nets, num_of_iterations: int):
     for _ in range(num_of_iterations):
 
         for i, (start, goal) in enumerate(nets):
-            path, belt, pad = a_star_route(start, goal, blocked_tiles, congestion_cost_map)
+            path, belt, pad, _ = a_star_route(start, goal, blocked_tiles, congestion_cost_map)
             paths[i] = path
             belts[i] = belt
             pads[i] = pad
