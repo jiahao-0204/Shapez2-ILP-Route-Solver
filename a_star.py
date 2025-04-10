@@ -20,9 +20,6 @@ BOARD_DIMENSION = (34, 14)
 AVAILABLE_JUMP_SIZE = [1, 2, 3, 4]
 # AVAILABLE_JUMP_SIZE = [4]
 
-# acceptable_belt_directions = [UP, LEFT, RIGHT]
-acceptable_belt_directions = [UP]
-
 class Action:
     def __init__(self, direction: tuple) -> None:
         self.direction = np.array(direction)
@@ -99,7 +96,7 @@ for direction in DIRECTIONS:
     DEFAULT_ACTION_LIST.append(StepAction(direction))
     for jump_size in AVAILABLE_JUMP_SIZE:
         DEFAULT_ACTION_LIST.append(ImmediateJumpAction(direction, jump_size))
-        
+
 class Keypoint:
     def __init__(self,
                  position: tuple[int, int],
@@ -430,11 +427,21 @@ def draw_result(nets, paths, belts, pads, congestion_cost_map: Optional[dict] = 
 
 
 if __name__ == "__main__":
+    # nets = [
+    #     (Keypoint((5, 0)), Keypoint((8, 5), acceptable_belt_directions=acceptable_belt_directions)),
+    #     (Keypoint((6, 0)), Keypoint((12, 5), acceptable_belt_directions=acceptable_belt_directions)),
+    #     (Keypoint((7, 0)), Keypoint((4, 5), acceptable_belt_directions=acceptable_belt_directions)),
+    #     (Keypoint((8, 0)), Keypoint((0, 5), acceptable_belt_directions=acceptable_belt_directions)),
+    # ]
+    
+    # acceptable_belt_directions = [UP, LEFT, RIGHT]
+    acceptable_belt_directions = [UP]
+
     nets = [
         (Keypoint((5, 0)), Keypoint((8, 5), acceptable_belt_directions=acceptable_belt_directions)),
-        (Keypoint((6, 0)), Keypoint((12, 5), acceptable_belt_directions=acceptable_belt_directions)),
-        (Keypoint((7, 0)), Keypoint((4, 5), acceptable_belt_directions=acceptable_belt_directions)),
-        (Keypoint((8, 0)), Keypoint((0, 5), acceptable_belt_directions=acceptable_belt_directions)),
+        (Keypoint((5, 0)), Keypoint((12, 5), acceptable_belt_directions=acceptable_belt_directions)),
+        (Keypoint((5, 0)), Keypoint((4, 5), acceptable_belt_directions=acceptable_belt_directions)),
+        (Keypoint((5, 0)), Keypoint((0, 5), acceptable_belt_directions=acceptable_belt_directions)),
     ]
 
     # paths, belts, pads = pathfinder_routing(nets, num_of_iterations=10)
