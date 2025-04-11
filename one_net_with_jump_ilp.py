@@ -250,7 +250,9 @@ class DirectionalJumpRouter:
 # Example usage
 if __name__ == "__main__":
     nets = [
-        ((5, 0), [(10, 13), (13, 13)]),
-        ((0, 0), [(5, 13), (10, 13)]),
+        ((4, 0), [(10, 13)]),
+        # ((5, 0), [(10, 13), (13, 13)]),
+        # ((0, 0), [(5, 13), (10, 13)]),
+        # ((1, 0), [(10, 13)]),
         ]
     router = DirectionalJumpRouter(width=34, height=14, nets=nets, jump_distance=4)
