@@ -103,8 +103,7 @@ class DirectionalJumpRouter:
         self.solve()
 
         # Plot
-        for i in range(self.num_nets):
-            self.plot(i)
+        self.plot()
 
     def dynamic_compute_is_node_used_by(self):
         for i in range(self.num_nets):
@@ -186,7 +185,7 @@ class DirectionalJumpRouter:
         solver = pulp.PULP_CBC_CMD(timeLimit=30)
         self.model.solve(solver)
 
-    def plot(self, i):
+    def plot(self):
         plt.figure(figsize=(12, 6))
         ax = plt.gca()
         ax.set_xlim(0, self.WIDTH + 1)
@@ -197,49 +196,52 @@ class DirectionalJumpRouter:
         ax.grid(True)
 
         offset = 0.5
-        used_step_edges = [e for e in self.step_edges[i] if pulp.value(self.is_edge_used[i][e]) == 1]
-        used_jump_edges = [e for e in self.jump_edges[i] if pulp.value(self.is_edge_used[i][e]) == 1]
 
-        # Plot start and goal
-        sx, sy = self.start[i]
-        for goal in self.goals[i]:
-            gx, gy = goal
-            plt.scatter(gx + offset, gy + offset, c='green', marker='s', s=120, edgecolors='black')
-            plt.scatter(gx + offset, gy + offset, c='black', marker='o', s=50, edgecolors='black')
-        plt.scatter(sx + offset, sy + offset, c='red', marker='s', s=120, edgecolors='black', label='Start')
+        for i in range(self.num_nets):
 
-        for (u, v, d) in used_step_edges:
-            ux, uy = u
-            ax.scatter(ux + offset, uy + offset, c='black', marker='o', s=50)
-            ax.plot([ux + offset, v[0] + offset], [uy + offset, v[1] + offset], c='black')
+            used_step_edges = [e for e in self.step_edges[i] if pulp.value(self.is_edge_used[i][e]) == 1]
+            used_jump_edges = [e for e in self.jump_edges[i] if pulp.value(self.is_edge_used[i][e]) == 1]
 
-        for (u, v, d) in used_jump_edges:
-            ux, uy = u
-            u2x, u2y = u
-            u2x += d[0] * (self.jump_distance + 1)
-            u2y += d[1] * (self.jump_distance + 1)
+            # Plot start and goal
+            sx, sy = self.start[i]
+            for goal in self.goals[i]:
+                gx, gy = goal
+                plt.scatter(gx + offset, gy + offset, c='green', marker='s', s=120, edgecolors='black')
+                plt.scatter(gx + offset, gy + offset, c='black', marker='o', s=50, edgecolors='black')
+            plt.scatter(sx + offset, sy + offset, c='red', marker='s', s=120, edgecolors='black', label='Start')
 
-            # if d == (0, 1):
-            #     marker = '2'
-            # elif d == (0, -1):
-            #     marker = '1'
-            # elif d == (1, 0):
-            #     marker = '4'
-            # elif d == (-1, 0):
-            #     marker = '3'
+            for (u, v, d) in used_step_edges:
+                ux, uy = u
+                ax.scatter(ux + offset, uy + offset, c='black', marker='o', s=50)
+                ax.plot([ux + offset, v[0] + offset], [uy + offset, v[1] + offset], c='black')
 
-            if d == (0, 1):
-                marker = '^'
-            elif d == (0, -1):
-                marker = 'v'
-            elif d == (1, 0):
-                marker = '>'
-            elif d == (-1, 0):
-                marker = '<'
+            for (u, v, d) in used_jump_edges:
+                ux, uy = u
+                u2x, u2y = u
+                u2x += d[0] * (self.jump_distance + 1)
+                u2y += d[1] * (self.jump_distance + 1)
 
-            ax.scatter(ux + offset, uy + offset, c='black', marker=marker, s=80)
-            ax.scatter(u2x + offset, u2y + offset, c='black', marker=marker, s=80)
-            ax.plot([u2x + offset, v[0] + offset], [u2y + offset, v[1] + offset], c='black')
+                # if d == (0, 1):
+                #     marker = '2'
+                # elif d == (0, -1):
+                #     marker = '1'
+                # elif d == (1, 0):
+                #     marker = '4'
+                # elif d == (-1, 0):
+                #     marker = '3'
+
+                if d == (0, 1):
+                    marker = '^'
+                elif d == (0, -1):
+                    marker = 'v'
+                elif d == (1, 0):
+                    marker = '>'
+                elif d == (-1, 0):
+                    marker = '<'
+
+                ax.scatter(ux + offset, uy + offset, c='black', marker=marker, s=80)
+                ax.scatter(u2x + offset, u2y + offset, c='black', marker=marker, s=80)
+                ax.plot([u2x + offset, v[0] + offset], [u2y + offset, v[1] + offset], c='black')
 
         plt.title("ILP Path with Step & Jump Actions")
         handles, labels = plt.gca().get_legend_handles_labels()
@@ -251,9 +253,7 @@ class DirectionalJumpRouter:
 # Example usage
 if __name__ == "__main__":
     nets = [
-        ((4, 0), [(10, 13)]),
-        # ((5, 0), [(10, 13), (13, 13)]),
-        # ((0, 0), [(5, 13), (10, 13)]),
-        # ((1, 0), [(10, 13)]),
+        ((0, 0), [(5, 13), (10, 13)]),
+        ((10, 0), [(15, 13), (18, 13)]),
         ]
     router = DirectionalJumpRouter(width=34, height=14, nets=nets, jump_distance=4)
