@@ -88,30 +88,20 @@ class DirectionalJumpRouter:
             # if there is incoming flow to u from the same direction.
 
             # Collect all edges (step and jump) that go into `u` from direction `direction`
-            incoming_edges_same_direction = []
-
-            # From step edges
+            incoming_edges_in_same_direction = []
             for (prev, target, dir_step) in self.step_edges:
                 if target == u and dir_step == direction:
-                    incoming_edges_same_direction.append((prev, target))
-
-            # From jump edges
+                    incoming_edges_in_same_direction.append(self.x_step[(prev, target)])
             for (prev, target, dir_jump) in self.jump_edges:
                 if target == u and dir_jump == direction:
-                    incoming_edges_same_direction.append((prev, target))
+                    incoming_edges_in_same_direction.append(self.x_jump[(prev, target)])
 
-            # Calculate incoming flow from same-direction edges
-            incoming_flow_list = []
-            for e in incoming_edges_same_direction:
-                if e in self.f_jump:
-                    incoming_flow_list.append(self.f_jump[e])
-                elif e in self.f_step:
-                    incoming_flow_list.append(self.f_step[e])
-            incoming_flow = pulp.lpSum(incoming_flow_list)
+            # create a variable that sums up the incoming edges in the same direction
+            existing_incoming_edge_in_same_direction = pulp.lpSum(incoming_edges_in_same_direction)
 
             # Enforce that jump flow is only allowed if incoming flow matches direction
             self.model += (
-                self.f_jump[(u, v)] <= incoming_flow,
+                self.x_jump[(u, v)] <= existing_incoming_edge_in_same_direction,
                 f"directional_jump_flow_{u}_{v}_{direction}"
             )
 
