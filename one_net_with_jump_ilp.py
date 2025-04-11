@@ -43,11 +43,11 @@ class DirectionalJumpRouter:
         return edges
 
     def build_variables(self):
-        for u, v, d in self.edges:
+        for u, v, _ in self.edges:
             self.x_step[(u, v)] = pulp.LpVariable(f"x_step_{u}_{v}", cat='Binary')
             self.f_step[(u, v)] = pulp.LpVariable(f"f_step_{u}_{v}", lowBound=0, cat='Integer')
 
-        for u, v, d in self.jump_edges:
+        for u, v, _ in self.jump_edges:
             self.x_jump[(u, v)] = pulp.LpVariable(f"x_jump_{u}_{v}", cat='Binary')
             self.f_jump[(u, v)] = pulp.LpVariable(f"f_jump_{u}_{v}", lowBound=0, cat='Integer')
 
@@ -58,6 +58,14 @@ class DirectionalJumpRouter:
         )
 
     def add_flow_constraints(self):
+        # Flow is avaiable if the edge is selected
+        for (u, v, _) in self.edges:
+            self.model += self.f_step[(u, v)] <= self.x_step[(u, v)], f"cap_step_{u}_{v}"
+
+        for (u, v, _) in self.jump_edges:
+            self.model += self.f_jump[(u, v)] <= self.x_jump[(u, v)], f"cap_jump_{u}_{v}"
+
+        # Flow conservation constraints
         all_nodes = [(x, y) for x in range(self.WIDTH) for y in range(self.HEIGHT)]
         for node in all_nodes:
             in_flow = (
@@ -75,13 +83,6 @@ class DirectionalJumpRouter:
                 self.model += (out_flow - in_flow == -1), f"goal_flow_{node}"
             else:
                 self.model += (out_flow - in_flow == 0), f"node_flow_{node}"
-
-    def add_capacity_and_direction_constraints(self):
-        for (u, v, _) in self.edges:
-            self.model += self.f_step[(u, v)] <= self.x_step[(u, v)], f"cap_step_{u}_{v}"
-
-        for (u, v, _) in self.jump_edges:
-            self.model += self.f_jump[(u, v)] <= self.x_jump[(u, v)], f"cap_jump_{u}_{v}"
 
     def add_directional_constraints(self):
         for (u, v, d) in self.jump_edges:
@@ -149,6 +150,5 @@ if __name__ == "__main__":
     router.add_objective()
     router.add_flow_constraints()
     router.add_directional_constraints()
-    router.add_capacity_and_direction_constraints()
     router.solve()
     router.plot()
