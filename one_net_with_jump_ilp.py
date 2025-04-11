@@ -19,6 +19,9 @@ class DirectionalJumpRouter:
         self.f_jump = {}
         self.path_edges = []
 
+        self.step_cost = 1
+        self.jump_cost = 2
+
     def _generate_step_edges(self):
         edges = []
         for x in range(self.WIDTH):
@@ -45,13 +48,13 @@ class DirectionalJumpRouter:
             self.f_step[(u, v)] = pulp.LpVariable(f"f_step_{u}_{v}", lowBound=0, cat='Integer')
 
         for u, v, d in self.jump_edges:
-            self.x_jump[(u, v, d)] = pulp.LpVariable(f"x_jump_{u}_{v}_{d}", cat='Binary')
-            self.f_jump[(u, v, d)] = pulp.LpVariable(f"f_jump_{u}_{v}_{d}", lowBound=0, cat='Integer')
+            self.x_jump[(u, v)] = pulp.LpVariable(f"x_jump_{u}_{v}", cat='Binary')
+            self.f_jump[(u, v)] = pulp.LpVariable(f"f_jump_{u}_{v}", lowBound=0, cat='Integer')
 
     def add_objective(self):
         self.model += (
-            pulp.lpSum(self.x_step[(u, v)] for (u, v, _) in self.edges) +
-            2 * pulp.lpSum(self.x_jump[(u, v, d)] for (u, v, d) in self.jump_edges)
+            pulp.lpSum(self.x_step[(u, v)] * self.step_cost for (u, v, _) in self.edges) +
+            pulp.lpSum(self.x_jump[(u, v)] * self.jump_cost for (u, v, _) in self.jump_edges)
         )
 
     def add_flow_constraints(self):
@@ -59,11 +62,11 @@ class DirectionalJumpRouter:
         for node in all_nodes:
             in_flow = (
                 pulp.lpSum(self.f_step[(u, v)] for (u, v, _) in self.edges if v == node) +
-                pulp.lpSum(self.f_jump[(u, v, d)] for (u, v, d) in self.jump_edges if v == node)
+                pulp.lpSum(self.f_jump[(u, v)] for (u, v, _) in self.jump_edges if v == node)
             )
             out_flow = (
                 pulp.lpSum(self.f_step[(u, v)] for (u, v, _) in self.edges if u == node) +
-                pulp.lpSum(self.f_jump[(u, v, d)] for (u, v, d) in self.jump_edges if u == node)
+                pulp.lpSum(self.f_jump[(u, v)] for (u, v, _) in self.jump_edges if u == node)
             )
 
             if node == self.start:
@@ -78,7 +81,7 @@ class DirectionalJumpRouter:
             self.model += self.f_step[(u, v)] <= self.x_step[(u, v)], f"cap_step_{u}_{v}"
 
         for (u, v, d) in self.jump_edges:
-            self.model += self.f_jump[(u, v, d)] <= self.x_jump[(u, v, d)], f"cap_jump_{u}_{v}"
+            self.model += self.f_jump[(u, v)] <= self.x_jump[(u, v)], f"cap_jump_{u}_{v}"
 
             # Directional flow constraint: jump at u in direction d only if incoming flow is in same direction
             dx, dy = d
@@ -91,7 +94,7 @@ class DirectionalJumpRouter:
                 pulp.lpSum(self.f_step[e] for e in allowed_in if e in self.f_step) +
                 pulp.lpSum(self.f_jump[e] for e in allowed_in if e in self.f_jump)
             )
-            self.model += self.f_jump[(u, v, d)] <= incoming, f"dir_jump_{u}_{v}_{d}"
+            self.model += self.f_jump[(u, v)] <= incoming, f"dir_jump_{u}_{v}_{d}"
 
     def solve(self):
         solver = pulp.PULP_CBC_CMD(timeLimit=30)
@@ -110,7 +113,7 @@ class DirectionalJumpRouter:
 
         offset = 0.5
         step_edges = [(u, v, d) for (u, v, d) in self.edges if pulp.value(self.x_step[(u, v)]) == 1]
-        jump_edges = [(u, v, d) for (u, v, d) in self.jump_edges if pulp.value(self.x_jump[(u, v, d)]) == 1]
+        jump_edges = [(u, v, d) for (u, v, d) in self.jump_edges if pulp.value(self.x_jump[(u, v)]) == 1]
 
         for (u, v, d) in step_edges:
             ux, uy = u
