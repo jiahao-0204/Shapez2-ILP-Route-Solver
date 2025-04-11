@@ -86,30 +86,30 @@ class DirectionalJumpRouter:
 
     def add_directional_constraints(self):
         for (u, v, direction) in self.jump_edges:
-            dx, dy = direction
-
             # A jump from u to v in direction `direction` is only allowed
             # if there is incoming flow to u from the same direction.
 
             # Collect all edges (step and jump) that go into `u` from direction `direction`
             incoming_edges_same_direction = []
 
-            # From jump edges
-            for (prev, target, dir_jump) in self.jump_edges:
-                if target == u and dir_jump == direction:
-                    incoming_edges_same_direction.append((prev, target, dir_jump))
-
             # From step edges
             for (prev, target, dir_step) in self.edges:
                 if target == u and dir_step == direction:
                     incoming_edges_same_direction.append((prev, target))
 
+            # From jump edges
+            for (prev, target, dir_jump) in self.jump_edges:
+                if target == u and dir_jump == direction:
+                    incoming_edges_same_direction.append((prev, target))
+
             # Calculate incoming flow from same-direction edges
-            incoming_flow = pulp.lpSum(
-                self.f_jump[e] for e in incoming_edges_same_direction if e in self.f_jump
-            ) + pulp.lpSum(
-                self.f_step[e] for e in incoming_edges_same_direction if e in self.f_step
-            )
+            incoming_flow_list = []
+            for e in incoming_edges_same_direction:
+                if e in self.f_jump:
+                    incoming_flow_list.append(self.f_jump[e])
+                elif e in self.f_step:
+                    incoming_flow_list.append(self.f_step[e])
+            incoming_flow = pulp.lpSum(incoming_flow_list)
 
             # Enforce that jump flow is only allowed if incoming flow matches direction
             self.model += (
