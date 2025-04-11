@@ -106,10 +106,10 @@ class DirectionalJumpRouter:
     def plot(self):
         plt.figure(figsize=(12, 6))
         ax = plt.gca()
-        ax.set_xlim(-0.5, self.WIDTH - 0.5)
-        ax.set_ylim(-0.5, self.HEIGHT - 0.5)
-        ax.set_xticks(range(self.WIDTH))
-        ax.set_yticks(range(self.HEIGHT))
+        ax.set_xlim(0, self.WIDTH + 1)
+        ax.set_ylim(0, self.HEIGHT + 1)
+        ax.set_xticks(range(self.WIDTH + 1))
+        ax.set_yticks(range(self.HEIGHT + 1))
         ax.set_aspect('equal')
         ax.grid(True)
 
@@ -144,7 +144,7 @@ class DirectionalJumpRouter:
 if __name__ == "__main__":
     start = (0, 0)
     goal = (10, 10)
-    router = DirectionalJumpRouter(width=15, height=15, start=start, goal=goal)
+    router = DirectionalJumpRouter(width=34, height=14, start=start, goal=goal)
     router.build_variables()
     router.add_objective()
     router.add_flow_constraints()
