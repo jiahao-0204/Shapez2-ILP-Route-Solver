@@ -13,11 +13,11 @@ Edge = Tuple[Node, Node, Tuple[int, int]]  # (start_node, end_node, direction)
 class DirectionalJumpRouter:
     def __init__(self, width, height, nets, jump_distance: int = 4):
 
-        self.num_nets = len(nets)
         # Input parameters
         self.WIDTH = width
         self.HEIGHT = height
 
+        self.num_nets = len(nets)
         self.start: Dict[int, Tuple[int, int]] = {}
         self.goals: Dict[int, List[Tuple[int, int]]] = {}
         for i, (start, goals) in enumerate(nets):
@@ -26,13 +26,16 @@ class DirectionalJumpRouter:
 
         self.jump_distance = jump_distance
 
+
+
+
         # Internal variables
         self.K: Dict[int, int] = {}
         for i, (start, goals) in enumerate(nets):
             self.K[i] = len(goals)
 
         self.all_nodes: Dict[int, List[Node]] = {}
-        for i in range(len(nets)):
+        for i in range(self.num_nets):
             self.all_nodes[i] = []
             for x in range(self.WIDTH):
                 for y in range(self.HEIGHT):
@@ -43,7 +46,7 @@ class DirectionalJumpRouter:
         self.jump_edges: Dict[int, List[Edge]] = {}
         self.node_related_step_edges: Dict[int, Dict[Node, List[Edge]]] = defaultdict(lambda: defaultdict(list))
         self.node_related_jump_edges: Dict[int, Dict[Node, List[Edge]]] = defaultdict(lambda: defaultdict(list))
-        for i in range(len(nets)):
+        for i in range(self.num_nets):
             self.all_edges[i] = []
             self.step_edges[i] = []
             self.jump_edges[i] = []
@@ -78,14 +81,14 @@ class DirectionalJumpRouter:
         # Dynamic variables
         self.is_edge_used: Dict[int, Dict[Edge, pulp.LpVariable]] = {}
         self.edge_flow_value: Dict[int, Dict[Edge, pulp.LpVariable]] = {}
-        for i in range(len(nets)):
+        for i in range(self.num_nets):
             self.is_edge_used[i] = {edge: pulp.LpVariable(f"edge_used_{i}_{edge}", cat='Binary') for edge in self.all_edges[i]}
             self.edge_flow_value[i] = {edge: pulp.LpVariable(f"edge_flow_value_{i}_{edge}", lowBound=0) for edge in self.all_edges[i]}
 
 
         self.is_node_used_by_step_edge: Dict[int, Dict[Node, pulp.LpVariable]] = {}
         self.is_node_used_by_jump_edge: Dict[int, Dict[Node, pulp.LpVariable]] = {}
-        for i in range(len(nets)):
+        for i in range(self.num_nets):
             self.is_node_used_by_step_edge[i] = {node: pulp.LpVariable(f"node_used_by_step_edge_{i}_{node}", cat='Binary') for node in self.all_nodes[i]}
             self.is_node_used_by_jump_edge[i] = {node: pulp.LpVariable(f"node_used_by_jump_edge_{i}_{node}", cat='Binary') for node in self.all_nodes[i]}
         
