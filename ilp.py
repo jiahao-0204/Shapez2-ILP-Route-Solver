@@ -22,26 +22,26 @@ model = pulp.LpProblem("MultiNetRouting", pulp.LpMinimize)
 # i need to minimize the total cost from actions 
 
 # Generate valid action edges (from tile u to tile v)
-step_edges = []
+step_actions = []
 for x in range(WIDTH):
     for y in range(HEIGHT):
         for dx, dy in DIRECTIONS:
             nx, ny = x + dx, y + dy
             if 0 <= nx < WIDTH and 0 <= ny < HEIGHT:
-                step_edges.append(((x, y), (nx, ny)))
+                step_actions.append(((x, y), (nx, ny)))
 step_cost = 1
 
 
 # Decision variables: x_{i, u, v} = 1 if net i uses edge (u,v)
 step_var = {}
 for i in range(len(nets)):
-    for u, v in step_edges:
+    for u, v in step_actions:
         step_var[(i, u, v)] = pulp.LpVariable(f"x_{i}_{u}_{v}", cat='Binary')
 
 # Objective: minimize total path length
 cost_list = []
 for i in range(len(nets)):
-    for u, v in step_edges:
+    for u, v in step_actions:
         cost_list.append(step_var[(i, u, v)] * step_cost)
 
 model += pulp.lpSum(cost_list)
@@ -51,8 +51,8 @@ for i, (start, goal) in enumerate(nets):
     for x in range(WIDTH):
         for y in range(HEIGHT):
             node = (x, y)
-            in_edges = [(u, v) for (u, v) in step_edges if v == node]
-            out_edges = [(u, v) for (u, v) in step_edges if u == node]
+            in_edges = [(u, v) for (u, v) in step_actions if v == node]
+            out_edges = [(u, v) for (u, v) in step_actions if u == node]
 
             flow_in = pulp.lpSum(step_var[(i, u, v)] for u, v in in_edges)
             flow_out = pulp.lpSum(step_var[(i, u, v)] for u, v in out_edges)
@@ -76,8 +76,8 @@ for i in range(len(nets)):
     for x in range(WIDTH):
         for y in range(HEIGHT):
             node = (x, y)
-            in_edges = [(u, v) for (u, v) in step_edges if v == node]
-            out_edges = [(u, v) for (u, v) in step_edges if u == node]
+            in_edges = [(u, v) for (u, v) in step_actions if v == node]
+            out_edges = [(u, v) for (u, v) in step_actions if u == node]
             related_edges = in_edges + out_edges
             model += (
                 pulp.lpSum(step_var[(i, u, v)] for (u, v) in related_edges) <= 2 * node_vars[(i, node)],
