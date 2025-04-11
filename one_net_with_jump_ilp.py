@@ -131,6 +131,8 @@ class DirectionalJumpRouter:
             self.add_directional_constraints(i)
             self.add_overlap_constraints(i)
             self.add_goal_action_constraints(i)
+        
+        self.add_net_overlap_constraints()
 
     def add_flow_constraints(self, i):
         # Flow is avaiable if the edge is selected
@@ -180,6 +182,25 @@ class DirectionalJumpRouter:
         # no action is to be taken at the goal nodes
         for goal in self.goals[i]:
             self.model += pulp.lpSum(self.is_node_used_by_jump_edge[i][goal] + self.is_node_used_by_step_edge[i][goal]) == 0
+
+    def add_net_overlap_constraints(self):
+        # no overlap between nets
+
+        # create dynamic variable that indicates if a node is used by ith net
+        self.is_node_used_by_net: Dict[int, Dict[Node, pulp.LpVariable]] = defaultdict(lambda: defaultdict(pulp.LpVariable))
+        for i in range(self.num_nets):
+            for node in self.all_nodes[i]:
+                self.is_node_used_by_net[i][node] = pulp.LpVariable(f"node_used_by_net_{i}_{node}", cat='Binary')
+                self.model += self.is_node_used_by_net[i][node] >= self.is_node_used_by_step_edge[i][node] + self.is_node_used_by_jump_edge[i][node]
+
+        # no overlap between nets
+        for node in self.all_nodes[0]:
+            list_of_nets_using_node = []
+            for i in range(self.num_nets):
+                list_of_nets_using_node.append(self.is_node_used_by_net[i][node])
+            
+            # constraint: at most one net can use a node
+            self.model += pulp.lpSum(list_of_nets_using_node) <= 1
 
     def solve(self):
         solver = pulp.PULP_CBC_CMD(timeLimit=30)
@@ -257,7 +278,7 @@ class DirectionalJumpRouter:
 # Example usage
 if __name__ == "__main__":
     nets = [
-        ((0, 0), [(5, 13), (10, 13)]),
-        ((10, 0), [(15, 13), (18, 13)]),
+        ((5, 0), [(13, 13)]),
+        ((6, 0), [(0, 13)]),
         ]
     router = DirectionalJumpRouter(width=34, height=14, nets=nets, jump_distance=4)
