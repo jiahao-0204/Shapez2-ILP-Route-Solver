@@ -19,6 +19,7 @@ class DirectionalJumpRouter:
         self.edge_flow_map = {}
         self.path_edges = []
         self.K = len(goals)
+        self.all_nodes = [(x, y) for x in range(self.WIDTH) for y in range(self.HEIGHT)]
 
         self.step_cost = 1
         self.jump_cost = 2
@@ -55,8 +56,7 @@ class DirectionalJumpRouter:
             self.model += self.edge_flow_map[edge] <= self.edge_used_map[edge] * self.K
 
         # Flow conservation constraints
-        all_nodes = [(x, y) for x in range(self.WIDTH) for y in range(self.HEIGHT)]
-        for node in all_nodes:
+        for node in self.all_nodes:
             in_flow = pulp.lpSum(self.edge_flow_map[edge] for edge in self.all_edges if edge[1] == node)
             out_flow = pulp.lpSum(self.edge_flow_map[edge] for edge in self.all_edges if edge[0] == node)
 
@@ -90,9 +90,7 @@ class DirectionalJumpRouter:
         self.node_used_by_step = {}
         self.node_used_by_jump = {}
 
-        all_nodes = {(x, y) for x in range(self.WIDTH) for y in range(self.HEIGHT)}
-
-        for node in all_nodes:
+        for node in self.all_nodes:
             self.node_used_by_step[node] = pulp.LpVariable(f"step_node_used_{node}", cat='Binary')
             self.node_used_by_jump[node] = pulp.LpVariable(f"jump_node_used_{node}", cat='Binary')
 
