@@ -85,19 +85,37 @@ class DirectionalJumpRouter:
                 self.model += (out_flow - in_flow == 0), f"node_flow_{node}"
 
     def add_directional_constraints(self):
-        for (u, v, d) in self.jump_edges:
-            # Directional flow constraint: jump at u in direction d only if incoming flow is in same direction
-            dx, dy = d
-            allowed_in = [
-                (u2, u, d) for (u2, _, d2) in self.jump_edges if _ == u and d2 == d
-            ] + [
-                (u2, u) for (u2, _, d2) in self.edges if _ == u and d2 == d
-            ]
-            incoming = (
-                pulp.lpSum(self.f_step[e] for e in allowed_in if e in self.f_step) +
-                pulp.lpSum(self.f_jump[e] for e in allowed_in if e in self.f_jump)
+        for (u, v, direction) in self.jump_edges:
+            dx, dy = direction
+
+            # A jump from u to v in direction `direction` is only allowed
+            # if there is incoming flow to u from the same direction.
+
+            # Collect all edges (step and jump) that go into `u` from direction `direction`
+            incoming_edges_same_direction = []
+
+            # From jump edges
+            for (prev, target, dir_jump) in self.jump_edges:
+                if target == u and dir_jump == direction:
+                    incoming_edges_same_direction.append((prev, target, dir_jump))
+
+            # From step edges
+            for (prev, target, dir_step) in self.edges:
+                if target == u and dir_step == direction:
+                    incoming_edges_same_direction.append((prev, target))
+
+            # Calculate incoming flow from same-direction edges
+            incoming_flow = pulp.lpSum(
+                self.f_jump[e] for e in incoming_edges_same_direction if e in self.f_jump
+            ) + pulp.lpSum(
+                self.f_step[e] for e in incoming_edges_same_direction if e in self.f_step
             )
-            self.model += self.f_jump[(u, v)] <= incoming, f"dir_jump_{u}_{v}_{d}"
+
+            # Enforce that jump flow is only allowed if incoming flow matches direction
+            self.model += (
+                self.f_jump[(u, v)] <= incoming_flow,
+                f"directional_jump_flow_{u}_{v}_{direction}"
+            )
 
     def solve(self):
         solver = pulp.PULP_CBC_CMD(timeLimit=30)
