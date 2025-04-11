@@ -77,12 +77,14 @@ class DirectionalJumpRouter:
                 self.model += (out_flow - in_flow == 0), f"node_flow_{node}"
 
     def add_capacity_and_direction_constraints(self):
-        for (u, v, d) in self.edges:
+        for (u, v, _) in self.edges:
             self.model += self.f_step[(u, v)] <= self.x_step[(u, v)], f"cap_step_{u}_{v}"
 
-        for (u, v, d) in self.jump_edges:
+        for (u, v, _) in self.jump_edges:
             self.model += self.f_jump[(u, v)] <= self.x_jump[(u, v)], f"cap_jump_{u}_{v}"
 
+    def add_directional_constraints(self):
+        for (u, v, d) in self.jump_edges:
             # Directional flow constraint: jump at u in direction d only if incoming flow is in same direction
             dx, dy = d
             allowed_in = [
@@ -146,6 +148,7 @@ if __name__ == "__main__":
     router.build_variables()
     router.add_objective()
     router.add_flow_constraints()
+    router.add_directional_constraints()
     router.add_capacity_and_direction_constraints()
     router.solve()
     router.plot()
