@@ -18,10 +18,10 @@ class DirectionalJumpRouter:
         self.WIDTH = width
         self.HEIGHT = height
 
-        self.starts: Dict[int, Tuple[int, int]] = {}
+        self.start: Dict[int, Tuple[int, int]] = {}
         self.goals: Dict[int, List[Tuple[int, int]]] = {}
         for i, (start, goals) in enumerate(nets):
-            self.starts[i] = start
+            self.start[i] = start
             self.goals[i] = goals
 
         self.jump_distance = jump_distance
@@ -103,7 +103,8 @@ class DirectionalJumpRouter:
         self.solve()
 
         # Plot
-        self.plot(0)
+        for i in range(self.num_nets):
+            self.plot(i)
 
     def dynamic_compute_is_node_used_by(self):
         for i in range(self.num_nets):
@@ -142,12 +143,12 @@ class DirectionalJumpRouter:
             in_flow = pulp.lpSum(self.edge_flow_value[i][edge] for edge in self.all_edges[i] if edge[1] == node)
             out_flow = pulp.lpSum(self.edge_flow_value[i][edge] for edge in self.all_edges[i] if edge[0] == node)
 
-            if node == self.starts[i]:
-                self.model += (out_flow - in_flow == self.K[i]), f"start_flow_{node}"
+            if node == self.start[i]:
+                self.model += (out_flow - in_flow == self.K[i])
             elif node in self.goals[i]:
-                self.model += (out_flow - in_flow == -1), f"goal_flow_{node}"
+                self.model += (out_flow - in_flow == -1)
             else:
-                self.model += (out_flow - in_flow == 0), f"node_flow_{node}"
+                self.model += (out_flow - in_flow == 0)
 
     def add_directional_constraints(self, i):
         for jump_edge in self.jump_edges[i]:
@@ -172,14 +173,13 @@ class DirectionalJumpRouter:
         for node in self.all_nodes[i]:
             # Constraint: a node cannot be used by both step and jump
             self.model += (
-                self.is_node_used_by_step_edge[i][node] + self.is_node_used_by_jump_edge[i][node] <= 1,
-                f"no_overlap_at_node_{node}"
+                self.is_node_used_by_step_edge[i][node] + self.is_node_used_by_jump_edge[i][node] <= 1
             )
 
     def add_goal_action_constraints(self, i):
         # no action is to be taken at the goal nodes
         for goal in self.goals[i]:
-            self.model += pulp.lpSum(self.is_node_used_by_jump_edge[i][goal] + self.is_node_used_by_step_edge[i][goal]) == 0, f"no_action_at_goal_{goal}"
+            self.model += pulp.lpSum(self.is_node_used_by_jump_edge[i][goal] + self.is_node_used_by_step_edge[i][goal]) == 0
 
     def solve(self):
         solver = pulp.PULP_CBC_CMD(timeLimit=30)
@@ -200,7 +200,7 @@ class DirectionalJumpRouter:
         used_jump_edges = [e for e in self.jump_edges[i] if pulp.value(self.is_edge_used[i][e]) == 1]
 
         # Plot start and goal
-        sx, sy = self.starts[i]
+        sx, sy = self.start[i]
         for goal in self.goals[i]:
             gx, gy = goal
             plt.scatter(gx + offset, gy + offset, c='green', marker='s', s=120, edgecolors='black')
@@ -249,5 +249,8 @@ class DirectionalJumpRouter:
 
 # Example usage
 if __name__ == "__main__":
-    nets = [((0, 0), [(5, 13), (10, 13)])]
+    nets = [
+        ((5, 0), [(10, 13), (13, 13)]),
+        ((0, 0), [(5, 13), (10, 13)]),
+        ]
     router = DirectionalJumpRouter(width=34, height=14, nets=nets, jump_distance=4)
