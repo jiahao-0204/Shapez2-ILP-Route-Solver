@@ -218,7 +218,8 @@ class DirectionalJumpRouter:
             self.model += pulp.lpSum(list_of_nets_using_node) <= 1
 
     def solve(self):
-        solver = pulp.PULP_CBC_CMD(timeLimit=self.timelimit)
+        # solver = pulp.PULP_CBC_CMD(timeLimit=self.timelimit)
+        solver = pulp.GUROBI_CMD(timeLimit=30)
         self.model.solve(solver)
 
     def plot(self):
