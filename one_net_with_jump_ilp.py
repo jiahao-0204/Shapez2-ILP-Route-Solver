@@ -86,6 +86,38 @@ class DirectionalJumpRouter:
             # Enforce that jump flow is only allowed if incoming flow matches direction
             self.model += self.edge_used_map[jump_edge] <= sum_of_incoming_edge_in_same_direction
 
+    def add_overlap_constraints(self):
+        self.node_used_by_step = {}
+        self.node_used_by_jump = {}
+
+        all_nodes = {(x, y) for x in range(self.WIDTH) for y in range(self.HEIGHT)}
+
+        for node in all_nodes:
+            self.node_used_by_step[node] = pulp.LpVariable(f"step_node_used_{node}", cat='Binary')
+            self.node_used_by_jump[node] = pulp.LpVariable(f"jump_node_used_{node}", cat='Binary')
+
+            # Link step_node_used[node] to usage of step edges
+            step_related_edges = [e for e in self.step_edges if e[0] == node]
+            if step_related_edges:
+                self.model += (
+                    pulp.lpSum(self.edge_used_map[e] for e in step_related_edges) <= len(step_related_edges) *  self.node_used_by_step[node],
+                    f"step_node_link_{node}"
+                )
+
+            # Link jump_node_used[node] to usage of jump edges
+            jump_related_edges = [e for e in self.jump_edges if e[0] == node]
+            if jump_related_edges:
+                self.model += (
+                    pulp.lpSum(self.edge_used_map[e] for e in jump_related_edges) <= len(jump_related_edges) * self.node_used_by_jump[node],
+                    f"jump_node_link_{node}"
+                )
+
+            # Constraint: a node cannot be used by both step and jump
+            self.model += (
+                self.node_used_by_step[node] + self.node_used_by_jump[node] <= 1,
+                f"no_overlap_at_node_{node}"
+            )
+
     def solve(self):
         solver = pulp.PULP_CBC_CMD(timeLimit=30)
         self.model.solve(solver)
@@ -155,11 +187,12 @@ class DirectionalJumpRouter:
 # Example usage
 if __name__ == "__main__":
     start = (0, 0)
-    goals = [(5, 13), (10, 13)]
+    goals = [(5, 13), (10, 13), (13, 13)]
     router = DirectionalJumpRouter(width=34, height=14, start=start, goals=goals)
     router.build_variables()
     router.add_objective()
     router.add_flow_constraints()
+    router.add_overlap_constraints()
     router.add_directional_constraints()
     router.solve()
     router.plot()
