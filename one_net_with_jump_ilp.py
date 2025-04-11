@@ -41,40 +41,53 @@ class DirectionalJumpRouter:
                         self.jump_edges.append(((x, y), (nx, ny), (dx, dy)))
 
     def build_variables(self):
-        for u, v, _ in self.step_edges:
-            self.x_step[(u, v)] = pulp.LpVariable(f"x_step_{u}_{v}", cat='Binary')
-            self.f_step[(u, v)] = pulp.LpVariable(f"f_step_{u}_{v}", lowBound=0, cat='Integer')
+        for e in self.step_edges:
+            self.x_step[e] = pulp.LpVariable(f"x_step_{e}", cat='Binary')
+            self.f_step[e] = pulp.LpVariable(f"f_step_{e}", lowBound=0, cat='Integer')
 
-        for u, v, _ in self.jump_edges:
-            self.x_jump[(u, v)] = pulp.LpVariable(f"x_jump_{u}_{v}", cat='Binary')
-            self.f_jump[(u, v)] = pulp.LpVariable(f"f_jump_{u}_{v}", lowBound=0, cat='Integer')
+        for e in self.jump_edges:
+            self.x_jump[e] = pulp.LpVariable(f"x_jump_{e}", cat='Binary')
+            self.f_jump[e] = pulp.LpVariable(f"f_jump_{e}", lowBound=0, cat='Integer')
 
     def add_objective(self):
         self.model += (
-            pulp.lpSum(self.x_step[(u, v)] * self.step_cost for (u, v, _) in self.step_edges) +
-            pulp.lpSum(self.x_jump[(u, v)] * self.jump_cost for (u, v, _) in self.jump_edges)
+            pulp.lpSum(self.x_step[e] * self.step_cost for e in self.step_edges) +
+            pulp.lpSum(self.x_jump[e] * self.jump_cost for e in self.jump_edges)
         )
 
     def add_flow_constraints(self):
         # Flow is avaiable if the edge is selected
-        for (u, v, _) in self.step_edges:
-            self.model += self.f_step[(u, v)] <= self.x_step[(u, v)], f"cap_step_{u}_{v}"
+        for e in self.step_edges:
+            self.model += self.f_step[e] <= self.x_step[e], f"cap_step_{e}"
 
-        for (u, v, _) in self.jump_edges:
-            self.model += self.f_jump[(u, v)] <= self.x_jump[(u, v)], f"cap_jump_{u}_{v}"
+        for e in self.jump_edges:
+            self.model += self.f_jump[e] <= self.x_jump[e], f"cap_jump_{e}"
 
         # Flow conservation constraints
         all_nodes = [(x, y) for x in range(self.WIDTH) for y in range(self.HEIGHT)]
         for node in all_nodes:
-            in_flow = (
-                pulp.lpSum(self.f_step[(u, v)] for (u, v, _) in self.step_edges if v == node) +
-                pulp.lpSum(self.f_jump[(u, v)] for (u, v, _) in self.jump_edges if v == node)
-            )
-            out_flow = (
-                pulp.lpSum(self.f_step[(u, v)] for (u, v, _) in self.step_edges if u == node) +
-                pulp.lpSum(self.f_jump[(u, v)] for (u, v, _) in self.jump_edges if u == node)
-            )
+            in_flow_edges = []
+            for e in self.step_edges:
+                u, v, _ = e
+                if v == node:
+                    in_flow_edges.append(self.f_step[e])
+            for e in self.jump_edges:
+                u, v, _ = e
+                if v == node:
+                    in_flow_edges.append(self.f_jump[e])
+            in_flow = pulp.lpSum(in_flow_edges)
 
+            out_flow_edges = []
+            for e in self.step_edges:
+                u, v, _ = e
+                if u == node:
+                    out_flow_edges.append(self.f_step[e])
+            for e in self.jump_edges:
+                u, v, _ = e
+                if u == node:
+                    out_flow_edges.append(self.f_jump[e])
+            out_flow = pulp.lpSum(out_flow_edges)
+            
             if node == self.start:
                 self.model += (out_flow - in_flow == 1), f"start_flow_{node}"
             elif node == self.goal:
@@ -83,26 +96,29 @@ class DirectionalJumpRouter:
                 self.model += (out_flow - in_flow == 0), f"node_flow_{node}"
 
     def add_directional_constraints(self):
-        for (u, v, direction) in self.jump_edges:
+        for jump_edge in self.jump_edges:
+            u, v, direction = jump_edge
             # A jump from u to v in direction `direction` is only allowed
             # if there is incoming flow to u from the same direction.
 
             # Collect all edges (step and jump) that go into `u` from direction `direction`
             incoming_edges_in_same_direction = []
-            for (prev, target, dir_step) in self.step_edges:
+            for edge in self.step_edges:
+                _, target, dir_step = edge
                 if target == u and dir_step == direction:
-                    incoming_edges_in_same_direction.append(self.x_step[(prev, target)])
-            for (prev, target, dir_jump) in self.jump_edges:
+                    incoming_edges_in_same_direction.append(self.x_step[edge])
+            for edge in self.jump_edges:
+                _, target, dir_jump = edge
                 if target == u and dir_jump == direction:
-                    incoming_edges_in_same_direction.append(self.x_jump[(prev, target)])
+                    incoming_edges_in_same_direction.append(self.x_jump[edge])
 
             # create a variable that sums up the incoming edges in the same direction
             existing_incoming_edge_in_same_direction = pulp.lpSum(incoming_edges_in_same_direction)
 
             # Enforce that jump flow is only allowed if incoming flow matches direction
             self.model += (
-                self.x_jump[(u, v)] <= existing_incoming_edge_in_same_direction,
-                f"directional_jump_flow_{u}_{v}_{direction}"
+                self.x_jump[jump_edge] <= existing_incoming_edge_in_same_direction,
+                f"directional_jump_flow_{jump_edge}"
             )
 
     def solve(self):
@@ -121,8 +137,14 @@ class DirectionalJumpRouter:
         ax.grid(True)
 
         offset = 0.5
-        step_edges = [(u, v, d) for (u, v, d) in self.step_edges if pulp.value(self.x_step[(u, v)]) == 1]
-        jump_edges = [(u, v, d) for (u, v, d) in self.jump_edges if pulp.value(self.x_jump[(u, v)]) == 1]
+        step_edges = []
+        for step_edge in self.step_edges:
+            if pulp.value(self.x_step[step_edge]) == 1:
+                step_edges.append(step_edge)
+        jump_edges = []
+        for jump_edge in self.jump_edges:
+            if pulp.value(self.x_jump[jump_edge]) == 1:
+                jump_edges.append(jump_edge)
 
         # Plot start and goal
         sx, sy = self.start
