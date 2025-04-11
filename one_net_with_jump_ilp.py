@@ -34,7 +34,7 @@ class DirectionalJumpRouter:
         for x in range(self.WIDTH):
             for y in range(self.HEIGHT):
                 for dx, dy in self.directions:
-                    nx, ny = x + dx * self.jump_distance, y + dy * self.jump_distance
+                    nx, ny = x + dx * (self.jump_distance + 2), y + dy * (self.jump_distance + 2)
                     if 0 <= nx < self.WIDTH and 0 <= ny < self.HEIGHT:
                         edges.append(((x, y), (nx, ny), (dx, dy)))
         return edges
@@ -119,8 +119,8 @@ class DirectionalJumpRouter:
         for (u, v, d) in jump_edges:
             ux, uy = u
             u2x, u2y = u
-            u2x += d[0] * (self.jump_distance - 1)
-            u2y += d[1] * (self.jump_distance - 1)
+            u2x += d[0] * (self.jump_distance + 1)
+            u2y += d[1] * (self.jump_distance + 1)
             ax.scatter(ux + offset, uy + offset, c='black', marker='x', s=80)
             ax.scatter(u2x + offset, u2y + offset, c='black', marker='x', s=80)
 
