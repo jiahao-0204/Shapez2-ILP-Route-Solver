@@ -197,7 +197,9 @@ class DirectionalJumpRouter:
 
         offset = 0.5
 
+        colors = ['red', 'green', 'blue', 'orange', 'purple', 'cyan', 'magenta', 'brown', 'gray', 'olive']    
         for i in range(self.num_nets):
+            color = colors[i % len(colors)]
 
             used_step_edges = [e for e in self.step_edges[i] if pulp.value(self.is_edge_used[i][e]) == 1]
             used_jump_edges = [e for e in self.jump_edges[i] if pulp.value(self.is_edge_used[i][e]) == 1]
@@ -206,14 +208,15 @@ class DirectionalJumpRouter:
             sx, sy = self.start[i]
             for goal in self.goals[i]:
                 gx, gy = goal
-                plt.scatter(gx + offset, gy + offset, c='green', marker='s', s=120, edgecolors='black')
-                plt.scatter(gx + offset, gy + offset, c='black', marker='o', s=50, edgecolors='black')
-            plt.scatter(sx + offset, sy + offset, c='red', marker='s', s=120, edgecolors='black', label='Start')
+                plt.scatter(gx + offset, gy + offset, c=color, marker='s', s=120, edgecolors='black', zorder = 0)
+                plt.scatter(gx + offset, gy + offset, c=color, marker='o', s=50, edgecolors='black', zorder = 2)
+            plt.scatter(sx + offset, sy + offset, c=color, marker='s', s=120, edgecolors='black', label='Start', zorder = 0)
 
+            # plot step circule and line
             for (u, v, d) in used_step_edges:
                 ux, uy = u
-                ax.scatter(ux + offset, uy + offset, c='black', marker='o', s=50)
-                ax.plot([ux + offset, v[0] + offset], [uy + offset, v[1] + offset], c='black')
+                ax.plot([ux + offset, v[0] + offset], [uy + offset, v[1] + offset], c='black', zorder = 1)
+                ax.scatter(ux + offset, uy + offset, c=color, marker='o', s=50, edgecolors='black', zorder = 2)
 
             for (u, v, d) in used_jump_edges:
                 ux, uy = u
@@ -239,9 +242,10 @@ class DirectionalJumpRouter:
                 elif d == (-1, 0):
                     marker = '<'
 
-                ax.scatter(ux + offset, uy + offset, c='black', marker=marker, s=80)
-                ax.scatter(u2x + offset, u2y + offset, c='black', marker=marker, s=80)
-                ax.plot([u2x + offset, v[0] + offset], [u2y + offset, v[1] + offset], c='black')
+                ax.plot([u2x + offset, v[0] + offset], [u2y + offset, v[1] + offset], c='black', zorder = 1)
+                ax.scatter(ux + offset, uy + offset, c=color, marker=marker, s=80, edgecolors='black', zorder = 2)
+                ax.scatter(u2x + offset, u2y + offset, c=color, marker=marker, s=80, edgecolors='black', zorder = 2)
+        
 
         plt.title("ILP Path with Step & Jump Actions")
         handles, labels = plt.gca().get_legend_handles_labels()
