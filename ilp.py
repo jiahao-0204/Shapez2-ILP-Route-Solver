@@ -15,12 +15,13 @@ RIGHT = (1, 0)
 DIRECTIONS = [UP, DOWN, LEFT, RIGHT]
 
 
-
+# ILP model
+model = pulp.LpProblem("MultiNetRouting", pulp.LpMinimize)
 
 # action has costs
 # i need to minimize the total cost from actions 
 
-# Generate valid grid edges
+# Generate valid action edges (from tile u to tile v)
 edges = []
 for x in range(WIDTH):
     for y in range(HEIGHT):
@@ -28,9 +29,6 @@ for x in range(WIDTH):
             nx, ny = x + dx, y + dy
             if 0 <= nx < WIDTH and 0 <= ny < HEIGHT:
                 edges.append(((x, y), (nx, ny)))
-
-# ILP model
-model = pulp.LpProblem("MultiNetRouting", pulp.LpMinimize)
 
 # Decision variables: x_{i, u, v} = 1 if net i uses edge (u,v)
 x_vars = {}
@@ -59,6 +57,7 @@ for i, (start, goal) in enumerate(nets):
             else:
                 model += (flow_out - flow_in == 0), f"net_{i}_node_{node}"
 
+# each node can only be used by one net
 node_vars = {}  # node_vars[(i, n)] = 1 if net i uses node n
 for i in range(len(nets)):
     for x in range(WIDTH):
@@ -96,12 +95,6 @@ paths = [[] for _ in nets]
 for (i, u, v), var in x_vars.items():
     if pulp.value(var) == 1:
         paths[i].append((u, v))
-
-for i, path in enumerate(paths):
-    print(f"Net {i} path:")
-    for u, v in path:
-        print(f"  {u} -> {v}")
-
 
 def plot_paths(paths, nets):
     plt.figure(figsize=(10, 5))
