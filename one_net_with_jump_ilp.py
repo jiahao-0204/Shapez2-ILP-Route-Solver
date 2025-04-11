@@ -20,36 +20,14 @@ class DirectionalJumpRouter:
         self.goals = goals
         self.jump_distance = jump_distance
 
-        # Initialize the model
-        self.model = pulp.LpProblem("JumpRouter", pulp.LpMinimize)
-
         # Internal variables
         self.K = len(goals)
         self.all_nodes: List[Node] = [(x, y) for x in range(self.WIDTH) for y in range(self.HEIGHT)]
         self.node_related_steps: Dict[Node, List[Edge]] = defaultdict(list)
         self.node_related_jumps: Dict[Node, List[Edge]] = defaultdict(list)
-
+        self.all_edges: List[Edge] = []
         self.step_edges: List[Edge] = []
         self.jump_edges: List[Edge] = []
-        self.all_edges: List[Edge] = []
-        self._generate_edges()
-
-
-        # Slack variables
-        
-        # Boolean variables
-        self.is_edge_used: Dict[Edge, pulp.LpVariable] = {edge: pulp.LpVariable(f"bool_used_{edge}", cat='Binary') for edge in self.all_edges}
-        self.is_node_used_by_step_edge: Dict[Node, pulp.LpVariable] = {node: pulp.LpVariable(f"step_node_used_{node}", cat='Binary') for node in self.all_nodes}
-        self.is_node_used_by_jump_edge: Dict[Node, pulp.LpVariable] = {node: pulp.LpVariable(f"jump_node_used_{node}", cat='Binary') for node in self.all_nodes}
-        self.dynamic_compute_is_node_used_by()
-
-        # Flow variables
-        self.edge_flow_value: Dict[Edge, pulp.LpVariable] = {edge: pulp.LpVariable(f"int_flow_{edge}", lowBound=0, cat='Integer') for edge in self.all_edges}
-
-        # Dynamic compute slack variables
-
-
-    def _generate_edges(self):
         for node in self.all_nodes:
             x, y = node
             for dx, dy in DIRECTIONS:
@@ -73,6 +51,32 @@ class DirectionalJumpRouter:
                     self.node_related_jumps[node].append(edge)
                     self.node_related_jumps[pad_node].append(edge)
 
+
+
+        # Optimization
+        self.model = pulp.LpProblem("JumpRouter", pulp.LpMinimize)
+        
+        # Dynamic variables
+        self.is_edge_used: Dict[Edge, pulp.LpVariable] = {edge: pulp.LpVariable(f"bool_used_{edge}", cat='Binary') for edge in self.all_edges}
+        self.is_node_used_by_step_edge: Dict[Node, pulp.LpVariable] = {node: pulp.LpVariable(f"step_node_used_{node}", cat='Binary') for node in self.all_nodes}
+        self.is_node_used_by_jump_edge: Dict[Node, pulp.LpVariable] = {node: pulp.LpVariable(f"jump_node_used_{node}", cat='Binary') for node in self.all_nodes}
+        self.edge_flow_value: Dict[Edge, pulp.LpVariable] = {edge: pulp.LpVariable(f"int_flow_{edge}", lowBound=0, cat='Integer') for edge in self.all_edges}
+
+        # Dynamic computes
+        self.dynamic_compute_is_node_used_by()
+        
+        # Objective function
+        self.add_objective()
+
+        # Constraints
+        self.add_constraints()
+
+        # Solve
+        self.solve()
+
+        # Plot
+        self.plot()
+
     def dynamic_compute_is_node_used_by(self):
         for node in self.all_nodes:
             if self.node_related_steps[node]:
@@ -84,6 +88,12 @@ class DirectionalJumpRouter:
         step_cost_list = [self.is_edge_used[edge] * STEP_COST for edge in self.step_edges]
         jump_cost_list = [self.is_edge_used[edge] * JUMP_COST for edge in self.jump_edges]
         self.model += pulp.lpSum(step_cost_list + jump_cost_list)
+
+    def add_constraints(self):
+        self.add_flow_constraints()
+        self.add_overlap_constraints()
+        self.add_directional_constraints()
+        self.add_goal_action_constraints()
 
     def add_flow_constraints(self):
         # Flow is avaiable if the edge is selected
@@ -205,10 +215,3 @@ if __name__ == "__main__":
     start = (0, 0)
     goals = [(5, 13), (10, 13)]
     router = DirectionalJumpRouter(width=34, height=14, start=start, goals=goals)
-    router.add_objective()
-    router.add_flow_constraints()
-    router.add_overlap_constraints()
-    router.add_directional_constraints()
-    router.add_goal_action_constraints()
-    router.solve()
-    router.plot()
