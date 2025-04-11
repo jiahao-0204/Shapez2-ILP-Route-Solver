@@ -33,16 +33,16 @@ step_cost = 1
 
 
 # Decision variables: x_{i, u, v} = 1 if net i uses edge (u,v)
-step_var = {}
+step_used = {}
 for i in range(len(nets)):
     for u, v in step_actions:
-        step_var[(i, u, v)] = pulp.LpVariable(f"x_{i}_{u}_{v}", cat='Binary')
+        step_used[(i, u, v)] = pulp.LpVariable(f"x_{i}_{u}_{v}", cat='Binary')
 
 # Objective: minimize total path length
 cost_list = []
 for i in range(len(nets)):
     for u, v in step_actions:
-        cost_list.append(step_var[(i, u, v)] * step_cost)
+        cost_list.append(step_used[(i, u, v)] * step_cost)
 
 model += pulp.lpSum(cost_list)
 
@@ -54,8 +54,8 @@ for i, (start, goal) in enumerate(nets):
             in_edges = [(u, v) for (u, v) in step_actions if v == node]
             out_edges = [(u, v) for (u, v) in step_actions if u == node]
 
-            flow_in = pulp.lpSum(step_var[(i, u, v)] for u, v in in_edges)
-            flow_out = pulp.lpSum(step_var[(i, u, v)] for u, v in out_edges)
+            flow_in = pulp.lpSum(step_used[(i, u, v)] for u, v in in_edges)
+            flow_out = pulp.lpSum(step_used[(i, u, v)] for u, v in out_edges)
 
             if node == start:
                 model += (flow_out - flow_in == 1), f"net_{i}_start_{node}"
@@ -80,7 +80,7 @@ for i in range(len(nets)):
             out_edges = [(u, v) for (u, v) in step_actions if u == node]
             related_edges = in_edges + out_edges
             model += (
-                pulp.lpSum(step_var[(i, u, v)] for (u, v) in related_edges) <= 2 * node_vars[(i, node)],
+                pulp.lpSum(step_used[(i, u, v)] for (u, v) in related_edges) <= 2 * node_vars[(i, node)],
                 f"node_link_{i}_{node}"
             )
 
@@ -99,7 +99,7 @@ model.solve(solver)
 
 # Output the paths
 paths = [[] for _ in nets]
-for (i, u, v), var in step_var.items():
+for (i, u, v), var in step_used.items():
     if pulp.value(var) == 1:
         paths[i].append((u, v))
 
