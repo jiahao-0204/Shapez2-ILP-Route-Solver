@@ -124,9 +124,16 @@ class DirectionalJumpRouter:
         step_edges = [(u, v, d) for (u, v, d) in self.step_edges if pulp.value(self.x_step[(u, v)]) == 1]
         jump_edges = [(u, v, d) for (u, v, d) in self.jump_edges if pulp.value(self.x_jump[(u, v)]) == 1]
 
+        # Plot start and goal
+        sx, sy = self.start
+        gx, gy = self.goal
+        plt.scatter(sx + offset, sy + offset, c='green', marker='s', s=120, edgecolors='black', label='Start')
+        plt.scatter(gx + offset, gy + offset, c='red', marker='*', s=120, edgecolors='black', label='Goal')
+
         for (u, v, d) in step_edges:
             ux, uy = u
             ax.scatter(ux + offset, uy + offset, c='black', marker='o', s=50)
+            ax.plot([ux + offset, v[0] + offset], [uy + offset, v[1] + offset], c='black')
 
         for (u, v, d) in jump_edges:
             ux, uy = u
@@ -135,11 +142,7 @@ class DirectionalJumpRouter:
             u2y += d[1] * (self.jump_distance + 1)
             ax.scatter(ux + offset, uy + offset, c='black', marker='x', s=80)
             ax.scatter(u2x + offset, u2y + offset, c='black', marker='x', s=80)
-
-        sx, sy = self.start
-        gx, gy = self.goal
-        plt.scatter(sx + offset, sy + offset, c='green', marker='s', s=120, edgecolors='black', label='Start')
-        plt.scatter(gx + offset, gy + offset, c='red', marker='*', s=150, edgecolors='black', label='Goal')
+            ax.plot([u2x + offset, v[0] + offset], [u2y + offset, v[1] + offset], c='black')
 
         plt.title("ILP Path with Step & Jump Actions")
         handles, labels = plt.gca().get_legend_handles_labels()
