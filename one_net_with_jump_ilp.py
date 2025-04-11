@@ -20,9 +20,17 @@ class DirectionalJumpRouter:
         self.path_edges = []
         self.K = len(goals)
         self.all_nodes = [(x, y) for x in range(self.WIDTH) for y in range(self.HEIGHT)]
+        self.node_used_by_step = {}
+        self.node_used_by_jump = {}
+        self._generate_node_used_variables()
 
         self.step_cost = 1
         self.jump_cost = 2
+
+    def _generate_node_used_variables(self):
+        for node in self.all_nodes:
+            self.node_used_by_step[node] = pulp.LpVariable(f"step_node_used_{node}", cat='Binary')
+            self.node_used_by_jump[node] = pulp.LpVariable(f"jump_node_used_{node}", cat='Binary')
 
     def _generate_step_edges(self):
         for x in range(self.WIDTH):
@@ -87,13 +95,7 @@ class DirectionalJumpRouter:
             self.model += self.edge_used_map[jump_edge] <= sum_of_incoming_edge_in_same_direction
 
     def add_overlap_constraints(self):
-        self.node_used_by_step = {}
-        self.node_used_by_jump = {}
-
         for node in self.all_nodes:
-            self.node_used_by_step[node] = pulp.LpVariable(f"step_node_used_{node}", cat='Binary')
-            self.node_used_by_jump[node] = pulp.LpVariable(f"jump_node_used_{node}", cat='Binary')
-
             # Link step_node_used[node] to usage of step edges
             step_related_edges = [e for e in self.step_edges if e[0] == node]
             if step_related_edges:
@@ -115,6 +117,11 @@ class DirectionalJumpRouter:
                 self.node_used_by_step[node] + self.node_used_by_jump[node] <= 1,
                 f"no_overlap_at_node_{node}"
             )
+
+    def add_goal_action_constraints(self):
+        # no action is to be taken at the goal nodes
+        for goal in self.goals:
+            self.model += pulp.lpSum(self.node_used_by_jump[goal] + self.node_used_by_step[goal]) == 0, f"no_action_at_goal_{goal}"
 
     def solve(self):
         solver = pulp.PULP_CBC_CMD(timeLimit=30)
@@ -185,12 +192,13 @@ class DirectionalJumpRouter:
 # Example usage
 if __name__ == "__main__":
     start = (0, 0)
-    goals = [(5, 13), (10, 13), (13, 13)]
+    goals = [(5, 13), (10, 13)]
     router = DirectionalJumpRouter(width=34, height=14, start=start, goals=goals)
     router.build_variables()
     router.add_objective()
     router.add_flow_constraints()
     router.add_overlap_constraints()
     router.add_directional_constraints()
+    router.add_goal_action_constraints()
     router.solve()
     router.plot()
