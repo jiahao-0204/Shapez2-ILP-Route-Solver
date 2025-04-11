@@ -12,7 +12,7 @@ Node = Tuple[int, int] # (x, y)
 Edge = Tuple[Node, Node, Tuple[int, int]]  # (start_node, end_node, direction)
 
 class DirectionalJumpRouter:
-    def __init__(self, width, height, nets, jump_distance: int = 4):
+    def __init__(self, width, height, nets, jump_distance: int = 4, timelimit: int = 60):
 
         # Input parameters
         self.WIDTH = width
@@ -26,6 +26,7 @@ class DirectionalJumpRouter:
             self.goals[i] = goals
 
         self.jump_distance = jump_distance
+        self.timelimit = timelimit
 
 
 
@@ -206,7 +207,7 @@ class DirectionalJumpRouter:
             self.model += pulp.lpSum(list_of_nets_using_node) <= 1
 
     def solve(self):
-        solver = pulp.PULP_CBC_CMD(timeLimit=30)
+        solver = pulp.PULP_CBC_CMD(timeLimit=self.timelimit)
         self.model.solve(solver)
 
     def plot(self):
@@ -285,7 +286,7 @@ class DirectionalJumpRouter:
 # Example usage
 if __name__ == "__main__":
     nets = [
-        ((5, 0), [(6, 13)]),
-        ((6, 0), [(5, 13)]),
+        ((5, 0), [(1, 6), (3, 6), (5, 6), (7, 6)]),
+        # ((26, 0), [(2, 6), (4, 6), (6, 6), (8, 6)]),
         ]
-    router = DirectionalJumpRouter(width=34, height=14, nets=nets, jump_distance=4)
+    router = DirectionalJumpRouter(width=34, height=7, nets=nets, jump_distance=2)
