@@ -2,21 +2,31 @@ import pulp
 import matplotlib.pyplot as plt
 
 # Grid size
-grid_width, grid_height = 5, 5
+WIDTH, HEIGHT = 34, 14
 
 # Define nets: each as (start, goal)
 nets = [((0, 0), (2, 2)), ((1, 0), (1, 4))]
 
-# Step directions (4-connected)
-directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+# Define directions for movement
+UP = (0, 1)
+DOWN = (0, -1)
+LEFT = (-1, 0)
+RIGHT = (1, 0)
+DIRECTIONS = [UP, DOWN, LEFT, RIGHT]
+
+
+
+
+# action has costs
+# i need to minimize the total cost from actions 
 
 # Generate valid grid edges
 edges = []
-for x in range(grid_width):
-    for y in range(grid_height):
-        for dx, dy in directions:
+for x in range(WIDTH):
+    for y in range(HEIGHT):
+        for dx, dy in DIRECTIONS:
             nx, ny = x + dx, y + dy
-            if 0 <= nx < grid_width and 0 <= ny < grid_height:
+            if 0 <= nx < WIDTH and 0 <= ny < HEIGHT:
                 edges.append(((x, y), (nx, ny)))
 
 # ILP model
@@ -33,8 +43,8 @@ model += pulp.lpSum(x_vars[(i, u, v)] for i in range(len(nets)) for u, v in edge
 
 # Flow constraints for each net
 for i, (start, goal) in enumerate(nets):
-    for x in range(grid_width):
-        for y in range(grid_height):
+    for x in range(WIDTH):
+        for y in range(HEIGHT):
             node = (x, y)
             in_edges = [(u, v) for (u, v) in edges if v == node]
             out_edges = [(u, v) for (u, v) in edges if u == node]
@@ -51,14 +61,14 @@ for i, (start, goal) in enumerate(nets):
 
 node_vars = {}  # node_vars[(i, n)] = 1 if net i uses node n
 for i in range(len(nets)):
-    for x in range(grid_width):
-        for y in range(grid_height):
+    for x in range(WIDTH):
+        for y in range(HEIGHT):
             node = (x, y)
             node_vars[(i, node)] = pulp.LpVariable(f"node_{i}_{node}", cat='Binary')
 
 for i in range(len(nets)):
-    for x in range(grid_width):
-        for y in range(grid_height):
+    for x in range(WIDTH):
+        for y in range(HEIGHT):
             node = (x, y)
             in_edges = [(u, v) for (u, v) in edges if v == node]
             out_edges = [(u, v) for (u, v) in edges if u == node]
@@ -68,8 +78,8 @@ for i in range(len(nets)):
                 f"node_link_{i}_{node}"
             )
 
-for x in range(grid_width):
-    for y in range(grid_height):
+for x in range(WIDTH):
+    for y in range(HEIGHT):
         node = (x, y)
         model += (
             pulp.lpSum(node_vars[(i, node)] for i in range(len(nets))) <= 1,
@@ -93,15 +103,17 @@ for i, path in enumerate(paths):
         print(f"  {u} -> {v}")
 
 
-def plot_paths(paths, grid_width, grid_height, nets):
-    plt.figure(figsize=(6, 6))
+def plot_paths(paths, nets):
+    plt.figure(figsize=(10, 5))
     ax = plt.gca()
-    ax.set_xlim(-0.5, grid_width - 0.5)
-    ax.set_ylim(-0.5, grid_height - 0.5)
-    ax.set_xticks(range(grid_width))
-    ax.set_yticks(range(grid_height))
+    ax.set_xlim(0, WIDTH + 1)
+    ax.set_ylim(0, HEIGHT + 1)
+    ax.set_xticks(range(WIDTH + 1))
+    ax.set_yticks(range(HEIGHT + 1))
     ax.set_aspect('equal')
     ax.grid(True)
+
+    location_offset = 0.5  # Center within grid cells
 
     colors = ['red', 'blue', 'green', 'purple', 'orange', 'cyan']
 
@@ -110,17 +122,24 @@ def plot_paths(paths, grid_width, grid_height, nets):
         for (u, v) in path:
             ux, uy = u
             vx, vy = v
-            ax.plot([ux, vx], [uy, vy], color=color, linewidth=2, label=f'Net {i}' if (u, v) == path[0] else "")
+            ax.plot(
+                [ux + location_offset, vx + location_offset],
+                [uy + location_offset, vy + location_offset],
+                color=color,
+                linewidth=2,
+                label=f'Net {i}' if (u, v) == path[0] else ""
+            )
 
         # Draw start and goal
         sx, sy = nets[i][0]
         gx, gy = nets[i][1]
-        plt.scatter(sx, sy, c=color, marker='s', s=100, edgecolors='black', label=f'Start {i}')
-        plt.scatter(gx, gy, c=color, marker='*', s=150, edgecolors='black', label=f'Goal {i}')
+        plt.scatter(sx + location_offset, sy + location_offset, c=color, marker='s', s=100, edgecolors='black', label=f'Start {i}')
+        plt.scatter(gx + location_offset, gy + location_offset, c=color, marker='*', s=150, edgecolors='black', label=f'Goal {i}')
 
     plt.legend()
     plt.title("ILP Multi-Net Path Planning")
     plt.show()
 
+
 # Call visualizer
-plot_paths(paths, grid_width, grid_height, nets)
+plot_paths(paths, nets)
