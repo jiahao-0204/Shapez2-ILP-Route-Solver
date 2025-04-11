@@ -83,14 +83,10 @@ class DirectionalJumpRouter:
         # Dynamic variables
         self.is_edge_used: Dict[int, Dict[Edge, pulp.LpVariable]] = {}
         self.edge_flow_value: Dict[int, Dict[Edge, pulp.LpVariable]] = {}
-        self.is_node_used_by_step_edge: Dict[int, Dict[Node, pulp.LpVariable]] = {}
-        self.is_node_used_by_jump_edge: Dict[int, Dict[Node, pulp.LpVariable]] = {}
+        self.is_node_used_by_net: Dict[int, Dict[Node, pulp.LpVariable]] = defaultdict(lambda: defaultdict(pulp.LpVariable))
         for i in range(self.num_nets):
             self.is_edge_used[i] = {edge: pulp.LpVariable(f"edge_used_{i}_{edge}", cat='Binary') for edge in self.all_edges[i]}
             self.edge_flow_value[i] = {edge: pulp.LpVariable(f"edge_flow_value_{i}_{edge}", cat='Integer', lowBound=0) for edge in self.all_edges[i]}
-            self.is_node_used_by_step_edge[i] = {node: pulp.LpVariable(f"node_used_by_step_edge_{i}_{node}", cat='Binary') for node in self.all_nodes[i]}
-            self.is_node_used_by_jump_edge[i] = {node: pulp.LpVariable(f"node_used_by_jump_edge_{i}_{node}", cat='Binary') for node in self.all_nodes[i]}
-        
         
         # Dynamic computes
         self.dynamic_compute_is_node_used_by()
@@ -110,10 +106,12 @@ class DirectionalJumpRouter:
     def dynamic_compute_is_node_used_by(self):
         for i in range(self.num_nets):
             for node in self.all_nodes[i]:
-                if self.node_related_step_edges[i][node]:
-                    self.model += pulp.lpSum(self.is_edge_used[i][e] for e in self.node_related_step_edges[i][node]) <= len(self.node_related_step_edges[i][node]) *  self.is_node_used_by_step_edge[i][node]
-                if self.node_related_jump_edges[i][node]:
-                    self.model += pulp.lpSum(self.is_edge_used[i][e] for e in self.node_related_jump_edges[i][node]) <= len(self.node_related_jump_edges[i][node]) * self.is_node_used_by_jump_edge[i][node]
+
+                step_edges_from_node = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[i][node]]
+                jump_edges_related_to_node = [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[i][node]]
+                
+                self.is_node_used_by_net[i][node] = pulp.LpVariable(f"node_used_by_net_{i}_{node}", cat='Binary')    
+                self.model += self.is_node_used_by_net[i][node] >= pulp.lpSum(step_edges_from_node) / len(step_edges_from_node) + pulp.lpSum(jump_edges_related_to_node)
 
     def add_objective(self):
         step_cost_list = []
@@ -222,18 +220,9 @@ class DirectionalJumpRouter:
         for i in range(self.num_nets):
             for j in range(self.num_nets):
                 for goal in self.goals[j]:
-                    self.model += pulp.lpSum(self.is_node_used_by_jump_edge[i][goal] + self.is_node_used_by_step_edge[i][goal]) == 0
+                    self.model += self.is_node_used_by_net[i][goal] == 0
 
     def add_net_overlap_constraints(self):
-        # no overlap between nets
-
-        # create dynamic variable that indicates if a node is used by ith net
-        self.is_node_used_by_net: Dict[int, Dict[Node, pulp.LpVariable]] = defaultdict(lambda: defaultdict(pulp.LpVariable))
-        for i in range(self.num_nets):
-            for node in self.all_nodes[i]:
-                self.is_node_used_by_net[i][node] = pulp.LpVariable(f"node_used_by_net_{i}_{node}", cat='Binary')
-                self.model += self.is_node_used_by_net[i][node] >= self.is_node_used_by_step_edge[i][node] + self.is_node_used_by_jump_edge[i][node]
-
         # no overlap between nets
         for node in self.all_nodes[0]:
             list_of_nets_using_node = []
@@ -330,9 +319,9 @@ if __name__ == "__main__":
         # ((6, 0), [(9, 6), (11, 6), (13, 6), (15, 6)]),
         # ((7, 0), [(17, 6), (19, 6), (21, 6), (23, 6)]),
         # ((8, 0), [(25, 6), (27, 6), (29, 6), (31, 6)]),
-        ((26, 0), [(2, 6), (4, 6), (6, 6), (8, 6)]),
+        # ((26, 0), [(2, 6), (4, 6), (6, 6), (8, 6)]),
         # ((27, 0), [(10, 6), (12, 6), (14, 6), (16, 6)]),
         # ((28, 0), [(18, 6), (20, 6), (22, 6), (24, 6)]),
         # ((29, 0), [(26, 6), (28, 6), (30, 6), (32, 6)]),
         ]
-    router = DirectionalJumpRouter(width=33, height=7, nets=nets, jump_distances= [4], timelimit = 120)
+    router = DirectionalJumpRouter(width=33, height=7, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = 120)
