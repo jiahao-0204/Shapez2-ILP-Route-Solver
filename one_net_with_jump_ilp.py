@@ -2,19 +2,25 @@ import pulp
 import matplotlib.pyplot as plt
 from collections import defaultdict
 
+DIRECTIONS = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+
 class DirectionalJumpRouter:
     def __init__(self, width, height, start, goals, jump_distance=4):
+
+        # Input parameters
         self.WIDTH = width
         self.HEIGHT = height
+        self.start = start
+        self.goals = goals
+        self.jump_distance = jump_distance
+
+        
         self.all_nodes = [(x, y) for x in range(self.WIDTH) for y in range(self.HEIGHT)]
         self.node_related_steps = defaultdict(list)
         self.node_related_jumps = defaultdict(list)
         self.node_used_by_step_bool = {}
         self.node_used_by_jump_bool = {}
-        self.start = start
-        self.goals = goals
-        self.jump_distance = jump_distance
-        self.directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+        
         self.step_edges = []
         self._generate_step_edges()
         self.jump_edges = []
@@ -40,7 +46,7 @@ class DirectionalJumpRouter:
     def _generate_step_edges(self):
         for node in self.all_nodes:
             x, y = node
-            for dx, dy in self.directions:
+            for dx, dy in DIRECTIONS:
                 nx, ny = x + dx, y + dy
                 if 0 <= nx < self.WIDTH and 0 <= ny < self.HEIGHT:
                     step_edge = ((x, y), (nx, ny), (dx, dy))
@@ -50,7 +56,7 @@ class DirectionalJumpRouter:
     def _generate_jump_edges(self):
         for node in self.all_nodes:
             x, y = node
-            for dx, dy in self.directions:
+            for dx, dy in DIRECTIONS:
                 nx, ny = x + dx * (self.jump_distance + 2), y + dy * (self.jump_distance + 2)
                 jx, jy = x + dx * (self.jump_distance + 1), y + dy * (self.jump_distance + 1)
                 pad_node = (jx, jy)
