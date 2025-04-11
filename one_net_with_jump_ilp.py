@@ -67,7 +67,6 @@ class DirectionalJumpRouter:
                         self.node_related_step_edges[i][node].append(edge)
                     
                     for jump_distance in self.jump_distances:
-                        # Jump edge
                         nx, ny = x + dx * (jump_distance + 2), y + dy * (jump_distance + 2)
                         jx, jy = x + dx * (jump_distance + 1), y + dy * (jump_distance + 1)
                         pad_node = (jx, jy)
@@ -132,8 +131,7 @@ class DirectionalJumpRouter:
         for i in range(self.num_nets):
             self.add_flow_constraints(i)
             self.add_directional_constraints(i)
-            self.add_overlap_constraints(i)
-            self.add_one_jump_constraints(i)
+            self.add_overlap_and_one_jump_constraints(i)
 
         self.add_goal_action_constraints()
         self.add_net_overlap_constraints()
@@ -175,21 +173,48 @@ class DirectionalJumpRouter:
             # Enforce that jump flow is only allowed if incoming flow matches direction
             self.model += self.is_edge_used[i][jump_edge] <= sum_of_incoming_edge_in_same_direction
 
-    def add_overlap_constraints(self, i):
+    def add_overlap_and_one_jump_constraints(self, i):
         for node in self.all_nodes[i]:
-            # Constraint: a node cannot be used by both step and jump
+            # list of all step edges from this node
+            step_edges_from_node = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[i][node]]
+
+            # list of all jump edges of this node
+            jump_edges_related_to_node = [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[i][node]]
+
+            # the constraint
             self.model += (
-                self.is_node_used_by_step_edge[i][node] + self.is_node_used_by_jump_edge[i][node] <= 1
+                pulp.lpSum(step_edges_from_node) / len(step_edges_from_node) + pulp.lpSum(jump_edges_related_to_node) <= 1
             )
 
-    def add_one_jump_constraints(self, i):
-        # at most one jump edge allowed in each node
-        for node in self.all_nodes[i]:
-            # create a variable that sums up the jump edges in the same node
-            num_of_jump_edges_per_node = pulp.lpSum(self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[i][node])
+    # def add_overlap_constraints_v3(self):
+    #     for node in self.all_nodes[0]:
+    #         step_edges_of_net: Dict[int, List[Edge]] = defaultdict(list)
+    #         jump_edges_of_net: Dict[int, List[Edge]] = defaultdict(list)
 
-            # Enforce that at most one jump edge is allowed in each node
-            self.model += num_of_jump_edges_per_node <= 1
+    #         for i in range(self.num_nets):
+    #             step_edges_of_net[i] = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[i][node]]
+    #             jump_edges_of_net[i] = [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[i][node]]
+
+    #         # the constraint
+    #         self.model += (
+    #             pulp.lpSum(pulp.lpSum(step_edges_of_net[i]) / len(step_edges_of_net[i]) for i in range(self.num_nets)) + 
+    #             pulp.lpSum(pulp.lpSum(jump_edges_of_net[i]) for i in range(self.num_nets)) <= 1)
+
+    # def add_overlap_constraints(self, i):
+    #     for node in self.all_nodes[i]:
+    #         # Constraint: a node cannot be used by both step and jump
+    #         self.model += (
+    #             self.is_node_used_by_step_edge[i][node] + self.is_node_used_by_jump_edge[i][node] <= 1
+    #         )
+
+    # def add_one_jump_constraints(self, i):
+    #     # at most one jump edge allowed in each node
+    #     for node in self.all_nodes[i]:
+    #         # create a variable that sums up the jump edges in the same node
+    #         num_of_jump_edges_per_node = pulp.lpSum(self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[i][node])
+
+    #         # Enforce that at most one jump edge is allowed in each node
+    #         self.model += num_of_jump_edges_per_node <= 1
 
 
     def add_goal_action_constraints(self):
@@ -304,8 +329,8 @@ if __name__ == "__main__":
         ((6, 0), [(9, 6), (11, 6), (13, 6), (15, 6)]),
         # ((7, 0), [(17, 6), (19, 6), (21, 6), (23, 6)]),
         # ((8, 0), [(25, 6), (27, 6), (29, 6), (31, 6)]),
-        ((26, 0), [(2, 6), (4, 6), (6, 6), (8, 6)]),
-        ((27, 0), [(10, 6), (12, 6), (14, 6), (16, 6)]),
+        # ((26, 0), [(2, 6), (4, 6), (6, 6), (8, 6)]),
+        # ((27, 0), [(10, 6), (12, 6), (14, 6), (16, 6)]),
         # ((28, 0), [(18, 6), (20, 6), (22, 6), (24, 6)]),
         # ((29, 0), [(26, 6), (28, 6), (30, 6), (32, 6)]),
         ]
