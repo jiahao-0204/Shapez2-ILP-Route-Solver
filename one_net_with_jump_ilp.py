@@ -10,8 +10,10 @@ class DirectionalJumpRouter:
         self.goal = goal
         self.jump_distance = jump_distance
         self.directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
-        self.edges = self._generate_step_edges()
-        self.jump_edges = self._generate_jump_edges()
+        self.step_edges = []
+        self._generate_step_edges()
+        self.jump_edges = []
+        self._generate_jump_edges()
         self.model = pulp.LpProblem("JumpRouter", pulp.LpMinimize)
         self.x_step = {}
         self.x_jump = {}
@@ -23,27 +25,23 @@ class DirectionalJumpRouter:
         self.jump_cost = 2
 
     def _generate_step_edges(self):
-        edges = []
         for x in range(self.WIDTH):
             for y in range(self.HEIGHT):
                 for dx, dy in self.directions:
                     nx, ny = x + dx, y + dy
                     if 0 <= nx < self.WIDTH and 0 <= ny < self.HEIGHT:
-                        edges.append(((x, y), (nx, ny), (dx, dy)))
-        return edges
+                        self.step_edges.append(((x, y), (nx, ny), (dx, dy)))
 
     def _generate_jump_edges(self):
-        edges = []
         for x in range(self.WIDTH):
             for y in range(self.HEIGHT):
                 for dx, dy in self.directions:
                     nx, ny = x + dx * (self.jump_distance + 2), y + dy * (self.jump_distance + 2)
                     if 0 <= nx < self.WIDTH and 0 <= ny < self.HEIGHT:
-                        edges.append(((x, y), (nx, ny), (dx, dy)))
-        return edges
+                        self.jump_edges.append(((x, y), (nx, ny), (dx, dy)))
 
     def build_variables(self):
-        for u, v, _ in self.edges:
+        for u, v, _ in self.step_edges:
             self.x_step[(u, v)] = pulp.LpVariable(f"x_step_{u}_{v}", cat='Binary')
             self.f_step[(u, v)] = pulp.LpVariable(f"f_step_{u}_{v}", lowBound=0, cat='Integer')
 
@@ -53,13 +51,13 @@ class DirectionalJumpRouter:
 
     def add_objective(self):
         self.model += (
-            pulp.lpSum(self.x_step[(u, v)] * self.step_cost for (u, v, _) in self.edges) +
+            pulp.lpSum(self.x_step[(u, v)] * self.step_cost for (u, v, _) in self.step_edges) +
             pulp.lpSum(self.x_jump[(u, v)] * self.jump_cost for (u, v, _) in self.jump_edges)
         )
 
     def add_flow_constraints(self):
         # Flow is avaiable if the edge is selected
-        for (u, v, _) in self.edges:
+        for (u, v, _) in self.step_edges:
             self.model += self.f_step[(u, v)] <= self.x_step[(u, v)], f"cap_step_{u}_{v}"
 
         for (u, v, _) in self.jump_edges:
@@ -69,11 +67,11 @@ class DirectionalJumpRouter:
         all_nodes = [(x, y) for x in range(self.WIDTH) for y in range(self.HEIGHT)]
         for node in all_nodes:
             in_flow = (
-                pulp.lpSum(self.f_step[(u, v)] for (u, v, _) in self.edges if v == node) +
+                pulp.lpSum(self.f_step[(u, v)] for (u, v, _) in self.step_edges if v == node) +
                 pulp.lpSum(self.f_jump[(u, v)] for (u, v, _) in self.jump_edges if v == node)
             )
             out_flow = (
-                pulp.lpSum(self.f_step[(u, v)] for (u, v, _) in self.edges if u == node) +
+                pulp.lpSum(self.f_step[(u, v)] for (u, v, _) in self.step_edges if u == node) +
                 pulp.lpSum(self.f_jump[(u, v)] for (u, v, _) in self.jump_edges if u == node)
             )
 
@@ -93,7 +91,7 @@ class DirectionalJumpRouter:
             incoming_edges_same_direction = []
 
             # From step edges
-            for (prev, target, dir_step) in self.edges:
+            for (prev, target, dir_step) in self.step_edges:
                 if target == u and dir_step == direction:
                     incoming_edges_same_direction.append((prev, target))
 
@@ -133,7 +131,7 @@ class DirectionalJumpRouter:
         ax.grid(True)
 
         offset = 0.5
-        step_edges = [(u, v, d) for (u, v, d) in self.edges if pulp.value(self.x_step[(u, v)]) == 1]
+        step_edges = [(u, v, d) for (u, v, d) in self.step_edges if pulp.value(self.x_step[(u, v)]) == 1]
         jump_edges = [(u, v, d) for (u, v, d) in self.jump_edges if pulp.value(self.x_jump[(u, v)]) == 1]
 
         for (u, v, d) in step_edges:
