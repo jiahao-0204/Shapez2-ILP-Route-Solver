@@ -137,6 +137,7 @@ class DirectionalJumpRouter:
         # Flow is avaiable if the edge is selected
         for edge in self.all_edges[i]:
             self.model += self.edge_flow_value[i][edge] <= self.is_edge_used[i][edge] * self.K[i]
+            self.model += self.edge_flow_value[i][edge] >= self.is_edge_used[i][edge]
 
         # Flow conservation constraints
         for node in self.all_nodes[i]:
