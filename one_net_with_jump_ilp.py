@@ -12,7 +12,7 @@ Node = Tuple[int, int] # (x, y)
 Edge = Tuple[Node, Node, Tuple[int, int]]  # (start_node, end_node, direction)
 
 class DirectionalJumpRouter:
-    def __init__(self, width, height, nets, jump_distance: int = 4, timelimit: int = 60):
+    def __init__(self, width, height, nets, jump_distances: List[int] = [4], timelimit: int = 60):
 
         # Input parameters
         self.WIDTH = width
@@ -25,7 +25,7 @@ class DirectionalJumpRouter:
             self.start[i] = start
             self.goals[i] = goals
 
-        self.jump_distance = jump_distance
+        self.jump_distances = jump_distances
         self.timelimit = timelimit
 
 
@@ -66,16 +66,17 @@ class DirectionalJumpRouter:
                         self.step_edges[i].append(edge)
                         self.node_related_step_edges[i][node].append(edge)
                     
-                    # Jump edge
-                    nx, ny = x + dx * (self.jump_distance + 2), y + dy * (self.jump_distance + 2)
-                    jx, jy = x + dx * (self.jump_distance + 1), y + dy * (self.jump_distance + 1)
-                    pad_node = (jx, jy)
-                    if 0 <= nx < self.WIDTH and 0 <= ny < self.HEIGHT:
-                        edge = ((x, y), (nx, ny), (dx, dy))
-                        self.all_edges[i].append(edge)
-                        self.jump_edges[i].append(edge)
-                        self.node_related_jump_edges[i][node].append(edge)
-                        self.node_related_jump_edges[i][pad_node].append(edge)
+                    for jump_distance in self.jump_distances:
+                        # Jump edge
+                        nx, ny = x + dx * (jump_distance + 2), y + dy * (jump_distance + 2)
+                        jx, jy = x + dx * (jump_distance + 1), y + dy * (jump_distance + 1)
+                        pad_node = (jx, jy)
+                        if 0 <= nx < self.WIDTH and 0 <= ny < self.HEIGHT:
+                            edge = ((x, y), (nx, ny), (dx, dy))
+                            self.all_edges[i].append(edge)
+                            self.jump_edges[i].append(edge)
+                            self.node_related_jump_edges[i][node].append(edge)
+                            self.node_related_jump_edges[i][pad_node].append(edge)
 
         # Optimization
         self.model = pulp.LpProblem("JumpRouter", pulp.LpMinimize)
@@ -258,8 +259,9 @@ class DirectionalJumpRouter:
             for (u, v, d) in used_jump_edges:
                 ux, uy = u
                 u2x, u2y = u
-                u2x += d[0] * (self.jump_distance + 1)
-                u2y += d[1] * (self.jump_distance + 1)
+                jump_distance = max(abs(v[0] - u[0]), abs(v[1] - u[1])) - 2
+                u2x += d[0] * (jump_distance + 1)
+                u2y += d[1] * (jump_distance + 1)
 
                 # if d == (0, 1):
                 #     marker = '2'
@@ -301,4 +303,4 @@ if __name__ == "__main__":
         ((5, 0), [(1, 6), (3, 6), (5, 6), (7, 6)]),
         ((26, 0), [(2, 6), (4, 6), (6, 6), (8, 6)]),
         ]
-    router = DirectionalJumpRouter(width=34, height=7, nets=nets, jump_distance=2, timelimit = 60)
+    router = DirectionalJumpRouter(width=34, height=7, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = 60)
