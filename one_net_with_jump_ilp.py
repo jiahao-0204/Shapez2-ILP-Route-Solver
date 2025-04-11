@@ -86,7 +86,7 @@ class DirectionalJumpRouter:
         self.is_node_used_by_net: Dict[int, Dict[Node, pulp.LpVariable]] = defaultdict(lambda: defaultdict(pulp.LpVariable))
         for i in range(self.num_nets):
             self.is_edge_used[i] = {edge: pulp.LpVariable(f"edge_used_{i}_{edge}", cat='Binary') for edge in self.all_edges[i]}
-            self.edge_flow_value[i] = {edge: pulp.LpVariable(f"edge_flow_value_{i}_{edge}", cat='Integer', lowBound=0) for edge in self.all_edges[i]}
+            self.edge_flow_value[i] = {edge: pulp.LpVariable(f"edge_flow_value_{i}_{edge}", cat='Integer', lowBound=0, upBound=self.K[i]) for edge in self.all_edges[i]}
         
         # Dynamic computes
         self.dynamic_compute_is_node_used_by()
