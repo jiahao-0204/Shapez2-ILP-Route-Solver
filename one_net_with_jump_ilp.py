@@ -87,7 +87,7 @@ class DirectionalJumpRouter:
         self.is_node_used_by_jump_edge: Dict[int, Dict[Node, pulp.LpVariable]] = {}
         for i in range(self.num_nets):
             self.is_edge_used[i] = {edge: pulp.LpVariable(f"edge_used_{i}_{edge}", cat='Binary') for edge in self.all_edges[i]}
-            self.edge_flow_value[i] = {edge: pulp.LpVariable(f"edge_flow_value_{i}_{edge}", lowBound=0) for edge in self.all_edges[i]}
+            self.edge_flow_value[i] = {edge: pulp.LpVariable(f"edge_flow_value_{i}_{edge}", cat='Integer', lowBound=0) for edge in self.all_edges[i]}
             self.is_node_used_by_step_edge[i] = {node: pulp.LpVariable(f"node_used_by_step_edge_{i}_{node}", cat='Binary') for node in self.all_nodes[i]}
             self.is_node_used_by_jump_edge[i] = {node: pulp.LpVariable(f"node_used_by_jump_edge_{i}_{node}", cat='Binary') for node in self.all_nodes[i]}
         
