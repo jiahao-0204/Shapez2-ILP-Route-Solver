@@ -1,13 +1,12 @@
-
 import pulp
 import matplotlib.pyplot as plt
 
 class DirectionalJumpRouter:
-    def __init__(self, width, height, start, goal, jump_distance=4):
+    def __init__(self, width, height, start, goals, jump_distance=4):
         self.WIDTH = width
         self.HEIGHT = height
         self.start = start
-        self.goal = goal
+        self.goals = goals
         self.jump_distance = jump_distance
         self.directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
         self.step_edges = []
@@ -19,7 +18,7 @@ class DirectionalJumpRouter:
         self.edge_used_map = {}
         self.edge_flow_map = {}
         self.path_edges = []
-        self.K = 1
+        self.K = len(goals)
 
         self.step_cost = 1
         self.jump_cost = 2
@@ -46,15 +45,9 @@ class DirectionalJumpRouter:
             self.edge_flow_map[edge] = pulp.LpVariable(f"int_flow_{edge}", lowBound=0, cat='Integer')
 
     def add_objective(self):
-        step_cost_list = []
-        for edge in self.step_edges:
-            step_cost_list.append(self.edge_used_map[edge] * self.step_cost)
-        
-        jump_cost_list = []
-        for edge in self.jump_edges:
-            jump_cost_list.append(self.edge_used_map[edge] * self.jump_cost)
-
-        self.model += (pulp.lpSum(step_cost_list) + pulp.lpSum(jump_cost_list))
+        step_cost_list = [self.edge_used_map[edge] * self.step_cost for edge in self.step_edges]
+        jump_cost_list = [self.edge_used_map[edge] * self.jump_cost for edge in self.jump_edges]
+        self.model += pulp.lpSum(step_cost_list + jump_cost_list)
 
     def add_flow_constraints(self):
         # Flow is avaiable if the edge is selected
@@ -64,23 +57,12 @@ class DirectionalJumpRouter:
         # Flow conservation constraints
         all_nodes = [(x, y) for x in range(self.WIDTH) for y in range(self.HEIGHT)]
         for node in all_nodes:
-            in_flow_edges = []
-            for edge in self.all_edges:
-                u, v, _ = edge
-                if v == node:
-                    in_flow_edges.append(self.edge_flow_map[edge])
-            in_flow = pulp.lpSum(in_flow_edges)
+            in_flow = pulp.lpSum(self.edge_flow_map[edge] for edge in self.all_edges if edge[1] == node)
+            out_flow = pulp.lpSum(self.edge_flow_map[edge] for edge in self.all_edges if edge[0] == node)
 
-            out_flow_edges = []
-            for edge in self.all_edges:
-                u, v, _ = edge
-                if u == node:
-                    out_flow_edges.append(self.edge_flow_map[edge])
-            out_flow = pulp.lpSum(out_flow_edges)
-            
             if node == self.start:
                 self.model += (out_flow - in_flow == self.K), f"start_flow_{node}"
-            elif node == self.goal:
+            elif node in self.goals:
                 self.model += (out_flow - in_flow == -1), f"goal_flow_{node}"
             else:
                 self.model += (out_flow - in_flow == 0), f"node_flow_{node}"
@@ -108,7 +90,6 @@ class DirectionalJumpRouter:
         solver = pulp.PULP_CBC_CMD(timeLimit=30)
         self.model.solve(solver)
 
-
     def plot(self):
         plt.figure(figsize=(12, 6))
         ax = plt.gca()
@@ -120,20 +101,15 @@ class DirectionalJumpRouter:
         ax.grid(True)
 
         offset = 0.5
-        used_step_edges = []
-        for step_edge in self.step_edges:
-            if pulp.value(self.edge_used_map[step_edge]) == 1:
-                used_step_edges.append(step_edge)
-        used_jump_edges = []
-        for jump_edge in self.jump_edges:
-            if pulp.value(self.edge_used_map[jump_edge]) == 1:
-                used_jump_edges.append(jump_edge)
+        used_step_edges = [e for e in self.step_edges if pulp.value(self.edge_used_map[e]) == 1]
+        used_jump_edges = [e for e in self.jump_edges if pulp.value(self.edge_used_map[e]) == 1]
 
         # Plot start and goal
         sx, sy = self.start
-        gx, gy = self.goal
+        for goal in self.goals:
+            gx, gy = goal
+            plt.scatter(gx + offset, gy + offset, c='green', marker='s', s=120, edgecolors='black')
         plt.scatter(sx + offset, sy + offset, c='red', marker='s', s=120, edgecolors='black', label='Start')
-        plt.scatter(gx + offset, gy + offset, c='green', marker='s', s=120, edgecolors='black', label='Goal')
         plt.scatter(gx + offset, gy + offset, c='black', marker='o', s=50, edgecolors='black')
 
         for (u, v, d) in used_step_edges:
@@ -175,11 +151,12 @@ class DirectionalJumpRouter:
         plt.legend(by_label.values(), by_label.keys())
         plt.show()
 
-# Usage
+
+# Example usage
 if __name__ == "__main__":
     start = (0, 0)
-    goal = (20, 10)
-    router = DirectionalJumpRouter(width=34, height=14, start=start, goal=goal)
+    goals = [(5, 13)]
+    router = DirectionalJumpRouter(width=34, height=14, start=start, goals=goals)
     router.build_variables()
     router.add_objective()
     router.add_flow_constraints()
