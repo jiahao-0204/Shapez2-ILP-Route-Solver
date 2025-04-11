@@ -1,10 +1,16 @@
 import pulp
 import matplotlib.pyplot as plt
+from collections import defaultdict
 
 class DirectionalJumpRouter:
     def __init__(self, width, height, start, goals, jump_distance=4):
         self.WIDTH = width
         self.HEIGHT = height
+        self.all_nodes = [(x, y) for x in range(self.WIDTH) for y in range(self.HEIGHT)]
+        self.node_related_steps = defaultdict(list)
+        self.node_related_jumps = defaultdict(list)
+        self.node_used_by_step_bool = {}
+        self.node_used_by_jump_bool = {}
         self.start = start
         self.goals = goals
         self.jump_distance = jump_distance
@@ -19,9 +25,6 @@ class DirectionalJumpRouter:
         self.edge_flow_map = {}
         self.path_edges = []
         self.K = len(goals)
-        self.all_nodes = [(x, y) for x in range(self.WIDTH) for y in range(self.HEIGHT)]
-        self.node_used_by_step = {}
-        self.node_used_by_jump = {}
         self._generate_node_used_variables()
 
         self.step_cost = 1
@@ -29,24 +32,28 @@ class DirectionalJumpRouter:
 
     def _generate_node_used_variables(self):
         for node in self.all_nodes:
-            self.node_used_by_step[node] = pulp.LpVariable(f"step_node_used_{node}", cat='Binary')
-            self.node_used_by_jump[node] = pulp.LpVariable(f"jump_node_used_{node}", cat='Binary')
+            self.node_used_by_step_bool[node] = pulp.LpVariable(f"step_node_used_{node}", cat='Binary')
+            self.node_used_by_jump_bool[node] = pulp.LpVariable(f"jump_node_used_{node}", cat='Binary')
 
     def _generate_step_edges(self):
-        for x in range(self.WIDTH):
-            for y in range(self.HEIGHT):
-                for dx, dy in self.directions:
-                    nx, ny = x + dx, y + dy
-                    if 0 <= nx < self.WIDTH and 0 <= ny < self.HEIGHT:
-                        self.step_edges.append(((x, y), (nx, ny), (dx, dy)))
+        for node in self.all_nodes:
+            x, y = node
+            for dx, dy in self.directions:
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < self.WIDTH and 0 <= ny < self.HEIGHT:
+                    step_edge = ((x, y), (nx, ny), (dx, dy))
+                    self.step_edges.append(step_edge)
+                    self.node_related_steps[node].append(step_edge)
 
     def _generate_jump_edges(self):
-        for x in range(self.WIDTH):
-            for y in range(self.HEIGHT):
-                for dx, dy in self.directions:
-                    nx, ny = x + dx * (self.jump_distance + 2), y + dy * (self.jump_distance + 2)
-                    if 0 <= nx < self.WIDTH and 0 <= ny < self.HEIGHT:
-                        self.jump_edges.append(((x, y), (nx, ny), (dx, dy)))
+        for node in self.all_nodes:
+            x, y = node
+            for dx, dy in self.directions:
+                nx, ny = x + dx * (self.jump_distance + 2), y + dy * (self.jump_distance + 2)
+                if 0 <= nx < self.WIDTH and 0 <= ny < self.HEIGHT:
+                    jump_edge = ((x, y), (nx, ny), (dx, dy))
+                    self.jump_edges.append(jump_edge)
+                    self.node_related_jumps[node].append(jump_edge)
 
     def build_variables(self):
         for edge in self.all_edges:
@@ -97,31 +104,31 @@ class DirectionalJumpRouter:
     def add_overlap_constraints(self):
         for node in self.all_nodes:
             # Link step_node_used[node] to usage of step edges
-            step_related_edges = [e for e in self.step_edges if e[0] == node]
-            if step_related_edges:
+            step_edges_that_use_this_node = self.node_related_steps[node]
+            if step_edges_that_use_this_node:
                 self.model += (
-                    pulp.lpSum(self.edge_used_map[e] for e in step_related_edges) <= len(step_related_edges) *  self.node_used_by_step[node],
+                    pulp.lpSum(self.edge_used_map[e] for e in step_edges_that_use_this_node) <= len(step_edges_that_use_this_node) *  self.node_used_by_step_bool[node],
                     f"step_node_link_{node}"
                 )
 
             # Link jump_node_used[node] to usage of jump edges
-            jump_related_edges = [e for e in self.jump_edges if e[0] == node]
-            if jump_related_edges:
+            jump_edges_that_use_this_node = self.node_related_jumps[node]
+            if jump_edges_that_use_this_node:
                 self.model += (
-                    pulp.lpSum(self.edge_used_map[e] for e in jump_related_edges) <= len(jump_related_edges) * self.node_used_by_jump[node],
+                    pulp.lpSum(self.edge_used_map[e] for e in jump_edges_that_use_this_node) <= len(jump_edges_that_use_this_node) * self.node_used_by_jump_bool[node],
                     f"jump_node_link_{node}"
                 )
 
             # Constraint: a node cannot be used by both step and jump
             self.model += (
-                self.node_used_by_step[node] + self.node_used_by_jump[node] <= 1,
+                self.node_used_by_step_bool[node] + self.node_used_by_jump_bool[node] <= 1,
                 f"no_overlap_at_node_{node}"
             )
 
     def add_goal_action_constraints(self):
         # no action is to be taken at the goal nodes
         for goal in self.goals:
-            self.model += pulp.lpSum(self.node_used_by_jump[goal] + self.node_used_by_step[goal]) == 0, f"no_action_at_goal_{goal}"
+            self.model += pulp.lpSum(self.node_used_by_jump_bool[goal] + self.node_used_by_step_bool[goal]) == 0, f"no_action_at_goal_{goal}"
 
     def solve(self):
         solver = pulp.PULP_CBC_CMD(timeLimit=30)
