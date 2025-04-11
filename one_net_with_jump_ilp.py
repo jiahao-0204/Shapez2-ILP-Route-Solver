@@ -109,8 +109,8 @@ class DirectionalJumpRouter:
         for goal in self.goals:
             gx, gy = goal
             plt.scatter(gx + offset, gy + offset, c='green', marker='s', s=120, edgecolors='black')
+            plt.scatter(gx + offset, gy + offset, c='black', marker='o', s=50, edgecolors='black')
         plt.scatter(sx + offset, sy + offset, c='red', marker='s', s=120, edgecolors='black', label='Start')
-        plt.scatter(gx + offset, gy + offset, c='black', marker='o', s=50, edgecolors='black')
 
         for (u, v, d) in used_step_edges:
             ux, uy = u
@@ -155,7 +155,7 @@ class DirectionalJumpRouter:
 # Example usage
 if __name__ == "__main__":
     start = (0, 0)
-    goals = [(5, 13)]
+    goals = [(5, 13), (10, 13)]
     router = DirectionalJumpRouter(width=34, height=14, start=start, goals=goals)
     router.build_variables()
     router.add_objective()
