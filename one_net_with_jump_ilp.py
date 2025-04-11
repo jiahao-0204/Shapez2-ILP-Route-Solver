@@ -21,8 +21,10 @@ class DirectionalJumpRouter:
         self._generate_jump_edges()
         self.all_edges = self.step_edges + self.jump_edges
         self.model = pulp.LpProblem("JumpRouter", pulp.LpMinimize)
-        self.edge_used_map = {}
-        self.edge_flow_map = {}
+
+        self.edge_is_used = {}
+        self.edge_flow_value = {}
+
         self.path_edges = []
         self.K = len(goals)
         self._generate_node_used_variables()
@@ -61,23 +63,23 @@ class DirectionalJumpRouter:
 
     def build_variables(self):
         for edge in self.all_edges:
-            self.edge_used_map[edge] = pulp.LpVariable(f"bool_used_{edge}", cat='Binary')
-            self.edge_flow_map[edge] = pulp.LpVariable(f"int_flow_{edge}", lowBound=0, cat='Integer')
+            self.edge_is_used[edge] = pulp.LpVariable(f"bool_used_{edge}", cat='Binary')
+            self.edge_flow_value[edge] = pulp.LpVariable(f"int_flow_{edge}", lowBound=0, cat='Integer')
 
     def add_objective(self):
-        step_cost_list = [self.edge_used_map[edge] * self.step_cost for edge in self.step_edges]
-        jump_cost_list = [self.edge_used_map[edge] * self.jump_cost for edge in self.jump_edges]
+        step_cost_list = [self.edge_is_used[edge] * self.step_cost for edge in self.step_edges]
+        jump_cost_list = [self.edge_is_used[edge] * self.jump_cost for edge in self.jump_edges]
         self.model += pulp.lpSum(step_cost_list + jump_cost_list)
 
     def add_flow_constraints(self):
         # Flow is avaiable if the edge is selected
         for edge in self.all_edges:
-            self.model += self.edge_flow_map[edge] <= self.edge_used_map[edge] * self.K
+            self.model += self.edge_flow_value[edge] <= self.edge_is_used[edge] * self.K
 
         # Flow conservation constraints
         for node in self.all_nodes:
-            in_flow = pulp.lpSum(self.edge_flow_map[edge] for edge in self.all_edges if edge[1] == node)
-            out_flow = pulp.lpSum(self.edge_flow_map[edge] for edge in self.all_edges if edge[0] == node)
+            in_flow = pulp.lpSum(self.edge_flow_value[edge] for edge in self.all_edges if edge[1] == node)
+            out_flow = pulp.lpSum(self.edge_flow_value[edge] for edge in self.all_edges if edge[0] == node)
 
             if node == self.start:
                 self.model += (out_flow - in_flow == self.K), f"start_flow_{node}"
@@ -97,13 +99,13 @@ class DirectionalJumpRouter:
             for edge in self.all_edges:
                 _, target, dir_step = edge
                 if target == u and dir_step == direction:
-                    incoming_edges_in_same_direction.append(self.edge_used_map[edge])
+                    incoming_edges_in_same_direction.append(self.edge_is_used[edge])
 
             # create a variable that sums up the incoming edges in the same direction
             sum_of_incoming_edge_in_same_direction = pulp.lpSum(incoming_edges_in_same_direction)
 
             # Enforce that jump flow is only allowed if incoming flow matches direction
-            self.model += self.edge_used_map[jump_edge] <= sum_of_incoming_edge_in_same_direction
+            self.model += self.edge_is_used[jump_edge] <= sum_of_incoming_edge_in_same_direction
 
     def add_overlap_constraints(self):
         for node in self.all_nodes:
@@ -111,7 +113,7 @@ class DirectionalJumpRouter:
             step_edges_that_use_this_node = self.node_related_steps[node]
             if step_edges_that_use_this_node:
                 self.model += (
-                    pulp.lpSum(self.edge_used_map[e] for e in step_edges_that_use_this_node) <= len(step_edges_that_use_this_node) *  self.node_used_by_step_bool[node],
+                    pulp.lpSum(self.edge_is_used[e] for e in step_edges_that_use_this_node) <= len(step_edges_that_use_this_node) *  self.node_used_by_step_bool[node],
                     f"step_node_link_{node}"
                 )
 
@@ -119,7 +121,7 @@ class DirectionalJumpRouter:
             jump_edges_that_use_this_node = self.node_related_jumps[node]
             if jump_edges_that_use_this_node:
                 self.model += (
-                    pulp.lpSum(self.edge_used_map[e] for e in jump_edges_that_use_this_node) <= len(jump_edges_that_use_this_node) * self.node_used_by_jump_bool[node],
+                    pulp.lpSum(self.edge_is_used[e] for e in jump_edges_that_use_this_node) <= len(jump_edges_that_use_this_node) * self.node_used_by_jump_bool[node],
                     f"jump_node_link_{node}"
                 )
 
@@ -149,8 +151,8 @@ class DirectionalJumpRouter:
         ax.grid(True)
 
         offset = 0.5
-        used_step_edges = [e for e in self.step_edges if pulp.value(self.edge_used_map[e]) == 1]
-        used_jump_edges = [e for e in self.jump_edges if pulp.value(self.edge_used_map[e]) == 1]
+        used_step_edges = [e for e in self.step_edges if pulp.value(self.edge_is_used[e]) == 1]
+        used_jump_edges = [e for e in self.jump_edges if pulp.value(self.edge_is_used[e]) == 1]
 
         # Plot start and goal
         sx, sy = self.start
