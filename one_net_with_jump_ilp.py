@@ -111,7 +111,7 @@ class DirectionalJumpRouter:
                 jump_edges_related_to_node = [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[i][node]]
                 
                 self.is_node_used_by_net[i][node] = pulp.LpVariable(f"node_used_by_net_{i}_{node}", cat='Binary')    
-                self.model += self.is_node_used_by_net[i][node] >= pulp.lpSum(step_edges_from_node) / len(step_edges_from_node) + pulp.lpSum(jump_edges_related_to_node)
+                self.model += len(step_edges_from_node) * self.is_node_used_by_net[i][node] >= pulp.lpSum(step_edges_from_node) + len(step_edges_from_node) * pulp.lpSum(jump_edges_related_to_node)
 
     def add_objective(self):
         step_cost_list = []
@@ -181,7 +181,7 @@ class DirectionalJumpRouter:
 
             # the constraint
             self.model += (
-                pulp.lpSum(step_edges_from_node) / len(step_edges_from_node) + pulp.lpSum(jump_edges_related_to_node) <= 1
+                pulp.lpSum(step_edges_from_node) + len(step_edges_from_node) * pulp.lpSum(jump_edges_related_to_node) <= len(step_edges_from_node)
             )
 
     # def add_overlap_constraints_v3(self):
