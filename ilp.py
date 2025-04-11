@@ -22,33 +22,40 @@ model = pulp.LpProblem("MultiNetRouting", pulp.LpMinimize)
 # i need to minimize the total cost from actions 
 
 # Generate valid action edges (from tile u to tile v)
-edges = []
+step_edges = []
 for x in range(WIDTH):
     for y in range(HEIGHT):
         for dx, dy in DIRECTIONS:
             nx, ny = x + dx, y + dy
             if 0 <= nx < WIDTH and 0 <= ny < HEIGHT:
-                edges.append(((x, y), (nx, ny)))
+                step_edges.append(((x, y), (nx, ny)))
+step_cost = 1
+
 
 # Decision variables: x_{i, u, v} = 1 if net i uses edge (u,v)
-x_vars = {}
+step_var = {}
 for i in range(len(nets)):
-    for u, v in edges:
-        x_vars[(i, u, v)] = pulp.LpVariable(f"x_{i}_{u}_{v}", cat='Binary')
+    for u, v in step_edges:
+        step_var[(i, u, v)] = pulp.LpVariable(f"x_{i}_{u}_{v}", cat='Binary')
 
 # Objective: minimize total path length
-model += pulp.lpSum(x_vars[(i, u, v)] for i in range(len(nets)) for u, v in edges)
+cost_list = []
+for i in range(len(nets)):
+    for u, v in step_edges:
+        cost_list.append(step_var[(i, u, v)] * step_cost)
+
+model += pulp.lpSum(cost_list)
 
 # Flow constraints for each net
 for i, (start, goal) in enumerate(nets):
     for x in range(WIDTH):
         for y in range(HEIGHT):
             node = (x, y)
-            in_edges = [(u, v) for (u, v) in edges if v == node]
-            out_edges = [(u, v) for (u, v) in edges if u == node]
+            in_edges = [(u, v) for (u, v) in step_edges if v == node]
+            out_edges = [(u, v) for (u, v) in step_edges if u == node]
 
-            flow_in = pulp.lpSum(x_vars[(i, u, v)] for u, v in in_edges)
-            flow_out = pulp.lpSum(x_vars[(i, u, v)] for u, v in out_edges)
+            flow_in = pulp.lpSum(step_var[(i, u, v)] for u, v in in_edges)
+            flow_out = pulp.lpSum(step_var[(i, u, v)] for u, v in out_edges)
 
             if node == start:
                 model += (flow_out - flow_in == 1), f"net_{i}_start_{node}"
@@ -69,11 +76,11 @@ for i in range(len(nets)):
     for x in range(WIDTH):
         for y in range(HEIGHT):
             node = (x, y)
-            in_edges = [(u, v) for (u, v) in edges if v == node]
-            out_edges = [(u, v) for (u, v) in edges if u == node]
+            in_edges = [(u, v) for (u, v) in step_edges if v == node]
+            out_edges = [(u, v) for (u, v) in step_edges if u == node]
             related_edges = in_edges + out_edges
             model += (
-                pulp.lpSum(x_vars[(i, u, v)] for (u, v) in related_edges) <= 2 * node_vars[(i, node)],
+                pulp.lpSum(step_var[(i, u, v)] for (u, v) in related_edges) <= 2 * node_vars[(i, node)],
                 f"node_link_{i}_{node}"
             )
 
@@ -92,7 +99,7 @@ model.solve(solver)
 
 # Output the paths
 paths = [[] for _ in nets]
-for (i, u, v), var in x_vars.items():
+for (i, u, v), var in step_var.items():
     if pulp.value(var) == 1:
         paths[i].append((u, v))
 
