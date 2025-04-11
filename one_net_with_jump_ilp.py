@@ -245,6 +245,7 @@ class DirectionalJumpRouter:
 
     def solve(self):
         # solver = pulp.PULP_CBC_CMD(timeLimit=self.timelimit)
+        # solver = pulp.GUROBI_CMD(timeLimit=self.timelimit, options=[("MIPFocus", 1)])
         solver = pulp.GUROBI_CMD(timeLimit=self.timelimit)
         self.model.solve(solver)
 
