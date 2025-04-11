@@ -2,6 +2,7 @@ import pulp
 import matplotlib.pyplot as plt
 from collections import defaultdict
 from typing import Dict, Tuple, List
+from matplotlib.lines import Line2D
 
 DIRECTIONS = [(0, 1), (0, -1), (1, 0), (-1, 0)]
 JUMP_COST = 2
@@ -270,10 +271,14 @@ class DirectionalJumpRouter:
                 ax.scatter(u2x + offset, u2y + offset, c=color, marker=marker, s=80, edgecolors='black', zorder = 2)
         
 
-        plt.title("ILP Path with Step & Jump Actions")
-        handles, labels = plt.gca().get_legend_handles_labels()
-        by_label = dict(zip(labels, handles))
-        plt.legend(by_label.values(), by_label.keys())
+        plt.title("Shapez2: Routing using Integer Linear Programming (ILP) -- Jiahao")
+        custom_legend = [
+            Line2D([0], [0], marker='s', color='grey', markersize=9, markeredgecolor='black', linestyle='None', label='Start/Goal'),
+            Line2D([0], [0], marker='^', color='grey', markersize=8, markeredgecolor='black', linestyle='None', label='Jump Pad'),
+            Line2D([0], [0], marker='o', color='grey', markersize=7, markeredgecolor='black', linestyle='None', label='Belt'),
+        ]
+        plt.legend(handles=custom_legend)
+
         plt.show()
 
 
