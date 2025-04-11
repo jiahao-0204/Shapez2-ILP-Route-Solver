@@ -23,11 +23,11 @@ class DirectionalJumpRouter:
         # Internal variables
         self.K = len(goals)
         self.all_nodes: List[Node] = [(x, y) for x in range(self.WIDTH) for y in range(self.HEIGHT)]
-        self.node_related_steps: Dict[Node, List[Edge]] = defaultdict(list)
-        self.node_related_jumps: Dict[Node, List[Edge]] = defaultdict(list)
         self.all_edges: List[Edge] = []
         self.step_edges: List[Edge] = []
         self.jump_edges: List[Edge] = []
+        self.node_related_step_edges: Dict[Node, List[Edge]] = defaultdict(list)
+        self.node_related_jump_edges: Dict[Node, List[Edge]] = defaultdict(list)
         for node in self.all_nodes:
             x, y = node
             for dx, dy in DIRECTIONS:
@@ -38,7 +38,7 @@ class DirectionalJumpRouter:
                     edge = ((x, y), (nx, ny), (dx, dy))
                     self.all_edges.append(edge)
                     self.step_edges.append(edge)
-                    self.node_related_steps[node].append(edge)
+                    self.node_related_step_edges[node].append(edge)
                 
                 # Jump edge
                 nx, ny = x + dx * (self.jump_distance + 2), y + dy * (self.jump_distance + 2)
@@ -48,8 +48,8 @@ class DirectionalJumpRouter:
                     edge = ((x, y), (nx, ny), (dx, dy))
                     self.all_edges.append(edge)
                     self.jump_edges.append(edge)
-                    self.node_related_jumps[node].append(edge)
-                    self.node_related_jumps[pad_node].append(edge)
+                    self.node_related_jump_edges[node].append(edge)
+                    self.node_related_jump_edges[pad_node].append(edge)
 
 
 
@@ -79,10 +79,10 @@ class DirectionalJumpRouter:
 
     def dynamic_compute_is_node_used_by(self):
         for node in self.all_nodes:
-            if self.node_related_steps[node]:
-                self.model += pulp.lpSum(self.is_edge_used[e] for e in self.node_related_steps[node]) <= len(self.node_related_steps[node]) *  self.is_node_used_by_step_edge[node]
-            if self.node_related_jumps[node]:
-                self.model += pulp.lpSum(self.is_edge_used[e] for e in self.node_related_jumps[node]) <= len(self.node_related_jumps[node]) * self.is_node_used_by_jump_edge[node]
+            if self.node_related_step_edges[node]:
+                self.model += pulp.lpSum(self.is_edge_used[e] for e in self.node_related_step_edges[node]) <= len(self.node_related_step_edges[node]) *  self.is_node_used_by_step_edge[node]
+            if self.node_related_jump_edges[node]:
+                self.model += pulp.lpSum(self.is_edge_used[e] for e in self.node_related_jump_edges[node]) <= len(self.node_related_jump_edges[node]) * self.is_node_used_by_jump_edge[node]
 
     def add_objective(self):
         step_cost_list = [self.is_edge_used[edge] * STEP_COST for edge in self.step_edges]
