@@ -50,10 +50,14 @@ class DirectionalJumpRouter:
             x, y = node
             for dx, dy in self.directions:
                 nx, ny = x + dx * (self.jump_distance + 2), y + dy * (self.jump_distance + 2)
+                jx, jy = x + dx * (self.jump_distance + 1), y + dy * (self.jump_distance + 1)
+                pad_node = (jx, jy)
                 if 0 <= nx < self.WIDTH and 0 <= ny < self.HEIGHT:
                     jump_edge = ((x, y), (nx, ny), (dx, dy))
                     self.jump_edges.append(jump_edge)
                     self.node_related_jumps[node].append(jump_edge)
+                    self.node_related_jumps[pad_node].append(jump_edge)
+                    
 
     def build_variables(self):
         for edge in self.all_edges:
