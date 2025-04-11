@@ -132,6 +132,7 @@ class DirectionalJumpRouter:
             self.add_flow_constraints(i)
             self.add_directional_constraints(i)
             self.add_overlap_constraints(i)
+            self.add_one_jump_constraints(i)
 
         self.add_goal_action_constraints()
         self.add_net_overlap_constraints()
@@ -179,6 +180,16 @@ class DirectionalJumpRouter:
             self.model += (
                 self.is_node_used_by_step_edge[i][node] + self.is_node_used_by_jump_edge[i][node] <= 1
             )
+
+    def add_one_jump_constraints(self, i):
+        # at most one jump edge allowed in each node
+        for node in self.all_nodes[i]:
+            # create a variable that sums up the jump edges in the same node
+            num_of_jump_edges_per_node = pulp.lpSum(self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[i][node])
+
+            # Enforce that at most one jump edge is allowed in each node
+            self.model += num_of_jump_edges_per_node <= 1
+
 
     def add_goal_action_constraints(self):
         # no action is to be taken at the goal nodes for any net
@@ -287,6 +298,6 @@ class DirectionalJumpRouter:
 if __name__ == "__main__":
     nets = [
         ((5, 0), [(1, 6), (3, 6), (5, 6), (7, 6)]),
-        # ((26, 0), [(2, 6), (4, 6), (6, 6), (8, 6)]),
+        ((26, 0), [(2, 6), (4, 6), (6, 6), (8, 6)]),
         ]
-    router = DirectionalJumpRouter(width=34, height=7, nets=nets, jump_distance=2)
+    router = DirectionalJumpRouter(width=34, height=7, nets=nets, jump_distance=2, timelimit = 60)
