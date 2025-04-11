@@ -143,7 +143,7 @@ class DirectionalJumpRouter:
 # Usage
 if __name__ == "__main__":
     start = (0, 0)
-    goal = (10, 10)
+    goal = (20, 0)
     router = DirectionalJumpRouter(width=34, height=14, start=start, goal=goal)
     router.build_variables()
     router.add_objective()
