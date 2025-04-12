@@ -133,18 +133,11 @@ class DirectionalJumpRouter:
         return is_node_used_by_net
 
     def add_objective(self):
-        step_cost_list = []
-        jump_cost_list = []
-
+        tile_used = []
         for i in range(self.num_nets):
-            step_cost_list_i = [self.is_edge_used[i][edge] * STEP_COST for edge in self.step_edges[i]]
-            jump_cost_list_i = [self.is_edge_used[i][edge] * JUMP_COST for edge in self.jump_edges[i]]
-            step_cost_list += step_cost_list_i
-            jump_cost_list += jump_cost_list_i
-            
-        self.model.Minimize(
-            sum(step_cost_list) + sum(jump_cost_list)
-        )
+            for node in self.all_nodes[i]:
+                tile_used.append(self.is_node_used_by_net[i][node])
+        self.model.Minimize(sum(tile_used))
 
     def add_constraints(self):
         for i in range(self.num_nets):
