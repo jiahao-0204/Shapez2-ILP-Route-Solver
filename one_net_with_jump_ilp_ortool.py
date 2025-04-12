@@ -91,7 +91,8 @@ class DirectionalJumpRouter:
             self.edge_flow_value[i] = {edge: self.model.NewIntVar(0, self.K[i], f"edge_flow_value_{i}_{edge}") for edge in self.all_edges[i]}
                 
         
-        self.is_node_used_by_net: Dict[int, Dict[Node, cp_model.BoolVarT]] = self.dynamic_compute_is_node_used_by()
+        self.is_step_edge_used_at_node: Dict[int, Dict[Node, cp_model.BoolVarT]] = self.dynamic_compute_is_step_edge_used_at_node()
+        self.is_node_used_by_net: Dict[int, Dict[Node, cp_model.BoolVarT]] = self.dynamic_compute_is_node_used_by_net()
 
         # Objective function
         self.add_objective()
@@ -105,16 +106,30 @@ class DirectionalJumpRouter:
         # Plot
         self.plot()
 
-    def dynamic_compute_is_node_used_by(self):
+    def dynamic_compute_is_step_edge_used_at_node(self):
+        is_step_edge_used_at_node: Dict[int, Dict[Node, cp_model.BoolVarT]] = defaultdict(lambda: defaultdict(cp_model.BoolVarT))
+        for i in range(self.num_nets):
+            for node in self.all_nodes[i]:
+                # list of all step edges from this node
+                step_edges_from_node = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[i][node]]
+
+                # add a variable that is true if any step edge is used for this node
+                is_step_edge_used_at_node[i][node] = self.model.NewBoolVar(f"step_edge_used_{i}_{node}")
+                self.model.AddBoolOr(step_edges_from_node).OnlyEnforceIf(is_step_edge_used_at_node[i][node])
+                self.model.AddBoolAnd([edge.Not() for edge in step_edges_from_node]).OnlyEnforceIf(is_step_edge_used_at_node[i][node].Not())
+        return is_step_edge_used_at_node
+
+    def dynamic_compute_is_node_used_by_net(self):
         is_node_used_by_net: Dict[int, Dict[Node, cp_model.BoolVarT]] = defaultdict(lambda: defaultdict(cp_model.BoolVarT))
         for i in range(self.num_nets):
             for node in self.all_nodes[i]:
 
-                step_edges_from_node = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[i][node]]
+                is_step_edge_used = self.is_step_edge_used_at_node[i][node]
                 jump_edges_related_to_node = [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[i][node]]
                 
                 is_node_used_by_net[i][node] = self.model.NewBoolVar(f"node_used_by_net_{i}_{node}")
-                self.model.Add(len(step_edges_from_node) * is_node_used_by_net[i][node] >= sum(step_edges_from_node) + len(step_edges_from_node) * sum(jump_edges_related_to_node))
+                self.model.AddBoolOr([is_step_edge_used] + jump_edges_related_to_node).OnlyEnforceIf(is_node_used_by_net[i][node])
+                self.model.AddBoolAnd([is_step_edge_used.Not()] + [edge.Not() for edge in jump_edges_related_to_node]).OnlyEnforceIf(is_node_used_by_net[i][node].Not())
         return is_node_used_by_net
 
     def add_objective(self):
@@ -144,8 +159,8 @@ class DirectionalJumpRouter:
     def add_flow_constraints(self, i):
         # Flow is avaiable if the edge is selected
         for edge in self.all_edges[i]:
-            self.model.Add(self.edge_flow_value[i][edge] <= self.is_edge_used[i][edge] * self.K[i])
-            self.model.Add(self.edge_flow_value[i][edge] >= self.is_edge_used[i][edge])
+            self.model.Add(self.edge_flow_value[i][edge] >= 1).OnlyEnforceIf(self.is_edge_used[i][edge])
+            self.model.Add(self.edge_flow_value[i][edge] == 0).OnlyEnforceIf(self.is_edge_used[i][edge].Not())
 
         # Flow conservation constraints
         for node in self.all_nodes[i]:
@@ -158,6 +173,25 @@ class DirectionalJumpRouter:
                 self.model.Add(out_flow - in_flow == -1)
             else:
                 self.model.Add(out_flow - in_flow == 0)
+
+    # def add_directional_constraints(self, i):
+    #     for jump_edge in self.jump_edges[i]:
+    #         u, v, direction = jump_edge
+    #         # A jump from u to v in direction `direction` is only allowed
+    #         # if there is incoming flow to u from the same direction.
+
+    #         # Collect all edges (step and jump) that go into `u` from direction `direction`
+    #         incoming_edges_in_same_direction = []
+    #         for edge in self.all_edges[i]:
+    #             _, target, dir_step = edge
+    #             if target == u and dir_step == direction:
+    #                 incoming_edges_in_same_direction.append(self.is_edge_used[i][edge])
+
+    #         # create a variable that sums up the incoming edges in the same direction
+    #         sum_of_incoming_edge_in_same_direction = sum(incoming_edges_in_same_direction)
+
+    #         # Enforce that jump flow is only allowed if incoming flow matches direction
+    #         self.model.Add(self.is_edge_used[i][jump_edge] <= sum_of_incoming_edge_in_same_direction)
 
     def add_directional_constraints(self, i):
         for jump_edge in self.jump_edges[i]:
@@ -172,24 +206,26 @@ class DirectionalJumpRouter:
                 if target == u and dir_step == direction:
                     incoming_edges_in_same_direction.append(self.is_edge_used[i][edge])
 
-            # create a variable that sums up the incoming edges in the same direction
-            sum_of_incoming_edge_in_same_direction = sum(incoming_edges_in_same_direction)
+            if incoming_edges_in_same_direction:
+                # Create an OR condition: at least one incoming edge in the same direction
+                condition = self.model.NewBoolVar(f"jump_allowed_into_{u}_dir_{direction}")
+                self.model.AddBoolOr(incoming_edges_in_same_direction).OnlyEnforceIf(condition)
+                self.model.AddBoolAnd([e.Not() for e in incoming_edges_in_same_direction]).OnlyEnforceIf(condition.Not())
 
-            # Enforce that jump flow is only allowed if incoming flow matches direction
-            self.model.Add(self.is_edge_used[i][jump_edge] <= sum_of_incoming_edge_in_same_direction)
+                # Enforce jump only if that condition is true
+                self.model.AddImplication(self.is_edge_used[i][jump_edge], condition)
+            else:
+                # No incoming edges in that direction => forbid the jump
+                self.model.Add(self.is_edge_used[i][jump_edge] == 0)
+
 
     def add_overlap_and_one_jump_constraints(self, i):
         for node in self.all_nodes[i]:
-            # list of all step edges from this node
-            step_edges_from_node = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[i][node]]
-
             # list of all jump edges of this node
             jump_edges_related_to_node = [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[i][node]]
 
             # the constraint
-            self.model.Add(
-                sum(step_edges_from_node) + len(step_edges_from_node) * sum(jump_edges_related_to_node) <= len(step_edges_from_node)
-            )
+            self.model.AddAtMostOne(jump_edges_related_to_node + [self.is_step_edge_used_at_node[i][node]])
 
     # def add_overlap_constraints_v3(self):
     #     for node in self.all_nodes[0]:
@@ -237,7 +273,7 @@ class DirectionalJumpRouter:
                 list_of_nets_using_node.append(self.is_node_used_by_net[i][node])
             
             # constraint: at most one net can use a node
-            self.model.Add(sum(list_of_nets_using_node) <= 1)
+            self.model.AddAtMostOne(list_of_nets_using_node)
 
     def add_symmetry_constraints(self):
         # net i should reflex net K-i
@@ -257,8 +293,12 @@ class DirectionalJumpRouter:
 
     def solve(self):
         self.solver.parameters.log_search_progress = True
-        self.solver.parameters.num_search_workers = 8  # for parallelism
+        # self.solver.parameters.num_search_workers = 8  # for parallelism
         status = self.solver.Solve(self.model)
+
+        # Print optimization time
+        print(f"Solver status: {self.solver.StatusName(status)}")
+        print(f"Optimization wall time: {self.solver.WallTime():.3f} seconds")
 
     def plot(self):
         plt.figure(figsize=(12, 6))
@@ -339,12 +379,12 @@ class DirectionalJumpRouter:
 if __name__ == "__main__":
     nets = [
         ((5, 0), [(1, 6), (3, 6), (5, 6), (7, 6)]),
-        ((6, 0), [(9, 6), (11, 6), (13, 6), (15, 6)]),
+        # ((6, 0), [(9, 6), (11, 6), (13, 6), (15, 6)]),
         # ((7, 0), [(17, 6), (19, 6), (21, 6), (23, 6)]),
         # ((8, 0), [(25, 6), (27, 6), (29, 6), (31, 6)]),
         # ((25, 0), [(2, 6), (4, 6), (6, 6), (8, 6)]),
         # ((26, 0), [(10, 6), (12, 6), (14, 6), (16, 6)]),
-        ((27, 0), [(18, 6), (20, 6), (22, 6), (24, 6)]),
+        # ((27, 0), [(18, 6), (20, 6), (22, 6), (24, 6)]),
         ((28, 0), [(26, 6), (28, 6), (30, 6), (32, 6)]),
         ]
     router = DirectionalJumpRouter(width=33, height=7, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = 120)
