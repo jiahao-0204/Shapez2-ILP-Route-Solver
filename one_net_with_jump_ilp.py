@@ -113,7 +113,8 @@ class DirectionalJumpRouter:
                 jump_edges_related_to_node = [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[i][node]]
                 
                 is_node_used_by_net[i][node] = pulp.LpVariable(f"node_used_by_net_{i}_{node}", cat='Binary')    
-                self.model += len(step_edges_from_node) * is_node_used_by_net[i][node] >= pulp.lpSum(step_edges_from_node) + len(step_edges_from_node) * pulp.lpSum(jump_edges_related_to_node)
+                # self.model += len(step_edges_from_node) * is_node_used_by_net[i][node] >= pulp.lpSum(step_edges_from_node) + len(step_edges_from_node) * pulp.lpSum(jump_edges_related_to_node)
+                self.model += is_node_used_by_net[i][node] >= pulp.lpSum(step_edges_from_node) / len(step_edges_from_node) + pulp.lpSum(jump_edges_related_to_node)
         return is_node_used_by_net
 
     def add_objective(self):
@@ -217,7 +218,8 @@ class DirectionalJumpRouter:
 
             # the constraint
             self.model += (
-                pulp.lpSum(step_edges_from_node) + len(step_edges_from_node) * pulp.lpSum(jump_edges_related_to_node) <= len(step_edges_from_node)
+                # pulp.lpSum(step_edges_from_node) + len(step_edges_from_node) * pulp.lpSum(jump_edges_related_to_node) <= len(step_edges_from_node)
+                pulp.lpSum(step_edges_from_node) / len(step_edges_from_node) + pulp.lpSum(jump_edges_related_to_node) <= 1
             )
 
     # def add_overlap_constraints_v3(self):
@@ -369,10 +371,10 @@ if __name__ == "__main__":
     nets = [
         ((5, 0), [(1, 6), (3, 6), (5, 6), (7, 6)]),
         ((6, 0), [(9, 6), (11, 6), (13, 6), (15, 6)]),
-        # ((7, 0), [(17, 6), (19, 6), (21, 6), (23, 6)]),
+        ((7, 0), [(17, 6), (19, 6), (21, 6), (23, 6)]),
         # ((8, 0), [(25, 6), (27, 6), (29, 6), (31, 6)]),
         # ((25, 0), [(2, 6), (4, 6), (6, 6), (8, 6)]),
-        # ((26, 0), [(10, 6), (12, 6), (14, 6), (16, 6)]),
+        ((26, 0), [(10, 6), (12, 6), (14, 6), (16, 6)]),
         ((27, 0), [(18, 6), (20, 6), (22, 6), (24, 6)]),
         ((28, 0), [(26, 6), (28, 6), (30, 6), (32, 6)]),
         ]
