@@ -14,6 +14,8 @@ Edge = Tuple[Node, Node, Tuple[int, int]]  # (start_node, end_node, direction)
 class DirectionalJumpRouter:
     def __init__(self, width, height, nets, jump_distances: List[int] = [4], timelimit: int = 60):
 
+        # allow multiple start
+
         # Input parameters
         self.WIDTH = width
         self.HEIGHT = height
@@ -83,14 +85,13 @@ class DirectionalJumpRouter:
         # Dynamic variables
         self.is_edge_used: Dict[int, Dict[Edge, pulp.LpVariable]] = {}
         self.edge_flow_value: Dict[int, Dict[Edge, pulp.LpVariable]] = {}
-        self.is_node_used_by_net: Dict[int, Dict[Node, pulp.LpVariable]] = defaultdict(lambda: defaultdict(pulp.LpVariable))
         for i in range(self.num_nets):
             self.is_edge_used[i] = {edge: pulp.LpVariable(f"edge_used_{i}_{edge}", cat='Binary') for edge in self.all_edges[i]}
             self.edge_flow_value[i] = {edge: pulp.LpVariable(f"edge_flow_value_{i}_{edge}", cat='Integer', lowBound=0, upBound=self.K[i]) for edge in self.all_edges[i]}
+                
         
-        # Dynamic computes
-        self.dynamic_compute_is_node_used_by()
-        
+        self.is_node_used_by_net: Dict[int, Dict[Node, pulp.LpVariable]] = self.dynamic_compute_is_node_used_by()
+
         # Objective function
         self.add_objective()
 
@@ -104,14 +105,16 @@ class DirectionalJumpRouter:
         self.plot()
 
     def dynamic_compute_is_node_used_by(self):
+        is_node_used_by_net: Dict[int, Dict[Node, pulp.LpVariable]] = defaultdict(lambda: defaultdict(pulp.LpVariable))
         for i in range(self.num_nets):
             for node in self.all_nodes[i]:
 
                 step_edges_from_node = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[i][node]]
                 jump_edges_related_to_node = [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[i][node]]
                 
-                self.is_node_used_by_net[i][node] = pulp.LpVariable(f"node_used_by_net_{i}_{node}", cat='Binary')    
-                self.model += len(step_edges_from_node) * self.is_node_used_by_net[i][node] >= pulp.lpSum(step_edges_from_node) + len(step_edges_from_node) * pulp.lpSum(jump_edges_related_to_node)
+                is_node_used_by_net[i][node] = pulp.LpVariable(f"node_used_by_net_{i}_{node}", cat='Binary')    
+                self.model += len(step_edges_from_node) * is_node_used_by_net[i][node] >= pulp.lpSum(step_edges_from_node) + len(step_edges_from_node) * pulp.lpSum(jump_edges_related_to_node)
+        return is_node_used_by_net
 
     def add_objective(self):
         step_cost_list = []
