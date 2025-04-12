@@ -116,7 +116,8 @@ class DirectionalJumpRouter:
                 # add a variable that is true if any step edge is used for this node
                 is_step_edge_used_at_node[i][node] = self.model.NewBoolVar(f"step_edge_used_{i}_{node}")
                 self.model.AddBoolOr(step_edges_from_node).OnlyEnforceIf(is_step_edge_used_at_node[i][node])
-                self.model.AddBoolAnd([edge.Not() for edge in step_edges_from_node]).OnlyEnforceIf(is_step_edge_used_at_node[i][node].Not())
+                self.model.Add(is_step_edge_used_at_node[i][node] == 0).OnlyEnforceIf([edge.Not() for edge in step_edges_from_node])
+                # self.model.AddBoolAnd([edge.Not() for edge in step_edges_from_node]).OnlyEnforceIf(is_step_edge_used_at_node[i][node].Not())
         return is_step_edge_used_at_node
 
     def dynamic_compute_is_node_used_by_net(self):
@@ -129,7 +130,8 @@ class DirectionalJumpRouter:
                 
                 is_node_used_by_net[i][node] = self.model.NewBoolVar(f"node_used_by_net_{i}_{node}")
                 self.model.AddBoolOr([is_step_edge_used] + jump_edges_related_to_node).OnlyEnforceIf(is_node_used_by_net[i][node])
-                self.model.AddBoolAnd([is_step_edge_used.Not()] + [edge.Not() for edge in jump_edges_related_to_node]).OnlyEnforceIf(is_node_used_by_net[i][node].Not())
+                self.model.Add(is_node_used_by_net[i][node] == 0).OnlyEnforceIf([edge.Not() for edge in jump_edges_related_to_node] + [is_step_edge_used.Not()])
+                # self.model.AddBoolAnd([is_step_edge_used.Not()] + [edge.Not() for edge in jump_edges_related_to_node]).OnlyEnforceIf(is_node_used_by_net[i][node].Not())
         return is_node_used_by_net
 
     def add_objective(self):
@@ -210,7 +212,8 @@ class DirectionalJumpRouter:
                 # Create an OR condition: at least one incoming edge in the same direction
                 condition = self.model.NewBoolVar(f"jump_allowed_into_{u}_dir_{direction}")
                 self.model.AddBoolOr(incoming_edges_in_same_direction).OnlyEnforceIf(condition)
-                self.model.AddBoolAnd([e.Not() for e in incoming_edges_in_same_direction]).OnlyEnforceIf(condition.Not())
+                self.model.Add(condition == 0).OnlyEnforceIf([edge.Not() for edge in incoming_edges_in_same_direction])
+                # self.model.AddBoolAnd([e.Not() for e in incoming_edges_in_same_direction]).OnlyEnforceIf(condition.Not())
 
                 # Enforce jump only if that condition is true
                 self.model.AddImplication(self.is_edge_used[i][jump_edge], condition)
