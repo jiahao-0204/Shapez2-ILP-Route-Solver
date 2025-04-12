@@ -85,10 +85,8 @@ class DirectionalJumpRouter:
         
         # Dynamic variables
         self.is_edge_used: Dict[int, Dict[Edge, cp_model.BoolVarT]] = {}
-        # self.edge_flow_value: Dict[int, Dict[Edge, cp_model.IntVar]] = {}
         for i in range(self.num_nets):
             self.is_edge_used[i] = {edge: self.model.NewBoolVar(f"edge_used_{i}_{edge}") for edge in self.all_edges[i]}
-            # self.edge_flow_value[i] = {edge: self.model.NewIntVar(0, self.K[i], f"edge_flow_value_{i}_{edge}") for edge in self.all_edges[i]}
                 
         
         self.is_step_edge_used_at_node: Dict[int, Dict[Node, cp_model.BoolVarT]] = self.dynamic_compute_is_step_edge_used_at_node()
@@ -141,7 +139,7 @@ class DirectionalJumpRouter:
 
     def add_constraints(self):
         for i in range(self.num_nets):
-            self.add_flow_constraints(i)
+            self.add_flow_constraints_v2(i)
             self.add_directional_constraints(i)
             self.add_overlap_and_one_jump_constraints(i)
 
@@ -150,23 +148,27 @@ class DirectionalJumpRouter:
         self.add_net_overlap_constraints()
 
     def add_flow_constraints(self, i):
-        # # Flow is avaiable if the edge is selected
-        # for edge in self.all_edges[i]:
-        #     self.model.Add(self.edge_flow_value[i][edge] >= 1).OnlyEnforceIf(self.is_edge_used[i][edge])
-        #     self.model.Add(self.edge_flow_value[i][edge] == 0).OnlyEnforceIf(self.is_edge_used[i][edge].Not())
+        self.edge_flow_value: Dict[int, Dict[Edge, cp_model.IntVar]] = {}
+        self.edge_flow_value[i] = {edge: self.model.NewIntVar(0, self.K[i], f"edge_flow_value_{i}_{edge}") for edge in self.all_edges[i]}
 
-        # # Flow conservation constraints
-        # for node in self.all_nodes[i]:
-        #     in_flow = sum(self.edge_flow_value[i][edge] for edge in self.all_edges[i] if edge[1] == node)
-        #     out_flow = sum(self.edge_flow_value[i][edge] for edge in self.all_edges[i] if edge[0] == node)
+        # Flow is avaiable if the edge is selected
+        for edge in self.all_edges[i]:
+            self.model.Add(self.edge_flow_value[i][edge] >= 1).OnlyEnforceIf(self.is_edge_used[i][edge])
+            self.model.Add(self.edge_flow_value[i][edge] == 0).OnlyEnforceIf(self.is_edge_used[i][edge].Not())
 
-        #     if node == self.start[i]:
-        #         self.model.Add(out_flow - in_flow == self.K[i])
-        #     elif node in self.goals[i]:
-        #         self.model.Add(out_flow - in_flow == -1)
-        #     else:
-        #         self.model.Add(out_flow - in_flow == 0)
+        # Flow conservation constraints
+        for node in self.all_nodes[i]:
+            in_flow = sum(self.edge_flow_value[i][edge] for edge in self.all_edges[i] if edge[1] == node)
+            out_flow = sum(self.edge_flow_value[i][edge] for edge in self.all_edges[i] if edge[0] == node)
 
+            if node == self.start[i]:
+                self.model.Add(out_flow - in_flow == self.K[i])
+            elif node in self.goals[i]:
+                self.model.Add(out_flow - in_flow == -1)
+            else:
+                self.model.Add(out_flow - in_flow == 0)
+    
+    def add_flow_constraints_v2(self, i):
         # Flow conservation constraints
         for node in self.all_nodes[i]:
             in_flow = [self.is_edge_used[i][edge] for edge in self.all_edges[i] if edge[1] == node]
