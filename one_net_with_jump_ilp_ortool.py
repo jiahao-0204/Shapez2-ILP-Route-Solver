@@ -1,4 +1,4 @@
-import pulp
+from ortools.sat.python import cp_model
 import matplotlib.pyplot as plt
 from collections import defaultdict
 from typing import Dict, Tuple, List
@@ -80,17 +80,18 @@ class DirectionalJumpRouter:
                             self.node_related_jump_edges[i][pad_node].append(edge)
 
         # Optimization
-        self.model = pulp.LpProblem("JumpRouter", pulp.LpMinimize)
+        self.model = cp_model.CpModel()
+        self.solver = cp_model.CpSolver()
         
         # Dynamic variables
-        self.is_edge_used: Dict[int, Dict[Edge, pulp.LpVariable]] = {}
-        self.edge_flow_value: Dict[int, Dict[Edge, pulp.LpVariable]] = {}
+        self.is_edge_used: Dict[int, Dict[Edge, cp_model.BoolVarT]] = {}
+        self.edge_flow_value: Dict[int, Dict[Edge, cp_model.IntVar]] = {}
         for i in range(self.num_nets):
-            self.is_edge_used[i] = {edge: pulp.LpVariable(f"edge_used_{i}_{edge}", cat='Binary') for edge in self.all_edges[i]}
-            self.edge_flow_value[i] = {edge: pulp.LpVariable(f"edge_flow_value_{i}_{edge}", cat='Integer', lowBound=0, upBound=self.K[i]) for edge in self.all_edges[i]}
+            self.is_edge_used[i] = {edge: self.model.NewBoolVar(f"edge_used_{i}_{edge}") for edge in self.all_edges[i]}
+            self.edge_flow_value[i] = {edge: self.model.NewIntVar(0, self.K[i], f"edge_flow_value_{i}_{edge}") for edge in self.all_edges[i]}
                 
         
-        self.is_node_used_by_net: Dict[int, Dict[Node, pulp.LpVariable]] = self.dynamic_compute_is_node_used_by()
+        self.is_node_used_by_net: Dict[int, Dict[Node, cp_model.BoolVarT]] = self.dynamic_compute_is_node_used_by()
 
         # Objective function
         self.add_objective()
@@ -105,15 +106,15 @@ class DirectionalJumpRouter:
         self.plot()
 
     def dynamic_compute_is_node_used_by(self):
-        is_node_used_by_net: Dict[int, Dict[Node, pulp.LpVariable]] = defaultdict(lambda: defaultdict(pulp.LpVariable))
+        is_node_used_by_net: Dict[int, Dict[Node, cp_model.BoolVarT]] = defaultdict(lambda: defaultdict(cp_model.BoolVarT))
         for i in range(self.num_nets):
             for node in self.all_nodes[i]:
 
                 step_edges_from_node = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[i][node]]
                 jump_edges_related_to_node = [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[i][node]]
                 
-                is_node_used_by_net[i][node] = pulp.LpVariable(f"node_used_by_net_{i}_{node}", cat='Binary')    
-                self.model += len(step_edges_from_node) * is_node_used_by_net[i][node] >= pulp.lpSum(step_edges_from_node) + len(step_edges_from_node) * pulp.lpSum(jump_edges_related_to_node)
+                is_node_used_by_net[i][node] = self.model.NewBoolVar(f"node_used_by_net_{i}_{node}")
+                self.model.Add(len(step_edges_from_node) * is_node_used_by_net[i][node] >= sum(step_edges_from_node) + len(step_edges_from_node) * sum(jump_edges_related_to_node))
         return is_node_used_by_net
 
     def add_objective(self):
@@ -126,7 +127,9 @@ class DirectionalJumpRouter:
             step_cost_list += step_cost_list_i
             jump_cost_list += jump_cost_list_i
             
-        self.model += pulp.lpSum(step_cost_list + jump_cost_list)
+        self.model.Minimize(
+            sum(step_cost_list) + sum(jump_cost_list)
+        )
 
     def add_constraints(self):
         for i in range(self.num_nets):
@@ -141,20 +144,20 @@ class DirectionalJumpRouter:
     def add_flow_constraints(self, i):
         # Flow is avaiable if the edge is selected
         for edge in self.all_edges[i]:
-            self.model += self.edge_flow_value[i][edge] <= self.is_edge_used[i][edge] * self.K[i]
-            self.model += self.edge_flow_value[i][edge] >= self.is_edge_used[i][edge]
+            self.model.Add(self.edge_flow_value[i][edge] <= self.is_edge_used[i][edge] * self.K[i])
+            self.model.Add(self.edge_flow_value[i][edge] >= self.is_edge_used[i][edge])
 
         # Flow conservation constraints
         for node in self.all_nodes[i]:
-            in_flow = pulp.lpSum(self.edge_flow_value[i][edge] for edge in self.all_edges[i] if edge[1] == node)
-            out_flow = pulp.lpSum(self.edge_flow_value[i][edge] for edge in self.all_edges[i] if edge[0] == node)
+            in_flow = sum(self.edge_flow_value[i][edge] for edge in self.all_edges[i] if edge[1] == node)
+            out_flow = sum(self.edge_flow_value[i][edge] for edge in self.all_edges[i] if edge[0] == node)
 
             if node == self.start[i]:
-                self.model += (out_flow - in_flow == self.K[i])
+                self.model.Add(out_flow - in_flow == self.K[i])
             elif node in self.goals[i]:
-                self.model += (out_flow - in_flow == -1)
+                self.model.Add(out_flow - in_flow == -1)
             else:
-                self.model += (out_flow - in_flow == 0)
+                self.model.Add(out_flow - in_flow == 0)
 
     def add_directional_constraints(self, i):
         for jump_edge in self.jump_edges[i]:
@@ -170,10 +173,10 @@ class DirectionalJumpRouter:
                     incoming_edges_in_same_direction.append(self.is_edge_used[i][edge])
 
             # create a variable that sums up the incoming edges in the same direction
-            sum_of_incoming_edge_in_same_direction = pulp.lpSum(incoming_edges_in_same_direction)
+            sum_of_incoming_edge_in_same_direction = sum(incoming_edges_in_same_direction)
 
             # Enforce that jump flow is only allowed if incoming flow matches direction
-            self.model += self.is_edge_used[i][jump_edge] <= sum_of_incoming_edge_in_same_direction
+            self.model.Add(self.is_edge_used[i][jump_edge] <= sum_of_incoming_edge_in_same_direction)
 
     def add_overlap_and_one_jump_constraints(self, i):
         for node in self.all_nodes[i]:
@@ -184,8 +187,8 @@ class DirectionalJumpRouter:
             jump_edges_related_to_node = [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[i][node]]
 
             # the constraint
-            self.model += (
-                pulp.lpSum(step_edges_from_node) + len(step_edges_from_node) * pulp.lpSum(jump_edges_related_to_node) <= len(step_edges_from_node)
+            self.model.Add(
+                sum(step_edges_from_node) + len(step_edges_from_node) * sum(jump_edges_related_to_node) <= len(step_edges_from_node)
             )
 
     # def add_overlap_constraints_v3(self):
@@ -224,7 +227,7 @@ class DirectionalJumpRouter:
         for i in range(self.num_nets):
             for j in range(self.num_nets):
                 for goal in self.goals[j]:
-                    self.model += self.is_node_used_by_net[i][goal] == 0
+                    self.model.Add(self.is_node_used_by_net[i][goal] == 0)
 
     def add_net_overlap_constraints(self):
         # no overlap between nets
@@ -234,7 +237,7 @@ class DirectionalJumpRouter:
                 list_of_nets_using_node.append(self.is_node_used_by_net[i][node])
             
             # constraint: at most one net can use a node
-            self.model += pulp.lpSum(list_of_nets_using_node) <= 1
+            self.model.Add(sum(list_of_nets_using_node) <= 1)
 
     def add_symmetry_constraints(self):
         # net i should reflex net K-i
@@ -250,13 +253,12 @@ class DirectionalJumpRouter:
                 sym_v = (sym_svx, sym_svy)
                 sym_d = (-d[0], d[1])
                 if ((sym_u, sym_v, sym_d) in self.all_edges[j]):
-                    self.model += self.is_edge_used[i][edge] == self.is_edge_used[j][(sym_u, sym_v, sym_d)]
+                    self.model.Add(self.is_edge_used[i][edge] == self.is_edge_used[j][(sym_u, sym_v, sym_d)])
 
     def solve(self):
-        # solver = pulp.PULP_CBC_CMD(timeLimit=self.timelimit)
-        # solver = pulp.GUROBI_CMD(timeLimit=self.timelimit, options=[("MIPFocus", 1)])
-        solver = pulp.GUROBI_CMD(timeLimit=self.timelimit)
-        self.model.solve(solver)
+        self.solver.parameters.log_search_progress = True
+        self.solver.parameters.num_search_workers = 8  # for parallelism
+        status = self.solver.Solve(self.model)
 
     def plot(self):
         plt.figure(figsize=(12, 6))
@@ -274,8 +276,9 @@ class DirectionalJumpRouter:
         for i in range(self.num_nets):
             color = colors[i % len(colors)]
 
-            used_step_edges = [e for e in self.step_edges[i] if pulp.value(self.is_edge_used[i][e]) == 1]
-            used_jump_edges = [e for e in self.jump_edges[i] if pulp.value(self.is_edge_used[i][e]) == 1]
+            used_step_edges = [e for e in self.step_edges[i] if self.solver.Value(self.is_edge_used[i][e]) == 1]
+            used_jump_edges = [e for e in self.jump_edges[i] if self.solver.Value(self.is_edge_used[i][e]) == 1]
+
 
             # Plot start and goal
             sx, sy = self.start[i]
@@ -336,12 +339,12 @@ class DirectionalJumpRouter:
 if __name__ == "__main__":
     nets = [
         ((5, 0), [(1, 6), (3, 6), (5, 6), (7, 6)]),
-        # ((6, 0), [(9, 6), (11, 6), (13, 6), (15, 6)]),
+        ((6, 0), [(9, 6), (11, 6), (13, 6), (15, 6)]),
         # ((7, 0), [(17, 6), (19, 6), (21, 6), (23, 6)]),
         # ((8, 0), [(25, 6), (27, 6), (29, 6), (31, 6)]),
         # ((25, 0), [(2, 6), (4, 6), (6, 6), (8, 6)]),
         # ((26, 0), [(10, 6), (12, 6), (14, 6), (16, 6)]),
-        # ((27, 0), [(18, 6), (20, 6), (22, 6), (24, 6)]),
+        ((27, 0), [(18, 6), (20, 6), (22, 6), (24, 6)]),
         ((28, 0), [(26, 6), (28, 6), (30, 6), (32, 6)]),
         ]
     router = DirectionalJumpRouter(width=33, height=7, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = 120)
