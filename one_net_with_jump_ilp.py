@@ -130,7 +130,7 @@ class DirectionalJumpRouter:
 
     def add_constraints(self):
         for i in range(self.num_nets):
-            self.add_flow_constraints(i)
+            self.add_flow_constraints_v2(i)
             self.add_directional_constraints(i)
             self.add_overlap_and_one_jump_constraints(i)
 
@@ -155,6 +155,38 @@ class DirectionalJumpRouter:
                 self.model += (out_flow - in_flow == -1)
             else:
                 self.model += (out_flow - in_flow == 0)
+
+    def add_flow_constraints_v2(self, i):
+        for node in self.all_nodes[i]:
+            in_flow = [self.is_edge_used[i][edge] for edge in self.all_edges[i] if edge[1] == node]
+            out_flow = [self.is_edge_used[i][edge] for edge in self.all_edges[i] if edge[0] == node]
+
+            if node == self.start[i]:
+                self.model += sum(in_flow) == 0
+                self.model += sum(out_flow) == 1
+            elif node in self.goals[i]:
+                self.model += sum(in_flow) == 1
+                self.model += sum(out_flow) == 0
+            else:
+                # if have in_flow, then must have out_flow
+                self.model += sum(in_flow) / len(in_flow) <= sum(out_flow)
+                # self.model += sum(in_flow) <= sum(out_flow) * len(in_flow)
+                # if have out_flow, then must have in_flow
+                self.model += sum(out_flow) / len(out_flow) <= sum(in_flow)
+                # self.model += sum(out_flow) <= sum(in_flow) * len(out_flow)
+
+        # the flow in and flow out must not be cyclic
+        max_level = self.WIDTH + self.HEIGHT  # rough upper bound for longest path
+        node_level = {}
+
+        for node in self.all_nodes[i]:
+            node_level[node] = pulp.LpVariable(f"node_level_{i}_{node}", lowBound=0, upBound=max_level, cat='Integer')
+                
+        # Acyclic constraint using topological levels
+        M = max_level + 1
+        for edge in self.all_edges[i]:
+            u, v, _ = edge
+            self.model += node_level[v] >= node_level[u] + 1 - M * (1 - self.is_edge_used[i][edge])
 
     def add_directional_constraints(self, i):
         for jump_edge in self.jump_edges[i]:
