@@ -134,6 +134,7 @@ class DirectionalJumpRouter:
             self.add_directional_constraints(i)
             self.add_overlap_and_one_jump_constraints(i)
 
+        self.add_symmetry_constraints()
         self.add_goal_action_constraints()
         self.add_net_overlap_constraints()
 
@@ -234,6 +235,22 @@ class DirectionalJumpRouter:
             
             # constraint: at most one net can use a node
             self.model += pulp.lpSum(list_of_nets_using_node) <= 1
+
+    def add_symmetry_constraints(self):
+        # net i should reflex net K-i
+        for i in range(int(self.num_nets / 2)):
+            j = self.num_nets - i - 1
+            for edge in self.all_edges[i]:
+                u, v, d = edge
+                sym_ux = self.WIDTH - u[0]
+                sym_suy = u[1]
+                sym_svx = self.WIDTH - v[0]
+                sym_svy = v[1]
+                sym_u = (sym_ux, sym_suy)
+                sym_v = (sym_svx, sym_svy)
+                sym_d = (-d[0], d[1])
+                if ((sym_u, sym_v, sym_d) in self.all_edges[j]):
+                    self.model += self.is_edge_used[i][edge] == self.is_edge_used[j][(sym_u, sym_v, sym_d)]
 
     def solve(self):
         # solver = pulp.PULP_CBC_CMD(timeLimit=self.timelimit)
