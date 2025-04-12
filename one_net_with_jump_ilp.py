@@ -84,11 +84,8 @@ class DirectionalJumpRouter:
         
         # Dynamic variables
         self.is_edge_used: Dict[int, Dict[Edge, pulp.LpVariable]] = {}
-        self.edge_flow_value: Dict[int, Dict[Edge, pulp.LpVariable]] = {}
         for i in range(self.num_nets):
-            self.is_edge_used[i] = {edge: pulp.LpVariable(f"edge_used_{i}_{edge}", cat='Binary') for edge in self.all_edges[i]}
-            self.edge_flow_value[i] = {edge: pulp.LpVariable(f"edge_flow_value_{i}_{edge}", cat='Integer', lowBound=0, upBound=self.K[i]) for edge in self.all_edges[i]}
-                
+            self.is_edge_used[i] = {edge: pulp.LpVariable(f"edge_used_{i}_{edge}", cat='Binary') for edge in self.all_edges[i]}    
         
         self.is_node_used_by_net: Dict[int, Dict[Node, pulp.LpVariable]] = self.dynamic_compute_is_node_used_by()
 
@@ -140,6 +137,9 @@ class DirectionalJumpRouter:
         self.add_net_overlap_constraints()
 
     def add_flow_constraints(self, i):
+        self.edge_flow_value: Dict[int, Dict[Edge, pulp.LpVariable]] = {}
+        self.edge_flow_value[i] = {edge: pulp.LpVariable(f"edge_flow_value_{i}_{edge}", cat='Integer', lowBound=0, upBound=self.K[i]) for edge in self.all_edges[i]}
+        
         # Flow is avaiable if the edge is selected
         for edge in self.all_edges[i]:
             self.model += self.edge_flow_value[i][edge] <= self.is_edge_used[i][edge] * self.K[i]
