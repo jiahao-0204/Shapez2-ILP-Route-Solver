@@ -20,18 +20,18 @@ class DirectionalJumpRouter:
         self.WIDTH = width
         self.HEIGHT = height
 
-        self.num_nets = len(nets)
         self.start: Dict[int, Tuple[int, int]] = {}
         self.goals: Dict[int, List[Tuple[int, int]]] = {}
+        current_i = 0
         for i, (start, goals) in enumerate(nets):
-            self.start[i] = start
-            self.goals[i] = goals
+            for goal in goals:    
+                self.start[current_i] = start
+                self.goals[current_i] = [goal]
+                current_i += 1
 
         self.jump_distances = jump_distances
         self.timelimit = timelimit
-
-
-
+        self.num_nets = len(self.start)
 
         # Internal variables
         self.K: Dict[int, int] = {}
@@ -155,13 +155,14 @@ class DirectionalJumpRouter:
 
     def add_constraints(self):
         for i in range(self.num_nets):
-            self.add_flow_constraints_v2(i)
+            self.add_simple_flow_constraints(i)
             self.add_directional_constraints(i)
             self.add_overlap_and_one_jump_constraints(i)
 
         self.add_symmetry_constraints()
         self.add_goal_action_constraints()
-        self.add_net_overlap_constraints()
+        self.add_net_overlap_constraints_between_separate_nets()
+        self.add_edge_overlap_constraint()
 
     def add_flow_constraints(self, i):
         self.edge_flow_value: Dict[int, Dict[Edge, cp_model.IntVar]] = {}
@@ -345,6 +346,19 @@ class DirectionalJumpRouter:
             
             # constraint: at most one net can use a node
             self.model.AddAtMostOne(list_of_nets_using_node)
+
+    def add_net_overlap_constraints_between_separate_nets(self):
+        # no overlap between nets that don't share start node
+        for node in self.all_nodes[0]:
+            # for each i and j, used by i means not used by j if they don't have same start
+            for i in range(self.num_nets):
+                # list of nets that don't share start node with i
+                list_of_nets_using_node = [self.is_node_used_by_net[j][node] for j in range(self.num_nets) if self.start[i] != self.start[j]]
+                self.model.Add(sum(list_of_nets_using_node) == 0).OnlyEnforceIf(self.is_node_used_by_net[i][node])
+
+                for j in range(self.num_nets):
+                    if i != j and self.start[i] != self.start[j]:
+                        self.model.Add(self.is_node_used_by_net[i][node] + self.is_node_used_by_net[j][node] <= 1)
 
     def add_net_overlap_constraints_by_edge(self):
         # for each net, for each node, if a edge is used, then no other net can have edge on that node
