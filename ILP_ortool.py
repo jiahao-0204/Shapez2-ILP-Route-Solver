@@ -145,7 +145,7 @@ class DirectionalJumpRouter:
 
         self.add_symmetry_constraints()
         self.add_goal_action_constraints()
-        self.add_net_overlap_constraints()
+        self.add_net_overlap_constraints_v2()
 
     def add_flow_constraints(self, i):
         self.edge_flow_value: Dict[int, Dict[Edge, cp_model.IntVar]] = {}
@@ -305,6 +305,17 @@ class DirectionalJumpRouter:
             
             # constraint: at most one net can use a node
             self.model.AddAtMostOne(list_of_nets_using_node)
+    
+    def add_net_overlap_constraints_v2(self):
+        # no overlap between nets
+        for edge in self.all_edges[0]:
+            edge_across_nets = []
+            for i in range(self.num_nets):
+                if edge in self.all_edges[i]:
+                    edge_across_nets.append(self.is_edge_used[i][edge])
+            
+            # constraint: at most one net can use a node
+            self.model.AddAtMostOne(edge_across_nets)
 
     def add_symmetry_constraints(self):
         # net i should reflex net K-i
