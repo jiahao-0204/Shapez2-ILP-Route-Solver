@@ -93,7 +93,7 @@ class DirectionalJumpRouter:
         self.is_node_used_by_net: Dict[int, Dict[Node, cp_model.BoolVarT]] = self.dynamic_compute_is_node_used_by_net()
 
         # Objective function
-        self.add_objective()
+        self.add_objective_by_node_used()
 
         # Constraints
         self.add_constraints()
@@ -136,6 +136,22 @@ class DirectionalJumpRouter:
             for node in self.all_nodes[i]:
                 tile_used.append(self.is_node_used_by_net[i][node])
         self.model.Minimize(sum(tile_used))
+
+    def add_objective_by_node_used(self):
+        # minimize the number of node used
+        all_node_used_bool = []
+        for node in self.all_nodes[0]:
+            node_is_used_list = []
+            node_is_used_bool = self.model.NewBoolVar(f"node_is_used_{node}")
+            for i in range(self.num_nets):
+                node_is_used_list.append(self.is_node_used_by_net[i][node])
+            
+            self.model.AddBoolOr(node_is_used_list).OnlyEnforceIf(node_is_used_bool)
+            self.model.AddBoolAnd([edge.Not() for edge in node_is_used_list]).OnlyEnforceIf(node_is_used_bool.Not())
+        
+            all_node_used_bool.append(node_is_used_bool)
+
+        self.model.Minimize(sum(all_node_used_bool))
 
     def add_constraints(self):
         for i in range(self.num_nets):
@@ -409,6 +425,7 @@ class DirectionalJumpRouter:
         # Print optimization time
         print(f"Solver status: {self.solver.StatusName(status)}")
         print(f"Optimization wall time: {self.solver.WallTime():.3f} seconds")
+        print(f"Objective value: {self.solver.ObjectiveValue()}")
 
     def plot(self):
         plt.figure(figsize=(12, 6))
