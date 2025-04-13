@@ -347,6 +347,44 @@ class DirectionalJumpRouter:
                             
                             self.model.AddBoolAnd([self.is_edge_used[j][edge].Not() for edge in edges_related_to_node_in_other_net]).OnlyEnforceIf(self.is_edge_used[i][edge])
 
+    def add_edge_overlap_constraint(self):
+        # node used by step
+        # node used by jump_1 in one of 4 direction
+        # node used by jump_2 in one of 4 direction
+        # node used by jump_3 in one of 4 direction
+        # node used by jump_4 in one of 4 direction
+        # for each node, it can only be used by one type of edge, this is true no matter what nets
+
+        # for each node
+        for node in self.all_nodes[0]:
+
+            # node used by any step from any net
+            step_edge_used_at_this_node = self.model.NewBoolVar(f"step_edge_at_this_node_{node}")
+            step_edges_bool_at_this_node = []
+            for i in range(self.num_nets):
+                step_edges_bool_at_this_node += [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[i][node]]
+            self.model.AddBoolOr(step_edges_bool_at_this_node).OnlyEnforceIf(step_edge_used_at_this_node)
+            self.model.AddBoolAnd([edge.Not() for edge in step_edges_bool_at_this_node]).OnlyEnforceIf(step_edge_used_at_this_node.Not())
+
+            # node used by any one jump from any net
+            jump_edge_bools_list = []
+
+            # for each different jump edge
+            for jump_edge in self.node_related_jump_edges[0][node]:
+                this_jump_edge_used_at_this_node = self.model.NewBoolVar(f"jump_edge_at_this_node_{node}")
+                this_jump_edges_bool_at_this_node = []
+                for i in range(self.num_nets):
+                    this_jump_edges_bool_at_this_node += [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[i][node] if edge == jump_edge]
+                
+                self.model.AddBoolOr(this_jump_edges_bool_at_this_node).OnlyEnforceIf(this_jump_edge_used_at_this_node)
+                self.model.AddBoolAnd([edge.Not() for edge in this_jump_edges_bool_at_this_node]).OnlyEnforceIf(this_jump_edge_used_at_this_node.Not())
+
+                jump_edge_bools_list.append(this_jump_edge_used_at_this_node)
+            
+            # add the constraint that at most one type of edge (where step edges of different direction are considered one type) can be used at this node
+            self.model.AddAtMostOne([step_edge_used_at_this_node] + jump_edge_bools_list)
+        
+
     def add_symmetry_constraints(self):
         # net i should reflex net K-i
         for i in range(int(self.num_nets / 2)):
