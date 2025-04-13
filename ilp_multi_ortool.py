@@ -346,7 +346,7 @@ class DirectionalJumpRouter:
             # constraint: at most one net can use a node
             self.model.AddAtMostOne(list_of_nets_using_node)
 
-    def add_net_overlap_constraints_v2(self):
+    def add_net_overlap_constraints_by_edge(self):
         # for each net, for each node, if a edge is used, then no other net can have edge on that node
         for i in range(self.num_nets):
             for node in self.all_nodes[i]:
