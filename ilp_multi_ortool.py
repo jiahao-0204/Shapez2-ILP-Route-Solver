@@ -205,6 +205,23 @@ class DirectionalJumpRouter:
             u, v, _ = edge
             self.model.Add(node_level[v] > node_level[u]).OnlyEnforceIf(self.is_edge_used[i][edge])
 
+    def add_simple_flow_constraints(self, i):
+        # Flow conservation constraints
+        for node in self.all_nodes[i]:
+            in_flow = [self.is_edge_used[i][edge] for edge in self.all_edges[i] if edge[1] == node]
+            out_flow = [self.is_edge_used[i][edge] for edge in self.all_edges[i] if edge[0] == node]
+
+            if node == self.start[i]:
+                self.model.Add(sum(out_flow) == 1)
+                self.model.AddBoolAnd([e.Not() for e in in_flow])
+            elif node in self.goals[i]:
+                self.model.Add(sum(in_flow) == 1)
+                self.model.AddBoolAnd([e.Not() for e in out_flow])
+            else:
+                self.model.Add(sum(in_flow) == sum(out_flow))
+                self.model.AddAtMostOne(in_flow)
+                self.model.AddAtMostOne(out_flow)
+
     # def add_directional_constraints(self, i):
     #     for jump_edge in self.jump_edges[i]:
     #         u, v, direction = jump_edge
