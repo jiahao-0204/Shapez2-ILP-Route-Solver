@@ -307,15 +307,21 @@ class DirectionalJumpRouter:
             self.model.AddAtMostOne(list_of_nets_using_node)
 
     def add_net_overlap_constraints_v2(self):
-        # no overlap between nets
-        for edge in self.all_edges[0]:
-            edge_across_nets = []
-            for i in range(self.num_nets):
-                if edge in self.all_edges[i]:
-                    edge_across_nets.append(self.is_edge_used[i][edge])
-            
-            # constraint: at most one net can use a node
-            self.model.AddAtMostOne(edge_across_nets)
+        # for each net, for each node, if a edge is used, then no other net can have edge on that node
+        for i in range(self.num_nets):
+            for node in self.all_nodes[i]:
+                # list of all edges of this node
+                edges_related_to_node = self.node_related_step_edges[i][node] + self.node_related_jump_edges[i][node]
+
+                # for each edge related node
+                for edge in edges_related_to_node:
+                    # for each net
+                    for j in range(self.num_nets):
+                        if j != i:
+                            # if edge is used, that implies that no other net can have edge on that node
+                            edges_related_to_node_in_other_net = self.node_related_step_edges[j][node] + self.node_related_jump_edges[j][node]
+                            
+                            self.model.AddBoolAnd([self.is_edge_used[j][edge].Not() for edge in edges_related_to_node_in_other_net]).OnlyEnforceIf(self.is_edge_used[i][edge])
 
     def add_symmetry_constraints(self):
         # net i should reflex net K-i
