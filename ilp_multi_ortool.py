@@ -145,7 +145,7 @@ class DirectionalJumpRouter:
 
         self.add_symmetry_constraints()
         self.add_goal_action_constraints()
-        self.add_net_overlap_constraints_v2()
+        self.add_net_overlap_constraints()
 
     def add_flow_constraints(self, i):
         self.edge_flow_value: Dict[int, Dict[Edge, cp_model.IntVar]] = {}
