@@ -230,6 +230,13 @@ class DirectionalJumpRouter:
             # A jump from u to v in direction `direction` is only allowed
             # if there is incoming flow to u from the same direction.
 
+            # if at start
+            if u == self.start[i]:
+                # only allow jump in up direction
+                if direction != (0, 1):
+                    self.model.Add(self.is_edge_used[i][jump_edge] == 0)
+                continue
+
             # Collect all edges (step and jump) that go into `u` from direction `direction`
             incoming_edges_in_same_direction = []
             for edge in self.all_edges[i]:
