@@ -38,12 +38,11 @@ class DirectionalJumpRouter:
         for i, (start, goals) in enumerate(nets):
             self.K[i] = len(goals)
 
-        self.all_nodes: Dict[int, List[Node]] = {}
-        for i in range(self.num_nets):
-            self.all_nodes[i] = []
-            for x in range(self.WIDTH):
-                for y in range(self.HEIGHT):
-                    self.all_nodes[i].append((x, y))
+        # all nodes
+        self.all_nodes: List[Node] = []
+        for x in range(self.WIDTH):
+            for y in range(self.HEIGHT):
+                self.all_nodes.append((x, y))
         
         self.all_edges: Dict[int, List[Edge]] = {}
         self.step_edges: Dict[int, List[Edge]] = {}
@@ -56,7 +55,7 @@ class DirectionalJumpRouter:
             self.jump_edges[i] = []
             self.node_related_step_edges[i] = defaultdict(list)
             self.node_related_jump_edges[i] = defaultdict(list)
-            for node in self.all_nodes[i]:
+            for node in self.all_nodes:
                 x, y = node
                 for dx, dy in DIRECTIONS:
 
@@ -104,7 +103,7 @@ class DirectionalJumpRouter:
     def dynamic_compute_is_node_used_by(self):
         is_node_used_by_net: Dict[int, Dict[Node, pulp.LpVariable]] = defaultdict(lambda: defaultdict(pulp.LpVariable))
         for i in range(self.num_nets):
-            for node in self.all_nodes[i]:
+            for node in self.all_nodes:
 
                 step_edges_from_node = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[i][node]]
                 jump_edges_related_to_node = [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[i][node]]
@@ -146,7 +145,7 @@ class DirectionalJumpRouter:
             self.model += self.edge_flow_value[i][edge] >= self.is_edge_used[i][edge]
 
         # Flow conservation constraints
-        for node in self.all_nodes[i]:
+        for node in self.all_nodes:
             in_flow = pulp.lpSum(self.edge_flow_value[i][edge] for edge in self.all_edges[i] if edge[1] == node)
             out_flow = pulp.lpSum(self.edge_flow_value[i][edge] for edge in self.all_edges[i] if edge[0] == node)
 
@@ -158,7 +157,7 @@ class DirectionalJumpRouter:
                 self.model += (out_flow - in_flow == 0)
 
     def add_flow_constraints_v2(self, i):
-        for node in self.all_nodes[i]:
+        for node in self.all_nodes:
             in_flow = [self.is_edge_used[i][edge] for edge in self.all_edges[i] if edge[1] == node]
             out_flow = [self.is_edge_used[i][edge] for edge in self.all_edges[i] if edge[0] == node]
 
@@ -180,7 +179,7 @@ class DirectionalJumpRouter:
         max_level = self.WIDTH + self.HEIGHT  # rough upper bound for longest path
         node_level = {}
 
-        for node in self.all_nodes[i]:
+        for node in self.all_nodes:
             node_level[node] = pulp.LpVariable(f"node_level_{i}_{node}", lowBound=0, upBound=max_level, cat='Integer')
                 
         # Acyclic constraint using topological levels
@@ -217,7 +216,7 @@ class DirectionalJumpRouter:
             self.model += self.is_edge_used[i][jump_edge] <= sum_of_incoming_edge_in_same_direction
 
     def add_overlap_and_one_jump_constraints(self, i):
-        for node in self.all_nodes[i]:
+        for node in self.all_nodes:
             # list of all step edges from this node
             step_edges_from_node = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[i][node]]
 
@@ -245,7 +244,7 @@ class DirectionalJumpRouter:
     #             pulp.lpSum(pulp.lpSum(jump_edges_of_net[i]) for i in range(self.num_nets)) <= 1)
 
     # def add_overlap_constraints(self, i):
-    #     for node in self.all_nodes[i]:
+    #     for node in self.all_nodes:
     #         # Constraint: a node cannot be used by both step and jump
     #         self.model += (
     #             self.is_node_used_by_step_edge[i][node] + self.is_node_used_by_jump_edge[i][node] <= 1
@@ -253,7 +252,7 @@ class DirectionalJumpRouter:
 
     # def add_one_jump_constraints(self, i):
     #     # at most one jump edge allowed in each node
-    #     for node in self.all_nodes[i]:
+    #     for node in self.all_nodes:
     #         # create a variable that sums up the jump edges in the same node
     #         num_of_jump_edges_per_node = pulp.lpSum(self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[i][node])
 
@@ -270,13 +269,34 @@ class DirectionalJumpRouter:
 
     def add_net_overlap_constraints(self):
         # no overlap between nets
-        for node in self.all_nodes[0]:
+        for node in self.all_nodes:
             list_of_nets_using_node = []
             for i in range(self.num_nets):
                 list_of_nets_using_node.append(self.is_node_used_by_net[i][node])
             
             # constraint: at most one net can use a node
             self.model += pulp.lpSum(list_of_nets_using_node) <= 1
+
+    def add_jump_pad_implication(self):
+        # if a jump edge is used, then the corresponding jump pad must be used
+        for i in range(self.num_nets):
+            for jump_edge in self.jump_edges[i]:
+                u, v, direction = jump_edge
+                # A jump from u to v in direction `direction` is only allowed
+                # if there is incoming flow to u from the same direction.
+
+                # Collect all edges (step and jump) that go into `u` from direction `direction`
+                incoming_edges_in_same_direction = []
+                for edge in self.all_edges[i]:
+                    _, target, dir_step = edge
+                    if target == u and dir_step == direction:
+                        incoming_edges_in_same_direction.append(self.is_edge_used[i][edge])
+
+                # create a variable that sums up the incoming edges in the same direction
+                sum_of_incoming_edge_in_same_direction = pulp.lpSum(incoming_edges_in_same_direction)
+
+                # Enforce that jump pad flow is only allowed if incoming flow matches direction
+                self.model += self.is_edge_used[i][jump_edge] <= sum_of_incoming_edge_in_same_direction
 
     def add_symmetry_constraints(self):
         # net i should reflex net K-i
