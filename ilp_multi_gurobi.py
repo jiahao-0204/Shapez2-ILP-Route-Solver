@@ -118,7 +118,7 @@ class DirectionalJumpRouter:
             self.add_directional_constraints(i)
             self.add_overlap_and_one_jump_constraints(i)
 
-        self.add_symmetry_constraints()
+        # self.add_symmetry_constraints()
         self.add_goal_action_constraints()
         self.add_net_overlap_constraints()
 
@@ -143,6 +143,7 @@ class DirectionalJumpRouter:
                 self.model += in_flow == 1
                 self.model += out_flow == 0
             else:
+                self.model += sum(in_flow) <= 4
                 self.model += (out_flow - in_flow == 0)
 
     def add_flow_constraints_v2(self, i):
@@ -387,13 +388,13 @@ class DirectionalJumpRouter:
 # Example usage
 if __name__ == "__main__":
     nets = [
-        ([(5, 0)], [(1, 6), (3, 6), (5, 6), (7, 6)]),
+        ([(5, 0), (6, 0)], [(1, 6), (3, 6), (5, 6), (7, 6), (9, 6), (11, 6), (13, 6), (15, 6)]),
         # ((6, 0), [(9, 6), (11, 6), (13, 6), (15, 6)]),
         # ((7, 0), [(17, 6), (19, 6), (21, 6), (23, 6)]),
         # ((8, 0), [(25, 6), (27, 6), (29, 6), (31, 6)]),
         # ((25, 0), [(2, 6), (4, 6), (6, 6), (8, 6)]),
         # ((26, 0), [(10, 6), (12, 6), (14, 6), (16, 6)]),
         # ((27, 0), [(18, 6), (20, 6), (22, 6), (24, 6)]),
-        ([(28, 0)], [(26, 6), (28, 6), (30, 6), (32, 6)]),
+        # ([(28, 0)], [(26, 6), (28, 6), (30, 6), (32, 6)]),
         ]
     router = DirectionalJumpRouter(width=33, height=7, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = 360)
