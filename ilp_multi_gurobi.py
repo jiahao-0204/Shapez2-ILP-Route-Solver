@@ -21,22 +21,15 @@ class DirectionalJumpRouter:
         self.HEIGHT = height
 
         self.num_nets = len(nets)
-        self.start: Dict[int, Tuple[int, int]] = {}
+        self.starts: Dict[int, List[Tuple[int, int]]] = {}
         self.goals: Dict[int, List[Tuple[int, int]]] = {}
-        for i, (start, goals) in enumerate(nets):
-            self.start[i] = start
+        for i, (starts, goals) in enumerate(nets):
+            self.starts[i] = starts
             self.goals[i] = goals
 
         self.jump_distances = jump_distances
         self.timelimit = timelimit
 
-
-
-
-        # Internal variables
-        self.K: Dict[int, int] = {}
-        for i, (start, goals) in enumerate(nets):
-            self.K[i] = len(goals)
 
         # all nodes
         self.all_nodes: List[Node] = []
@@ -143,7 +136,7 @@ class DirectionalJumpRouter:
             in_flow = pulp.lpSum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[1] == node)
             out_flow = pulp.lpSum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[0] == node)
 
-            if node == self.start[i]:
+            if node in self.starts[i]:
                 self.model += in_flow == 0
                 self.model += out_flow == 4
             elif node in self.goals[i]:
@@ -157,7 +150,7 @@ class DirectionalJumpRouter:
             in_flow = [self.is_edge_used[i][edge] for edge in self.all_edges if edge[1] == node]
             out_flow = [self.is_edge_used[i][edge] for edge in self.all_edges if edge[0] == node]
 
-            if node == self.start[i]:
+            if node in self.starts[i]:
                 self.model += sum(in_flow) == 0
                 self.model += sum(out_flow) == 1
             elif node in self.goals[i]:
@@ -191,7 +184,7 @@ class DirectionalJumpRouter:
             # if there is incoming flow to u from the same direction.
 
             # if u is at start, then only up jump is allowed
-            if u == self.start[i]:
+            if u in self.starts[i]:
                 if direction == (0, 1):
                     continue
                 else:
@@ -336,12 +329,13 @@ class DirectionalJumpRouter:
             used_jump_edges = [e for e in self.jump_edges if pulp.value(self.is_edge_used[i][e]) == 1]
 
             # Plot start and goal
-            sx, sy = self.start[i]
+            for start in self.starts[i]:
+                sx, sy = start
+                plt.scatter(sx + offset, sy + offset, c=color, marker='s', s=120, edgecolors='black', label='Start', zorder = 0)
             for goal in self.goals[i]:
                 gx, gy = goal
                 plt.scatter(gx + offset, gy + offset, c=color, marker='s', s=120, edgecolors='black', zorder = 0)
                 plt.scatter(gx + offset, gy + offset, c=color, marker='o', s=50, edgecolors='black', zorder = 2)
-            plt.scatter(sx + offset, sy + offset, c=color, marker='s', s=120, edgecolors='black', label='Start', zorder = 0)
 
             # plot step circule and line
             for (u, v, d) in used_step_edges:
@@ -393,13 +387,13 @@ class DirectionalJumpRouter:
 # Example usage
 if __name__ == "__main__":
     nets = [
-        ((5, 0), [(1, 6), (3, 6), (5, 6), (7, 6)]),
+        ([(5, 0)], [(1, 6), (3, 6), (5, 6), (7, 6)]),
         # ((6, 0), [(9, 6), (11, 6), (13, 6), (15, 6)]),
         # ((7, 0), [(17, 6), (19, 6), (21, 6), (23, 6)]),
         # ((8, 0), [(25, 6), (27, 6), (29, 6), (31, 6)]),
         # ((25, 0), [(2, 6), (4, 6), (6, 6), (8, 6)]),
         # ((26, 0), [(10, 6), (12, 6), (14, 6), (16, 6)]),
         # ((27, 0), [(18, 6), (20, 6), (22, 6), (24, 6)]),
-        ((28, 0), [(26, 6), (28, 6), (30, 6), (32, 6)]),
+        ([(28, 0)], [(26, 6), (28, 6), (30, 6), (32, 6)]),
         ]
     router = DirectionalJumpRouter(width=33, height=7, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = 360)
