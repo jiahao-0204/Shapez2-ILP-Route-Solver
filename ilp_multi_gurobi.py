@@ -321,9 +321,9 @@ class DirectionalJumpRouter:
             j = self.num_nets - i - 1
             for edge in self.all_edges:
                 u, v, d = edge
-                sym_ux = self.WIDTH - u[0]
+                sym_ux = self.WIDTH - u[0] - 1
                 sym_suy = u[1]
-                sym_svx = self.WIDTH - v[0]
+                sym_svx = self.WIDTH - v[0] - 1
                 sym_svy = v[1]
                 sym_u = (sym_ux, sym_suy)
                 sym_v = (sym_svx, sym_svy)
@@ -340,10 +340,10 @@ class DirectionalJumpRouter:
     def plot(self):
         plt.figure(figsize=(12, 6))
         ax = plt.gca()
-        ax.set_xlim(0, self.WIDTH + 1)
-        ax.set_ylim(0, self.HEIGHT + 1)
-        ax.set_xticks(range(self.WIDTH + 1))
-        ax.set_yticks(range(self.HEIGHT + 1))
+        ax.set_xlim(0, self.WIDTH)
+        ax.set_ylim(0, self.HEIGHT)
+        ax.set_xticks(range(self.WIDTH))
+        ax.set_yticks(range(self.HEIGHT))
         ax.set_aspect('equal')
         ax.grid(True)
 
@@ -424,4 +424,4 @@ if __name__ == "__main__":
         # ((27, 0), [(18, 6), (20, 6), (22, 6), (24, 6)]),
         # ([(28, 0)], [(26, 6), (28, 6), (30, 6), (32, 6)]),
         ]
-    router = DirectionalJumpRouter(width=33, height=7, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = 360)
+    router = DirectionalJumpRouter(width=34, height=7, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = 360)
