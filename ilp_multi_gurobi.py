@@ -12,7 +12,7 @@ Node = Tuple[int, int] # (x, y)
 Edge = Tuple[Node, Node, Tuple[int, int]]  # (start_node, end_node, direction)
 
 class DirectionalJumpRouter:
-    def __init__(self, width, height, nets, jump_distances: List[int] = [4], timelimit: int = 60):
+    def __init__(self, width, height, nets, jump_distances: List[int] = [4], timelimit: int = 60, symmetry: bool = False):
 
         # allow multiple start
 
@@ -29,6 +29,7 @@ class DirectionalJumpRouter:
 
         self.jump_distances = jump_distances
         self.timelimit = timelimit
+        self.symmetry = symmetry
 
 
         # all nodes
@@ -118,9 +119,11 @@ class DirectionalJumpRouter:
             self.add_directional_constraints_v2(i)
             self.add_overlap_and_one_jump_constraints(i)
 
-        # self.add_symmetry_constraints()
         self.add_goal_action_constraints()
         self.add_net_overlap_constraints()
+
+        if self.symmetry:
+            self.add_symmetry_constraints()
 
     def add_flow_constraints(self, i):
         self.edge_flow_value: Dict[int, Dict[Edge, pulp.LpVariable]] = {}
@@ -424,4 +427,4 @@ if __name__ == "__main__":
         # ((27, 0), [(18, 6), (20, 6), (22, 6), (24, 6)]),
         # ([(28, 0)], [(26, 6), (28, 6), (30, 6), (32, 6)]),
         ]
-    router = DirectionalJumpRouter(width=34, height=7, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = 360)
+    router = DirectionalJumpRouter(width=34, height=7, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = 360, symmetry = False)
