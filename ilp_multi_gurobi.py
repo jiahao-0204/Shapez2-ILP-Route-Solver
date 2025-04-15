@@ -121,7 +121,7 @@ class DirectionalJumpRouter:
 
     def add_constraints(self):
         for i in range(self.num_nets):
-            self.add_flow_constraints_v2(i)
+            self.add_flow_constraints(i)
             self.add_directional_constraints(i)
             self.add_overlap_and_one_jump_constraints(i)
 
@@ -131,11 +131,11 @@ class DirectionalJumpRouter:
 
     def add_flow_constraints(self, i):
         self.edge_flow_value: Dict[int, Dict[Edge, pulp.LpVariable]] = {}
-        self.edge_flow_value[i] = {edge: pulp.LpVariable(f"edge_flow_value_{i}_{edge}", cat='Integer', lowBound=0, upBound=self.K[i]) for edge in self.all_edges}
+        self.edge_flow_value[i] = {edge: pulp.LpVariable(f"edge_flow_value_{i}_{edge}", cat='Integer', lowBound=0, upBound=4) for edge in self.all_edges}
         
         # Flow is avaiable if the edge is selected
         for edge in self.all_edges:
-            self.model += self.edge_flow_value[i][edge] <= self.is_edge_used[i][edge] * self.K[i]
+            self.model += self.edge_flow_value[i][edge] <= self.is_edge_used[i][edge] * 4
             self.model += self.edge_flow_value[i][edge] >= self.is_edge_used[i][edge]
 
         # Flow conservation constraints
@@ -144,9 +144,11 @@ class DirectionalJumpRouter:
             out_flow = pulp.lpSum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[0] == node)
 
             if node == self.start[i]:
-                self.model += (out_flow - in_flow == self.K[i])
+                self.model += in_flow == 0
+                self.model += out_flow == 4
             elif node in self.goals[i]:
-                self.model += (out_flow - in_flow == -1)
+                self.model += in_flow == 1
+                self.model += out_flow == 0
             else:
                 self.model += (out_flow - in_flow == 0)
 
