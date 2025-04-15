@@ -328,7 +328,7 @@ class DirectionalJumpRouter:
                 sym_u = (sym_ux, sym_suy)
                 sym_v = (sym_svx, sym_svy)
                 sym_d = (-d[0], d[1])
-                if ((sym_u, sym_v, sym_d) in self.all_edges[j]):
+                if ((sym_u, sym_v, sym_d) in self.all_edges):
                     self.model += self.is_edge_used[i][edge] == self.is_edge_used[j][(sym_u, sym_v, sym_d)]
 
     def solve(self):
