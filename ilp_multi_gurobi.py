@@ -115,7 +115,7 @@ class DirectionalJumpRouter:
     def add_constraints(self):
         for i in range(self.num_nets):
             self.add_flow_constraints(i)
-            self.add_directional_constraints(i)
+            self.add_directional_constraints_v2(i)
             self.add_overlap_and_one_jump_constraints(i)
 
         # self.add_symmetry_constraints()
@@ -204,6 +204,33 @@ class DirectionalJumpRouter:
 
             # Enforce that jump flow is only allowed if incoming flow matches direction
             self.model += self.is_edge_used[i][jump_edge] <= sum_of_incoming_edge_in_same_direction
+
+    def add_directional_constraints_v2(self, i):
+        # for jump edge at start, only up direction is allowed
+        for jump_edge in self.jump_edges:
+            u, v, direction = jump_edge
+            if u in self.starts[i]:
+                if direction == (0, 1):
+                    continue
+                else:
+                    self.model += self.is_edge_used[i][jump_edge] == 0
+                    continue
+
+        # for each edge, if the edge is used, then the end node must not have jump edge at different direction
+        for edge in self.all_edges:
+            u, v, direction = edge
+
+            # if the edge is used, then the end node must not have starting jump edge at different direction, and must not have any landing jump edge
+            for jump_edge in self.node_related_jump_edges[v]:
+                u2, v2, jump_direction = jump_edge
+                if u2 == v: # starting jump edge
+                    if direction == jump_direction:
+                        continue
+                    else:
+                        self.model += self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1
+                else:
+                    self.model += self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1 # only one can be true
+                
 
     def add_overlap_and_one_jump_constraints(self, i):
         for node in self.all_nodes:
