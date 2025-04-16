@@ -143,7 +143,7 @@ class DirectionalJumpRouter:
                 self.model += in_flow == 0
                 self.model += out_flow == 4
             elif node in self.goals[i]:
-                self.model += in_flow == 1
+                self.model += in_flow == 4
                 self.model += out_flow == 0
             else:
                 self.model += sum(in_flow) <= 4
@@ -441,7 +441,7 @@ if __name__ == "__main__":
 
     nets = [
         ([(5, 0)], 
-        [(1, 6), (4, 6)]),
+        [(0, 5)]),
         ]
     router = DirectionalJumpRouter(width=14, height=14, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = 300, symmetry = False)
 
