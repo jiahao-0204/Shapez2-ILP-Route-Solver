@@ -36,6 +36,9 @@ class DirectionalJumpRouter:
         self.net_sources[1] = []
         self.net_sinks[1] = sinks
 
+        self.component_source_amount = 2
+        self.component_sink_amount = 2
+
         # here, add start as source for net 0, add component sink as sink for net 0
 
         # then, add component source as source for net 1, add goal as sink for net 1
@@ -226,7 +229,9 @@ class DirectionalJumpRouter:
             node_component_used_bool_list = [self.is_component_used[component] for component in node_components]
             node_is_component_sink = pulp.LpVariable(f"node_is_component_sink_{i}_{node}", cat='Binary')
             if node_component_used_bool_list:
+                # OR trick
                 self.model += node_is_component_sink >= pulp.lpSum(node_component_used_bool_list) / len(node_component_used_bool_list)
+                self.model += node_is_component_sink <= pulp.lpSum(node_component_used_bool_list)
             else:
                 self.model += node_is_component_sink == 0
 
@@ -242,7 +247,10 @@ class DirectionalJumpRouter:
                 self.model += out_flow == 4
             else:
                 # Constraint 1: if z == 1 ⇒ in_flow == 4
-                self.model += in_flow >= 4 * node_is_component_sink
+                # IMPLICATION trick
+                M = 4                    
+                self.model += in_flow >= self.component_sink_amount - M * (1 - node_is_component_sink)
+                self.model += in_flow <= self.component_sink_amount + M * (1 - node_is_component_sink)
 
                 # Constraint 2: if z == 1 ⇒ out_flow == 0
                 self.model += out_flow <= 4 * (1 - node_is_component_sink)
@@ -268,7 +276,9 @@ class DirectionalJumpRouter:
             node_component_used_bool_list = [self.is_component_used[component] for component in node_components]
             node_is_component_source = pulp.LpVariable(f"node_is_component_source_{i}_{node}", cat='Binary')
             if node_component_used_bool_list:
+                # OR trick
                 self.model += node_is_component_source >= pulp.lpSum(node_component_used_bool_list) / len(node_component_used_bool_list)
+                self.model += node_is_component_source <= pulp.lpSum(node_component_used_bool_list)
             else:
                 self.model += node_is_component_source == 0
 
@@ -284,7 +294,10 @@ class DirectionalJumpRouter:
                 self.model += in_flow == 4
             else:
                 # Constraint 1: if z == 1 ⇒ out_flow == 4
-                self.model += out_flow >= 4 * node_is_component_source
+                # IMPLICATION trick
+                M = 4                    
+                self.model += out_flow >= self.component_source_amount - M * (1 - node_is_component_source)
+                self.model += out_flow <= self.component_source_amount + M * (1 - node_is_component_source)
 
                 # Constraint 2: if z == 1 ⇒ in_flow == 0
                 self.model += in_flow <= 4 * (1 - node_is_component_source)
