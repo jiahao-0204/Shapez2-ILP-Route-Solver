@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from collections import defaultdict
 from typing import Dict, Tuple, List
 from matplotlib.lines import Line2D
+from matplotlib.legend_handler import HandlerTuple
 
 DIRECTIONS = [(0, 1), (0, -1), (1, 0), (-1, 0)]
 JUMP_COST = 2
@@ -648,23 +649,25 @@ class DirectionalJumpRouter:
         used_components = [c for c in self.all_components if pulp.value(self.is_component_used[c]) == 1]
         for component in used_components:
             (x, y), (dx, dy) = component
-            if dx == 0 and dy == 1:
-                ax.scatter(x + offset, y + offset, c='grey', marker='^', s=180, edgecolors='black', zorder = 2)
-            elif dx == 0 and dy == -1:
-                ax.scatter(x + offset, y + offset, c='grey', marker='v', s=180, edgecolors='black', zorder = 2)
-            elif dx == 1 and dy == 0:
-                ax.scatter(x + offset, y + offset, c='grey', marker='>', s=180, edgecolors='black', zorder = 2)
-            elif dx == -1 and dy == 0:
-                ax.scatter(x + offset, y + offset, c='grey', marker='<', s=180, edgecolors='black', zorder = 2)
+            nx, ny = x + dx, y + dy
+            ax.plot([x + offset, nx + offset], [y + offset, ny + offset], c='black', zorder = 1)
+            ax.scatter(x + offset, y + offset, c='grey', marker='s', s=180, edgecolors='black', zorder = 2)
+            ax.scatter(x + offset, y + offset, c='grey', marker='o', s=180, edgecolors='black', zorder = 2)
 
         plt.title("Shapez2: Routing using Integer Linear Programming (ILP) -- Jiahao")
-        custom_legend = [
-            Line2D([0], [0], marker='s', color='grey', markersize=9, markeredgecolor='black', linestyle='None', label='Start/Goal'),
-            Line2D([0], [0], marker='^', color='grey', markersize=8, markeredgecolor='black', linestyle='None', label='Jump Pad'),
-            Line2D([0], [0], marker='o', color='grey', markersize=7, markeredgecolor='black', linestyle='None', label='Belt'),
-        ]
-        plt.legend(handles=custom_legend)
 
+        # custom legend
+        handle_start = Line2D([], [], marker='s', color='grey', markersize=9, markeredgecolor='black', linestyle='None', label='Start/Goal')
+        handle_jump_pad = Line2D([], [], marker='^', color='grey', markersize=8, markeredgecolor='black', linestyle='None', label='Jump Pad')
+        handle_belt = Line2D([], [], marker='o', color='grey', markersize=7, markeredgecolor='black', linestyle='None', label='Belt')
+        handle_component_square = Line2D([], [], marker='s', color='grey', markersize=14, markeredgecolor='black', linestyle='None')
+        handle_component_circle = Line2D([], [], marker='o', color='grey', markersize=13, markeredgecolor='black', linestyle='None')
+        handle_component = (handle_component_square, handle_component_circle)
+        legend_handles = [handle_start, handle_jump_pad, handle_belt, handle_component]
+        legend_labels  = ['Start/Goal', 'Jump Pad', 'Belt', 'Component']
+        ax.legend(legend_handles, legend_labels, handler_map={tuple: HandlerTuple(ndivide=1)})
+
+        # show
         plt.show()
 
 
