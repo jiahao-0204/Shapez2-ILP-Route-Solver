@@ -9,8 +9,14 @@ JUMP_COST = 2
 STEP_COST = 1
 
 Node = Tuple[int, int] # (x, y)
-Edge = Tuple[Node, Node, Tuple[int, int]]  # (start_node, end_node, direction)
-Component = Tuple[Node, Tuple[int, int]] # (location, direction) # 1x1 component
+Direction = Tuple[int, int] # (dx, dy)
+Amount = int # amount of flow
+
+Edge = Tuple[Node, Node, Direction] # start, end, direciton
+Component = Tuple[Node, Direction] # location, direction
+
+Source = Tuple[Node, Direction, Amount] # location, direction, amount
+Sink = Tuple[Node, Direction, Amount] # location, direction, amount
 
 class DirectionalJumpRouter:
     def __init__(self, width, height, nets, jump_distances: List[int] = [4], timelimit: int = 60, symmetry: bool = False):
@@ -22,11 +28,11 @@ class DirectionalJumpRouter:
         self.HEIGHT = height
 
         self.num_nets = len(nets)
-        self.starts: Dict[int, List[Tuple[int, int]]] = {}
-        self.goals: Dict[int, List[Tuple[int, int]]] = {}
-        for i, (starts, goals) in enumerate(nets):
-            self.starts[i] = starts
-            self.goals[i] = goals
+        self.net_sources: Dict[int, List[Node]] = {}
+        self.net_sinks: Dict[int, List[Node]] = {}
+        for i, (sources, sinks) in enumerate(nets):
+            self.net_sources[i] = sources
+            self.net_sinks[i] = sinks
 
         self.jump_distances = jump_distances
         self.timelimit = timelimit
@@ -168,10 +174,10 @@ class DirectionalJumpRouter:
             in_flow = pulp.lpSum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[1] == node)
             out_flow = pulp.lpSum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[0] == node)
 
-            if node in self.starts[i]:
+            if node in self.net_sources[i]:
                 self.model += in_flow == 0
                 self.model += out_flow == 4
-            elif node in self.goals[i]:
+            elif node in self.net_sinks[i]:
                 self.model += in_flow == 4
                 self.model += out_flow == 0
             else:
@@ -183,10 +189,10 @@ class DirectionalJumpRouter:
             in_flow = [self.is_edge_used[i][edge] for edge in self.all_edges if edge[1] == node]
             out_flow = [self.is_edge_used[i][edge] for edge in self.all_edges if edge[0] == node]
 
-            if node in self.starts[i]:
+            if node in self.net_sources[i]:
                 self.model += sum(in_flow) == 0
                 self.model += sum(out_flow) == 1
-            elif node in self.goals[i]:
+            elif node in self.net_sinks[i]:
                 self.model += sum(in_flow) == 1
                 self.model += sum(out_flow) == 0
             else:
@@ -217,7 +223,7 @@ class DirectionalJumpRouter:
             # if there is incoming flow to u from the same direction.
 
             # if u is at start, then only up jump is allowed
-            if u in self.starts[i]:
+            if u in self.net_sources[i]:
                 if direction == (0, 1):
                     continue
                 else:
@@ -241,7 +247,7 @@ class DirectionalJumpRouter:
         # for jump edge at start, only up direction is allowed
         for jump_edge in self.jump_edges:
             u, v, direction = jump_edge
-            if u in self.starts[i]:
+            if u in self.net_sources[i]:
                 if direction == (0, 1):
                     continue
                 else:
@@ -313,7 +319,7 @@ class DirectionalJumpRouter:
         # no action is to be taken at the goal nodes for any net
         for i in range(self.num_nets):
             for j in range(self.num_nets):
-                for goal in self.goals[j]:
+                for goal in self.net_sinks[j]:
                     self.model += self.is_node_used_by_net[i][goal] == 0
 
     def add_net_overlap_constraints(self):
@@ -399,10 +405,10 @@ class DirectionalJumpRouter:
             used_jump_edges = [e for e in self.jump_edges if pulp.value(self.is_edge_used[i][e]) == 1]
 
             # Plot start and goal
-            for start in self.starts[i]:
+            for start in self.net_sources[i]:
                 sx, sy = start
                 plt.scatter(sx + offset, sy + offset, c=color, marker='s', s=120, edgecolors='black', label='Start', zorder = 0)
-            for goal in self.goals[i]:
+            for goal in self.net_sinks[i]:
                 gx, gy = goal
                 plt.scatter(gx + offset, gy + offset, c=color, marker='s', s=120, edgecolors='black', zorder = 0)
                 plt.scatter(gx + offset, gy + offset, c=color, marker='o', s=50, edgecolors='black', zorder = 2)
