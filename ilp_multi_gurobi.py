@@ -460,13 +460,13 @@ class DirectionalJumpRouter:
         for component in used_components:
             (x, y), (dx, dy) = component
             if dx == 0 and dy == 1:
-                ax.scatter(x + offset, y + offset, c='grey', marker='^', s=80, edgecolors='black', zorder = 2)
+                ax.scatter(x + offset, y + offset, c='grey', marker='^', s=180, edgecolors='black', zorder = 2)
             elif dx == 0 and dy == -1:
-                ax.scatter(x + offset, y + offset, c='grey', marker='v', s=80, edgecolors='black', zorder = 2)
+                ax.scatter(x + offset, y + offset, c='grey', marker='v', s=180, edgecolors='black', zorder = 2)
             elif dx == 1 and dy == 0:
-                ax.scatter(x + offset, y + offset, c='grey', marker='>', s=80, edgecolors='black', zorder = 2)
+                ax.scatter(x + offset, y + offset, c='grey', marker='>', s=180, edgecolors='black', zorder = 2)
             elif dx == -1 and dy == 0:
-                ax.scatter(x + offset, y + offset, c='grey', marker='<', s=80, edgecolors='black', zorder = 2)
+                ax.scatter(x + offset, y + offset, c='grey', marker='<', s=180, edgecolors='black', zorder = 2)
 
         plt.title("Shapez2: Routing using Integer Linear Programming (ILP) -- Jiahao")
         custom_legend = [
