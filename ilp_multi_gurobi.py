@@ -82,7 +82,7 @@ class DirectionalJumpRouter:
                     self.all_components.append(component)
                     self.node_related_components[(x, y)].append(component)
                     self.node_related_component_sources[(ox, oy)].append(component)
-                    self.node_related_component_sinks[(ix, iy)].append(component)
+                    self.node_related_component_sinks[(x, y)].append(component)
 
         # is component used
         self.is_component_used: Dict[Component, pulp.LpVariable] = {}
