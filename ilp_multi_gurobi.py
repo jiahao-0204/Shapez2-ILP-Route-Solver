@@ -173,9 +173,9 @@ class DirectionalJumpRouter:
         self.add_flow_constraints_source_to_components(0)
         self.add_flow_constraints_component_to_goal(1)
 
-        self.add_directional_constraints_v2(0)
         for i in range(self.num_nets):
             self.add_overlap_and_one_jump_constraints(i)
+            self.add_directional_constraints_w_component(i)
 
         # self.add_goal_action_constraints()
         self.add_net_overlap_constraints()
@@ -363,6 +363,61 @@ class DirectionalJumpRouter:
                 else:
                     self.model += self.is_edge_used[i][jump_edge] == 0
                     continue
+
+        # for each edge, if the edge is used, then the end node must not have jump edge at different direction
+        for edge in self.all_edges:
+            u, v, direction = edge
+
+            # if the edge is used, then the end node must not have starting jump edge at different direction, and must not have any landing jump edge
+            for jump_edge in self.node_related_jump_edges[v]:
+                u2, v2, jump_direction = jump_edge
+                if u2 == v: # starting jump edge
+                    if direction == jump_direction:
+                        continue
+                    else:
+                        self.model += self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1
+                else:
+                    self.model += self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1 # only one can be true
+                
+    def add_directional_constraints_w_component(self, i):
+        # for jump edge at start, only up direction is allowed
+        for jump_edge in self.jump_edges:
+            u, v, direction = jump_edge
+            if u in self.net_sources[i]:
+                if direction == (0, 1):
+                    continue
+                else:
+                    self.model += self.is_edge_used[i][jump_edge] == 0
+                    continue
+        
+        # component direction constraint
+        for node in self.all_nodes:
+            # if a node has active component source, only jump in the component direction is allowed
+            for component in self.node_related_component_sources[node]:
+                _, component_direction = component
+                for jump_edge in self.node_related_jump_edges[node]:
+                    u, v, direction = jump_edge
+                    if u == node:
+                        if direction == component_direction:
+                            continue
+                        else:
+                            self.model += self.is_edge_used[i][jump_edge] + self.is_component_used[component] <= 1
+                    else:
+                        self.model += self.is_edge_used[i][jump_edge] + self.is_component_used[component] <= 1
+            
+            # if a node has active component sink, only jump in the component direction is allowed
+            for component in self.node_related_component_sinks[node]:
+                _, component_direction = component
+                related_jump_edge = [edge for edge in self.all_edges if edge[1] == node]
+                for jump_edge in related_jump_edge:
+                    u, v, direction = jump_edge
+                    if v == node: # this is landing jump edge
+                        if direction == component_direction:
+                            continue
+                        else:
+                            self.model += self.is_edge_used[i][jump_edge] + self.is_component_used[component] <= 1
+                    else:
+                        self.model += self.is_edge_used[i][jump_edge] + self.is_component_used[component] <= 1
 
         # for each edge, if the edge is used, then the end node must not have jump edge at different direction
         for edge in self.all_edges:
