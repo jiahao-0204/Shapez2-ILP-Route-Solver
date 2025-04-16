@@ -183,7 +183,7 @@ class DirectionalJumpRouter:
         # self.add_goal_action_constraints()
         self.add_net_overlap_constraints()
 
-        self.add_component_count_constraint()
+        # self.add_component_count_constraint()
 
         if self.symmetry:
             self.add_symmetry_constraints()
@@ -513,16 +513,16 @@ class DirectionalJumpRouter:
     def add_component_count_constraint(self):
         # add component count constraint
         component_used_bool_list = [self.is_component_used[component] for component in self.all_components]
-        self.model += pulp.lpSum(component_used_bool_list) == 1
+        self.model += pulp.lpSum(component_used_bool_list) == 2
 
-        # add component location constraint
-        for component in self.all_components:
-            # get the location of the component
-            (x, y), (dx, dy) = component
+        # # add component location constraint
+        # for component in self.all_components:
+        #     # get the location of the component
+        #     (x, y), (dx, dy) = component
 
-            if (x == 5 and y == 6 and dx == 0 and dy == 1):
-                # add constraint
-                self.model += self.is_component_used[component] == 1            
+        #     if (x == 5 and y == 5 and dx == -1 and dy == 0):
+        #         # add constraint
+        #         self.model += self.is_component_used[component] == 1            
 
     def add_jump_pad_implication(self):
         # if a jump edge is used, then the corresponding jump pad must be used
