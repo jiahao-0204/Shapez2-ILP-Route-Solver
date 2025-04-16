@@ -182,8 +182,7 @@ class DirectionalJumpRouter:
             self.add_directional_constraints_w_component(i)
 
         # self.add_goal_action_constraints()
-        self.add_net_overlap_constraints()
-        self.add_component_overlap_constraints()
+        self.add_things_overlap_constraints()
 
         # self.add_component_count_constraint()
 
@@ -521,6 +520,18 @@ class DirectionalJumpRouter:
             
             # constraint: at most one component can use a node
             self.model += pulp.lpSum(list_of_components_bool_using_node) <= 1
+
+    def add_things_overlap_constraints(self):
+        # between belts / pads / components
+        for node in self.all_nodes:
+            list_of_things_using_node = []
+            for i in range(self.num_nets):
+                list_of_things_using_node.append(self.is_node_used_by_net[i][node])
+            for component in self.node_related_components[node]:
+                list_of_things_using_node.append(self.is_component_used[component])
+            
+            # constraint: at most one thing can use a node
+            self.model += pulp.lpSum(list_of_things_using_node) <= 1
 
     def add_component_count_constraint(self):
         # add component count constraint
