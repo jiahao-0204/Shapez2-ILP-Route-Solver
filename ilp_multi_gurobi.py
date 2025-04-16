@@ -333,11 +333,18 @@ class DirectionalJumpRouter:
             self.model += pulp.lpSum(list_of_nets_using_node) <= 1
 
     def add_component_count_constraint(self):
-        # must have 2 components in total
+        # add component count constraint
         component_used_bool_list = [self.is_component_used[component] for component in self.all_components]
+        self.model += pulp.lpSum(component_used_bool_list) == 1
 
-        # add constraint
-        self.model += pulp.lpSum(component_used_bool_list) == 2
+        # add component location constraint
+        for component in self.all_components:
+            # get the location of the component
+            (x, y), (dx, dy) = component
+
+            if (x == 5 and y == 6 and dx == 0 and dy == 1):
+                # add constraint
+                self.model += self.is_component_used[component] == 1            
 
     def add_jump_pad_implication(self):
         # if a jump edge is used, then the corresponding jump pad must be used
