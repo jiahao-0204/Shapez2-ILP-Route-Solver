@@ -10,6 +10,7 @@ STEP_COST = 1
 
 Node = Tuple[int, int] # (x, y)
 Edge = Tuple[Node, Node, Tuple[int, int]]  # (start_node, end_node, direction)
+Component = Tuple[Node, Tuple[int, int]] # (location, direction) # 1x1 component
 
 class DirectionalJumpRouter:
     def __init__(self, width, height, nets, jump_distances: List[int] = [4], timelimit: int = 60, symmetry: bool = False):
@@ -31,6 +32,32 @@ class DirectionalJumpRouter:
         self.timelimit = timelimit
         self.symmetry = symmetry
 
+        # all possible location and orientation to place the components
+        self.all_components: List[Component] = []
+        for x in range(self.WIDTH):
+            for y in range(self.HEIGHT):
+                for dx, dy in DIRECTIONS:
+                    # output location
+                    ox = x + dx
+                    oy = y + dy
+
+                    # input location
+                    ix = x - dx
+                    iy = y - dy
+
+                    # skip if output location is invalid
+                    if ox < 0 or ox >= self.WIDTH or oy < 0 or oy >= self.HEIGHT:
+                        continue
+                    
+                    # skip if input location is invalid
+                    if ix < 0 or ix >= self.WIDTH or iy < 0 or iy >= self.HEIGHT:
+                        continue
+
+                    self.all_components.append(((x, y), (dx, dy)))
+
+        # is component used
+        self.is_component_used: Dict[Component, pulp.LpVariable] = {}
+        self.is_component_used = {component: pulp.LpVariable(f"component_used_{component}", cat='Binary') for component in self.all_components}
 
         # all nodes
         self.all_nodes: List[Node] = []
@@ -121,6 +148,8 @@ class DirectionalJumpRouter:
 
         self.add_goal_action_constraints()
         self.add_net_overlap_constraints()
+
+        self.add_component_count_constraint()
 
         if self.symmetry:
             self.add_symmetry_constraints()
@@ -297,6 +326,13 @@ class DirectionalJumpRouter:
             # constraint: at most one net can use a node
             self.model += pulp.lpSum(list_of_nets_using_node) <= 1
 
+    def add_component_count_constraint(self):
+        # must have 2 components in total
+        component_used_bool_list = [self.is_component_used[component] for component in self.all_components]
+
+        # add constraint
+        self.model += pulp.lpSum(component_used_bool_list) == 2
+
     def add_jump_pad_implication(self):
         # if a jump edge is used, then the corresponding jump pad must be used
         for i in range(self.num_nets):
@@ -406,6 +442,18 @@ class DirectionalJumpRouter:
                 ax.scatter(ux + offset, uy + offset, c=color, marker=marker, s=80, edgecolors='black', zorder = 2)
                 ax.scatter(u2x + offset, u2y + offset, c=color, marker=marker, s=80, edgecolors='black', zorder = 2)
         
+        # draw components
+        used_components = [c for c in self.all_components if pulp.value(self.is_component_used[c]) == 1]
+        for component in used_components:
+            (x, y), (dx, dy) = component
+            if dx == 0 and dy == 1:
+                ax.scatter(x + offset, y + offset, c='grey', marker='^', s=80, edgecolors='black', zorder = 2)
+            elif dx == 0 and dy == -1:
+                ax.scatter(x + offset, y + offset, c='grey', marker='v', s=80, edgecolors='black', zorder = 2)
+            elif dx == 1 and dy == 0:
+                ax.scatter(x + offset, y + offset, c='grey', marker='>', s=80, edgecolors='black', zorder = 2)
+            elif dx == -1 and dy == 0:
+                ax.scatter(x + offset, y + offset, c='grey', marker='<', s=80, edgecolors='black', zorder = 2)
 
         plt.title("Shapez2: Routing using Integer Linear Programming (ILP) -- Jiahao")
         custom_legend = [
