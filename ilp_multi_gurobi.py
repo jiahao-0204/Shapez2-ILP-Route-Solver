@@ -27,41 +27,62 @@ class DirectionalJumpRouter:
         self.WIDTH = width
         self.HEIGHT = height
 
-        self.num_nets = 1 # start to component, component to goal
+        self.num_nets = 2 # start to component, component to goal
         self.net_sources: Dict[int, List[Node]] = {}
         self.net_sinks: Dict[int, List[Node]] = {}
-        for i, (sources, sinks) in enumerate(nets):
-            self.net_sources[i] = sources
-            self.net_sinks[i] = sinks
+        sources, sinks = nets[0]
+        self.net_sources[0] = sources
+        self.net_sinks[0] = []
+        self.net_sources[1] = []
+        self.net_sinks[1] = sinks
 
+        # here, add start as source for net 0, add component sink as sink for net 0
+
+        # then, add component source as source for net 1, add goal as sink for net 1
+
+        # thus for add_flow_constraint, i need to pass in list of component source, a list of component sink, and try to connect them
+
+        # component is used means the source and sink of it is also used.
+
+        # pass in potential_component_whose_source_is_at_this_node
+        # pass in potential_component_whose_sink_is_at_this_node
+
+        # each potential sources have corresponding used flag
+        
         self.jump_distances = jump_distances
         self.timelimit = timelimit
         self.symmetry = symmetry
 
         # all possible location and orientation to place the components
         self.all_components: List[Component] = []
-        self.node_related_components: Dict[Node, List[Component]] = defaultdict(list)
+        self.node_related_components: Dict[Node, List[Component]] = defaultdict(list) # to record occupancy
+        self.node_related_component_sources: Dict[Node, List[Component]] = defaultdict(list) # to record source
+        self.node_related_component_sinks: Dict[Node, List[Component]] = defaultdict(list) # to record sink
         for x in range(self.WIDTH):
             for y in range(self.HEIGHT):
                 for dx, dy in DIRECTIONS:
-                    # output location
-                    ox = x + dx
-                    oy = y + dy
+                    component = ((x, y), (dx, dy))
 
-                    # input location
+                    # input location (sink)
                     ix = x - dx
                     iy = y - dy
 
-                    # skip if output location is invalid
-                    if ox < 0 or ox >= self.WIDTH or oy < 0 or oy >= self.HEIGHT:
-                        continue
-                    
+                    # output location (source)
+                    ox = x + dx
+                    oy = y + dy
+
                     # skip if input location is invalid
                     if ix < 0 or ix >= self.WIDTH or iy < 0 or iy >= self.HEIGHT:
                         continue
 
-                    self.all_components.append(((x, y), (dx, dy)))
-                    self.node_related_components[(x, y)].append(((x, y), (dx, dy)))
+                    # skip if output location is invalid
+                    if ox < 0 or ox >= self.WIDTH or oy < 0 or oy >= self.HEIGHT:
+                        continue
+
+                    self.all_components.append(component)
+                    self.node_related_components[(x, y)].append(component)
+                    self.node_related_component_sources[(ox, oy)].append(component)
+                    self.node_related_component_sinks[(ix, iy)].append(component)
 
         # is component used
         self.is_component_used: Dict[Component, pulp.LpVariable] = {}
@@ -150,6 +171,7 @@ class DirectionalJumpRouter:
 
     def add_constraints(self):
         self.add_flow_constraints_source_to_components(0)
+        self.add_flow_constraints_component_to_goal(1)
 
         self.add_directional_constraints_v2(0)
         for i in range(self.num_nets):
@@ -228,6 +250,48 @@ class DirectionalJumpRouter:
                 # Constraint 3: if z == 0 ⇒ in_flow == out_flow
                 self.model += (out_flow - in_flow) <= node_is_component_sink * 4
                 self.model += (out_flow - in_flow) >= -node_is_component_sink * 4
+    
+    def add_flow_constraints_component_to_goal(self, i):
+        self.edge_flow_value: Dict[int, Dict[Edge, pulp.LpVariable]] = {}
+        self.edge_flow_value[i] = {edge: pulp.LpVariable(f"edge_flow_value_{i}_{edge}", cat='Integer', lowBound=0, upBound=4) for edge in self.all_edges}
+        
+        # Flow is avaiable if the edge is selected
+        for edge in self.all_edges:
+            self.model += self.edge_flow_value[i][edge] <= self.is_edge_used[i][edge] * 4
+            self.model += self.edge_flow_value[i][edge] >= self.is_edge_used[i][edge]
+
+        sinks = self.net_sinks[1]
+
+        # Flow conservation constraints for each net
+        for node in self.all_nodes:
+            node_components = self.node_related_component_sources[node]
+            node_component_used_bool_list = [self.is_component_used[component] for component in node_components]
+            node_is_component_source = pulp.LpVariable(f"node_is_component_source_{i}_{node}", cat='Binary')
+            if node_component_used_bool_list:
+                self.model += node_is_component_source >= pulp.lpSum(node_component_used_bool_list) / len(node_component_used_bool_list)
+            else:
+                self.model += node_is_component_source == 0
+
+            in_flow = pulp.lpSum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[1] == node)
+            out_flow = pulp.lpSum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[0] == node)
+            
+            # no matter what
+            self.model += in_flow <= 4
+            self.model += out_flow <= 4
+
+            if node in sinks:
+                self.model += out_flow == 0
+                self.model += in_flow == 4
+            else:
+                # Constraint 1: if z == 1 ⇒ out_flow == 4
+                self.model += out_flow >= 4 * node_is_component_source
+
+                # Constraint 2: if z == 1 ⇒ in_flow == 0
+                self.model += in_flow <= 4 * (1 - node_is_component_source)
+
+                # Constraint 3: if z == 0 ⇒ in_flow == out_flow
+                self.model += (out_flow - in_flow) <= node_is_component_source * 4
+                self.model += (out_flow - in_flow) >= -node_is_component_source * 4
             
 
     def add_flow_constraints_v2(self, i):
