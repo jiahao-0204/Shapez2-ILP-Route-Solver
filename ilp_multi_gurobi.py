@@ -714,13 +714,13 @@ if __name__ == "__main__":
 
 
     nets = [        
-        # ([(6, 0)], 
-        #  [(6, 15)]),
+        ([(6, 0)], 
+         [(6, 15)]),
 
-        ([(6, 0), (7, 0), (8, 0), (9, 0)], 
-         [(6, 15), (7, 15), (8, 15), (9, 15)]),
+        # ([(6, 0), (7, 0), (8, 0), (9, 0)], 
+        #  [(6, 15), (7, 15), (8, 15), (9, 15)]),
         ]
-    router = DirectionalJumpRouter(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = 300, symmetry = False)
+    router = DirectionalJumpRouter(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = 10, symmetry = False)
 
 
     # 169 cost without variable length launcher
