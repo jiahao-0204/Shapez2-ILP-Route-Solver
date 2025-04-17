@@ -670,7 +670,13 @@ class DirectionalJumpRouter:
             self.model.setParam('TimeLimit', self.timelimit)
         if self.use_option:
             self.model.setParam('MIPFocus', 1)  # equivalent to use_option
+        self.model.update()
         self.model.optimize()
+        
+        # # Copy and apply feasibility relaxation
+        # relaxed_model = self.model.copy()
+        # relaxed_model.feasRelaxS(0, False, False, True)
+        # relaxed_model.optimize()
 
     def plot(self):
         plt.figure(figsize=(12, 6))
@@ -814,13 +820,13 @@ if __name__ == "__main__":
         # ([(6, 0)], 
         #  [(6, 15)]),
 
-        ([(6, 0)], 
-        [(6, 15)],
-        [(0, 6)]),
+        # ([(6, 0)], 
+        # [(6, 15)],
+        # [(0, 6)]),
 
-        # ([(6, 0), (7, 0), (8, 0), (9, 0)], 
-        #  [(6, 15), (7, 15), (8, 15), (9, 15)],
-        #  [(0, 6), (0, 7), (0, 8), (0, 9)]),
+        ([(6, 0), (7, 0), (8, 0), (9, 0)], 
+         [(6, 15), (7, 15), (8, 15), (9, 15)],
+         [(0, 6), (0, 7), (0, 8), (0, 9)]),
 
         # ([(6, 0), (7, 0), (8, 0)], 
         #  [(6, 15), (7, 15), (8, 15)],
@@ -830,7 +836,7 @@ if __name__ == "__main__":
         #  [(6, 15), (7, 15)],
         #  [(0, 6), (0, 7)]),
         ]
-    router = DirectionalJumpRouter(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = 300, symmetry = False, use_option=True)
+    router = DirectionalJumpRouter(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = -1, symmetry = False, use_option=True)
 
 
     # 169 cost without variable length launcher for 8 to 32 routing
