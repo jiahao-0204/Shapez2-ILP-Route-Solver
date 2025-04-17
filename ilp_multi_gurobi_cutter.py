@@ -20,7 +20,7 @@ Source = Tuple[Node, Direction, Amount] # location, direction, amount
 Sink = Tuple[Node, Direction, Amount] # location, direction, amount
 
 class DirectionalJumpRouter:
-    def __init__(self, width, height, nets, jump_distances: List[int] = [4], timelimit: int = 60, symmetry: bool = False):
+    def __init__(self, width, height, nets, jump_distances: List[int] = [4], timelimit: int = 60, symmetry: bool = False, use_option: bool = False):
 
         # allow multiple start
 
@@ -43,8 +43,8 @@ class DirectionalJumpRouter:
         self.net_sources[2] = []
         self.net_sinks[2] = sinks2
 
-        self.component_source_amount = 4
-        self.component_sink_amount = 4
+        self.component_source_amount = 1
+        self.component_sink_amount = 1
 
         # blocked tile is the border of the map
         self.blocked_tiles = [(x, 0) for x in range(self.WIDTH)] + [(x, self.HEIGHT-1) for x in range(self.WIDTH)] + [(0, y) for y in range(self.HEIGHT)] + [(self.WIDTH-1, y) for y in range(self.HEIGHT)]
@@ -77,6 +77,7 @@ class DirectionalJumpRouter:
         self.jump_distances = jump_distances
         self.timelimit = timelimit
         self.symmetry = symmetry
+        self.use_option = use_option
 
         # all possible location and orientation to place the components
         self.all_components: List[Component] = []
@@ -609,7 +610,7 @@ class DirectionalJumpRouter:
     def add_component_count_constraint(self):
         # add component count constraint
         component_used_bool_list = [self.is_component_used[component] for component in self.all_components]
-        self.model += pulp.lpSum(component_used_bool_list) == 2
+        self.model += pulp.lpSum(component_used_bool_list) == 4
 
         # # add component location constraint
         # for component in self.all_components:
@@ -661,9 +662,15 @@ class DirectionalJumpRouter:
         # solver = pulp.PULP_CBC_CMD(timeLimit=self.timelimit)
         # solver = pulp.GUROBI_CMD(timeLimit=self.timelimit, options=[("MIPFocus", 1)])
         if self.timelimit == -1:
-            solver = pulp.GUROBI_CMD(options=[("MIPFocus", 1)])
+            if self.use_option:
+                solver = pulp.GUROBI_CMD(options=[("MIPFocus", 1)])
+            else:
+                solver = pulp.GUROBI_CMD()
         else:
-            solver = pulp.GUROBI_CMD(timeLimit=self.timelimit, options=[("MIPFocus", 1)])
+            if self.use_option:
+                solver = pulp.GUROBI_CMD(timeLimit=self.timelimit, options=[("MIPFocus", 1)])
+            else:
+                solver = pulp.GUROBI_CMD(timeLimit=self.timelimit)
         self.model.solve(solver)
 
     def plot(self):
@@ -808,14 +815,15 @@ if __name__ == "__main__":
         # ([(6, 0)], 
         #  [(6, 15)]),
 
-        ([(6, 0)], 
-        [(6, 15)],
-        [(0, 6)]),
+        # ([(6, 0)], 
+        # [(6, 15)],
+        # [(0, 6)]),
 
-        # ([(6, 0), (7, 0), (8, 0), (9, 0)], 
-        #  [(6, 15), (7, 15), (8, 15), (9, 15)]),
+        ([(6, 0), (7, 0), (8, 0), (9, 0)], 
+         [(6, 15), (7, 15), (8, 15), (9, 15)],
+         [(0, 6), (0, 7), (0, 8), (0, 9)]),
         ]
-    router = DirectionalJumpRouter(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = 25, symmetry = False)
+    router = DirectionalJumpRouter(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = -1, symmetry = False, use_option=False)
 
 
     # 169 cost without variable length launcher
