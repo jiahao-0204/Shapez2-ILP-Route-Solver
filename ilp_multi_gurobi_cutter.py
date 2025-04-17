@@ -31,18 +31,26 @@ class DirectionalJumpRouter:
         self.num_nets = 2 # start to component, component to goal
         self.net_sources: Dict[int, List[Node]] = {}
         self.net_sinks: Dict[int, List[Node]] = {}
-        sources, sinks = nets[0]
+
+        sources, sinks1, sinks2 = nets[0]
+        
         self.net_sources[0] = sources
         self.net_sinks[0] = []
-        self.net_sources[1] = []
-        self.net_sinks[1] = sinks
 
-        self.component_source_amount = 2
-        self.component_sink_amount = 2
+        self.net_sources[1] = []
+        self.net_sinks[1] = sinks1
+
+        self.net_sources[2] = []
+        self.net_sinks[2] = sinks2
+
+        self.component_source_amount = 1
+        self.component_sink_amount = 1
 
         # blocked tile is the border of the map
         self.blocked_tiles = [(x, 0) for x in range(self.WIDTH)] + [(x, self.HEIGHT-1) for x in range(self.WIDTH)] + [(0, y) for y in range(self.HEIGHT)] + [(self.WIDTH-1, y) for y in range(self.HEIGHT)]
-        remove_from_blocked_tiles = [(6, 0), (7, 0), (8, 0), (9, 0), (6, 15), (7, 15), (8, 15), (9, 15)]
+        remove_from_blocked_tiles = [(6, 0), (7, 0), (8, 0), (9, 0)]
+        remove_from_blocked_tiles += [(6, 15), (7, 15), (8, 15), (9, 15)]
+        remove_from_blocked_tiles += [(0, 6), (0, 7), (0, 8), (0, 9)]
         for tile in remove_from_blocked_tiles:
             self.blocked_tiles.remove(tile)
 
@@ -73,33 +81,45 @@ class DirectionalJumpRouter:
         # all possible location and orientation to place the components
         self.all_components: List[Component] = []
         self.node_related_components: Dict[Node, List[Component]] = defaultdict(list) # to record occupancy
+        self.node_related_secondary_components: Dict[Node, List[Component]] = defaultdict(list) # to record occupancy of secondary component
         self.node_related_component_sources: Dict[Node, List[Component]] = defaultdict(list) # to record source
+        self.node_related_component_secondary_sources: Dict[Node, List[Component]] = defaultdict(list) # to record secondary source
         self.node_related_component_sinks: Dict[Node, List[Component]] = defaultdict(list) # to record sink
         for node in self.all_nodes:
             x, y = node
             for dx, dy in DIRECTIONS:
-                component = ((x, y), (dx, dy))
+                # compute secondary direction: direction but exclude the opposite direction and the same direction
+                secondary_direction = DIRECTIONS.copy()
+                secondary_direction.remove((dx, dy))
+                secondary_direction.remove((-dx, -dy))
+                
+                for secondary_dx, secondary_dy in secondary_direction:
+                    component = ((x, y), (dx, dy), (secondary_dx, secondary_dy))
 
-                # input location (sink)
-                ix = x - dx
-                iy = y - dy
+                    # input location (sink)
+                    ix = x - dx
+                    iy = y - dy
 
-                # output location (source)
-                ox = x + dx
-                oy = y + dy
+                    # output location (source)
+                    ox1 = x + dx
+                    oy1 = y + dy
+                    ox2 = x + secondary_dx + dx
+                    oy2 = y + secondary_dy + dy
 
-                # skip if input location is invalid
-                if (ix, iy) not in self.all_nodes:
-                    continue
+                    # skip if input location is invalid
+                    if (ix, iy) not in self.all_nodes:
+                        continue
 
-                # skip if output location is invalid
-                if (ox, oy) not in self.all_nodes:
-                    continue
+                    # skip if output location is invalid
+                    if (ox1, oy1) not in self.all_nodes or (ox2, oy2) not in self.all_nodes:
+                        continue
 
-                self.all_components.append(component)
-                self.node_related_components[(x, y)].append(component)
-                self.node_related_component_sources[(ox, oy)].append(component)
-                self.node_related_component_sinks[(x, y)].append(component)
+                    self.all_components.append(component)
+                    self.node_related_components[(x, y)].append(component)
+                    self.node_related_secondary_components[(x + secondary_dx, y + secondary_dy)].append(component)
+                    self.node_related_component_sources[(ox1, oy1)].append(component)
+                    self.node_related_component_secondary_sources[(ox2, oy2)].append(component)
+                    self.node_related_component_sinks[(x, y)].append(component)
 
         # is component used
         self.is_component_used: Dict[Component, pulp.LpVariable] = {}
@@ -411,7 +431,7 @@ class DirectionalJumpRouter:
         for node in self.all_nodes:
             # if a node has active component source, only jump in the component direction is allowed
             for component in self.node_related_component_sources[node]:
-                _, component_direction = component
+                _, component_direction, _ = component
                 for jump_edge in self.node_related_jump_edges[node]:
                     u, v, direction = jump_edge
                     if u == node:
@@ -424,7 +444,7 @@ class DirectionalJumpRouter:
             
             # if a node has active component sink, only jump in the component direction is allowed
             for component in self.node_related_component_sinks[node]:
-                _, component_direction = component
+                _, component_direction, _ = component
                 related_jump_edge = [edge for edge in self.all_edges if edge[1] == node]
                 for jump_edge in related_jump_edge:
                     u, v, direction = jump_edge
@@ -532,6 +552,8 @@ class DirectionalJumpRouter:
                 list_of_things_using_node.append(self.is_node_used_by_net[i][node])
             for component in self.node_related_components[node]:
                 list_of_things_using_node.append(self.is_component_used[component])
+            for component in self.node_related_secondary_components[node]:
+                list_of_things_using_node.append(self.is_component_used[component])
             
             # constraint: at most one thing can use a node
             self.model += pulp.lpSum(list_of_things_using_node) <= 1
@@ -591,9 +613,9 @@ class DirectionalJumpRouter:
         # solver = pulp.PULP_CBC_CMD(timeLimit=self.timelimit)
         # solver = pulp.GUROBI_CMD(timeLimit=self.timelimit, options=[("MIPFocus", 1)])
         if self.timelimit == -1:
-            solver = pulp.GUROBI_CMD()
+            solver = pulp.GUROBI_CMD(options=[("MIPFocus", 1)])
         else:
-            solver = pulp.GUROBI_CMD(timeLimit=self.timelimit)
+            solver = pulp.GUROBI_CMD(timeLimit=self.timelimit, options=[("MIPFocus", 1)])
         self.model.solve(solver)
 
     def plot(self):
@@ -669,11 +691,30 @@ class DirectionalJumpRouter:
         # draw components
         used_components = [c for c in self.all_components if pulp.value(self.is_component_used[c]) == 1]
         for component in used_components:
-            (x, y), (dx, dy) = component
+            (x, y), (dx, dy), (dx2, dy2) = component        # two‑cell component
+            x2, y2 = x + dx2, y + dy2                       # second node
             nx, ny = x + dx, y + dy
-            ax.plot([x + offset, nx + offset], [y + offset, ny + offset], c='black', zorder = 1)
-            ax.scatter(x + offset, y + offset, c='grey', marker='s', s=180, edgecolors='black', zorder = 2)
-            ax.scatter(x + offset, y + offset, c='grey', marker='o', s=180, edgecolors='black', zorder = 2)
+
+            margin = 0.2
+            ll_x = min(x, x2) + margin
+            ll_y = min(y, y2) + margin
+            width  = abs(x2 - x) + 1 - 2 * margin       # +1 because each node is 1×1
+            height = abs(y2 - y) + 1 - 2 * margin
+
+            rect = plt.Rectangle((ll_x, ll_y), width, height, facecolor='grey', edgecolor='black', linewidth=1.2, zorder=1)
+            ax.add_patch(rect)
+            d = (dx, dy)
+            if d == (0, 1):
+                marker = '^'
+            elif d == (0, -1):
+                marker = 'v'
+            elif d == (1, 0):
+                marker = '>'
+            elif d == (-1, 0):
+                marker = '<'
+            ax.scatter(x + offset, y + offset, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
+            ax.scatter(x2 + offset, y2 + offset, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
+            ax.plot([x + offset, nx + offset], [y + offset, ny + offset], c='black', zorder=0)
 
         plt.title("Shapez2: Routing using Integer Linear Programming (ILP) -- Jiahao")
 
@@ -714,13 +755,17 @@ if __name__ == "__main__":
 
 
     nets = [        
+        # ([(6, 0)], 
+        #  [(6, 15)]),
+
         ([(6, 0)], 
-         [(6, 15)]),
+        [(6, 15)],
+        [(0, 6)]),
 
         # ([(6, 0), (7, 0), (8, 0), (9, 0)], 
         #  [(6, 15), (7, 15), (8, 15), (9, 15)]),
         ]
-    router = DirectionalJumpRouter(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = 10, symmetry = False)
+    router = DirectionalJumpRouter(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = 25, symmetry = False)
 
 
     # 169 cost without variable length launcher
