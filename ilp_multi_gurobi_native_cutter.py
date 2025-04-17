@@ -55,6 +55,7 @@ class DirectionalJumpRouter:
         remove_from_blocked_tiles = [(6, 0), (7, 0), (8, 0), (9, 0)]
         remove_from_blocked_tiles += [(6, 15), (7, 15), (8, 15), (9, 15)]
         remove_from_blocked_tiles += [(0, 6), (0, 7), (0, 8), (0, 9)]
+        remove_from_blocked_tiles += [(15, 6), (15, 7), (15, 8), (15, 9)]
         for tile in remove_from_blocked_tiles:
             self.blocked_tiles.remove(tile)
 
@@ -613,18 +614,18 @@ class DirectionalJumpRouter:
     def add_component_count_constraint(self):
         # add component count constraint
         component_used_bool_list = [self.is_component_used[component] for component in self.all_components]
-        self.model.addConstr(quicksum(component_used_bool_list) == 2)
+        self.model.addConstr(quicksum(component_used_bool_list) == 16)
 
         # add component location constraint
         for component in self.all_components:
             # get the location of the component
             (x, y), (dx, dy), (dx2, dy2) = component
 
-            if (x == 6 and y == 8 and dx == 0 and dy == 1 and dx2 == 1 and dy2 == 0):
+            if (x == 6 and y == 6 and dx == 0 and dy == 1 and dx2 == 1 and dy2 == 0):
                 # add constraint
                 self.model.addConstr(self.is_component_used[component] == 1            )
 
-            if (x == 6 and y == 6 and dx == 0 and dy == -1 and dx2 == 1 and dy2 == 0):
+            if (x == 6 and y == 8 and dx == 0 and dy == -1 and dx2 == 1 and dy2 == 0):
                 # add constraint
                 self.model.addConstr(self.is_component_used[component] == 1            )
 
@@ -820,6 +821,8 @@ if __name__ == "__main__":
         # ([(6, 0)], 
         #  [(6, 15)]),
 
+        # try aws again, this time use this https://support.gurobi.com/hc/en-us/articles/13232844297489-How-do-I-set-up-a-Web-License-Service-WLS-license
+
         # ([(6, 0)], 
         # [(6, 15)],
         # [(0, 6)]),
@@ -829,6 +832,18 @@ if __name__ == "__main__":
          [(0, 6), (0, 7), (0, 8), (0, 9)]),
 
         # ([(6, 0), (7, 0), (8, 0)], 
+        #  [(15, 6), (15, 7), (15, 8)],
+        #  [(0, 6), (0, 7), (0, 8)]),
+
+        # ([(6, 0)], 
+        # [(15, 6)],
+        # [(0, 6)]),
+
+        # ([(6, 0), (7, 0)], 
+        # [(15, 6), (15, 7)],
+        # [(0, 6), (0, 7)]),
+
+        # ([(6, 0), (7, 0), (8, 0)], 
         #  [(6, 15), (7, 15), (8, 15)],
         #  [(0, 6), (0, 7), (0, 8)]),
 
@@ -836,7 +851,7 @@ if __name__ == "__main__":
         #  [(6, 15), (7, 15)],
         #  [(0, 6), (0, 7)]),
         ]
-    router = DirectionalJumpRouter(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = -1, symmetry = False, use_option=True)
+    router = DirectionalJumpRouter(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = -1, symmetry = False, use_option=False)
 
 
     # 169 cost without variable length launcher for 8 to 32 routing
