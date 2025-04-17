@@ -40,6 +40,19 @@ class DirectionalJumpRouter:
         self.component_source_amount = 2
         self.component_sink_amount = 2
 
+        # blocked tile is the border of the map
+        self.blocked_tiles = [(x, 0) for x in range(self.WIDTH)] + [(x, self.HEIGHT-1) for x in range(self.WIDTH)] + [(0, y) for y in range(self.HEIGHT)] + [(self.WIDTH-1, y) for y in range(self.HEIGHT)]
+        remove_from_blocked_tiles = [(6, 0), (7, 0), (8, 0), (9, 0), (6, 15), (7, 15), (8, 15), (9, 15)]
+        for tile in remove_from_blocked_tiles:
+            self.blocked_tiles.remove(tile)
+
+        # all nodes
+        self.all_nodes: List[Node] = []
+        for x in range(self.WIDTH):
+            for y in range(self.HEIGHT):
+                if (x, y) not in self.blocked_tiles:
+                    self.all_nodes.append((x, y))
+
         # here, add start as source for net 0, add component sink as sink for net 0
 
         # then, add component source as source for net 1, add goal as sink for net 1
@@ -62,41 +75,35 @@ class DirectionalJumpRouter:
         self.node_related_components: Dict[Node, List[Component]] = defaultdict(list) # to record occupancy
         self.node_related_component_sources: Dict[Node, List[Component]] = defaultdict(list) # to record source
         self.node_related_component_sinks: Dict[Node, List[Component]] = defaultdict(list) # to record sink
-        for x in range(self.WIDTH):
-            for y in range(self.HEIGHT):
-                for dx, dy in DIRECTIONS:
-                    component = ((x, y), (dx, dy))
+        for node in self.all_nodes:
+            x, y = node
+            for dx, dy in DIRECTIONS:
+                component = ((x, y), (dx, dy))
 
-                    # input location (sink)
-                    ix = x - dx
-                    iy = y - dy
+                # input location (sink)
+                ix = x - dx
+                iy = y - dy
 
-                    # output location (source)
-                    ox = x + dx
-                    oy = y + dy
+                # output location (source)
+                ox = x + dx
+                oy = y + dy
 
-                    # skip if input location is invalid
-                    if ix < 0 or ix >= self.WIDTH or iy < 0 or iy >= self.HEIGHT:
-                        continue
+                # skip if input location is invalid
+                if (ix, iy) not in self.all_nodes:
+                    continue
 
-                    # skip if output location is invalid
-                    if ox < 0 or ox >= self.WIDTH or oy < 0 or oy >= self.HEIGHT:
-                        continue
+                # skip if output location is invalid
+                if (ox, oy) not in self.all_nodes:
+                    continue
 
-                    self.all_components.append(component)
-                    self.node_related_components[(x, y)].append(component)
-                    self.node_related_component_sources[(ox, oy)].append(component)
-                    self.node_related_component_sinks[(x, y)].append(component)
+                self.all_components.append(component)
+                self.node_related_components[(x, y)].append(component)
+                self.node_related_component_sources[(ox, oy)].append(component)
+                self.node_related_component_sinks[(x, y)].append(component)
 
         # is component used
         self.is_component_used: Dict[Component, pulp.LpVariable] = {}
         self.is_component_used = {component: pulp.LpVariable(f"component_used_{component}", cat='Binary') for component in self.all_components}
-
-        # all nodes
-        self.all_nodes: List[Node] = []
-        for x in range(self.WIDTH):
-            for y in range(self.HEIGHT):
-                self.all_nodes.append((x, y))
         
         self.all_edges: List[Edge] = []
         self.step_edges: List[Edge] = []
@@ -109,7 +116,7 @@ class DirectionalJumpRouter:
 
                 # Step edge
                 nx, ny = x + dx, y + dy
-                if 0 <= nx < self.WIDTH and 0 <= ny < self.HEIGHT:
+                if (nx, ny) in self.all_nodes:
                     edge = ((x, y), (nx, ny), (dx, dy))
                     self.all_edges.append(edge)
                     self.step_edges.append(edge)
@@ -119,7 +126,7 @@ class DirectionalJumpRouter:
                     nx, ny = x + dx * (jump_distance + 2), y + dy * (jump_distance + 2)
                     jx, jy = x + dx * (jump_distance + 1), y + dy * (jump_distance + 1)
                     pad_node = (jx, jy)
-                    if 0 <= nx < self.WIDTH and 0 <= ny < self.HEIGHT:
+                    if (nx, ny) in self.all_nodes:
                         edge = ((x, y), (nx, ny), (dx, dy))
                         self.all_edges.append(edge)
                         self.jump_edges.append(edge)
@@ -394,15 +401,11 @@ class DirectionalJumpRouter:
                     self.model += self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1 # only one can be true
                 
     def add_directional_constraints_w_component(self, i):
-        # for jump edge at start, only up direction is allowed
+        # no jump edge at start
         for jump_edge in self.jump_edges:
             u, v, direction = jump_edge
             if u in self.net_sources[i]:
-                if direction == (0, 1):
-                    continue
-                else:
-                    self.model += self.is_edge_used[i][jump_edge] == 0
-                    continue
+                self.model += self.is_edge_used[i][jump_edge] == 0
         
         # component direction constraint
         for node in self.all_nodes:
@@ -605,6 +608,13 @@ class DirectionalJumpRouter:
 
         offset = 0.5
 
+        # draw blocked tiles
+        for (x, y) in self.blocked_tiles:
+            # ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='none', hatch='////'))
+            # ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='lightgrey', edgecolor='black', linewidth=2))
+            ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='lightgrey', linewidth=2))
+
+
         colors = ['red', 'green', 'blue', 'orange', 'purple', 'cyan', 'magenta', 'brown', 'gray', 'olive']    
         for i in range(self.num_nets):
             color = colors[i % len(colors)]
@@ -676,7 +686,7 @@ class DirectionalJumpRouter:
         handle_component = (handle_component_square, handle_component_circle)
         legend_handles = [handle_start, handle_jump_pad, handle_belt, handle_component]
         legend_labels  = ['Start/Goal', 'Jump Pad', 'Belt', 'Component']
-        ax.legend(legend_handles, legend_labels, handler_map={tuple: HandlerTuple(ndivide=1)})
+        ax.legend(legend_handles, legend_labels, handler_map={tuple: HandlerTuple(ndivide=1)}, loc='upper right')
 
         # show
         plt.show()
@@ -703,11 +713,14 @@ if __name__ == "__main__":
     # router = DirectionalJumpRouter(width=34, height=7, nets=nets, jump_distances= [4], timelimit = 300, symmetry = False)
 
 
-    nets = [
-        ([(5, 0)], 
-        [(0, 5)]),
+    nets = [        
+        # ([(6, 0)], 
+        #  [(6, 15)]),
+
+        ([(6, 0), (7, 0), (8, 0), (9, 0)], 
+         [(6, 15), (7, 15), (8, 15), (9, 15)]),
         ]
-    router = DirectionalJumpRouter(width=14, height=14, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = 300, symmetry = False)
+    router = DirectionalJumpRouter(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = 300, symmetry = False)
 
 
     # 169 cost without variable length launcher
