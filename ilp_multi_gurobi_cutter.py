@@ -323,11 +323,11 @@ class DirectionalJumpRouter:
                 self.model += out_flow == 0
                 self.model += in_flow == 4
             else:
-                # Constraint 1: if z == 1 ⇒ out_flow == 4
+                # Constraint 1: if z == 1 ⇒ out_flow == component_source_amount * sum(node_component_used_bool_list)
                 # IMPLICATION trick
                 M = 4                    
-                self.model += out_flow >= self.component_source_amount - M * (1 - node_is_component_source)
-                self.model += out_flow <= self.component_source_amount + M * (1 - node_is_component_source)
+                self.model += out_flow >= self.component_source_amount * pulp.lpSum(node_component_used_bool_list) - M * (1 - node_is_component_source)
+                self.model += out_flow <= self.component_source_amount * pulp.lpSum(node_component_used_bool_list) + M * (1 - node_is_component_source)
 
                 # Constraint 2: if z == 1 ⇒ in_flow == 0
                 self.model += in_flow <= 4 * (1 - node_is_component_source)
@@ -373,8 +373,8 @@ class DirectionalJumpRouter:
                 # Constraint 1: if z == 1 ⇒ out_flow == 4
                 # IMPLICATION trick
                 M = 4                    
-                self.model += out_flow >= self.component_source_amount - M * (1 - node_is_component_source)
-                self.model += out_flow <= self.component_source_amount + M * (1 - node_is_component_source)
+                self.model += out_flow >= self.component_source_amount * pulp.lpSum(node_component_used_bool_list) - M * (1 - node_is_component_source)
+                self.model += out_flow <= self.component_source_amount * pulp.lpSum(node_component_used_bool_list) + M * (1 - node_is_component_source)
 
                 # Constraint 2: if z == 1 ⇒ in_flow == 0
                 self.model += in_flow <= 4 * (1 - node_is_component_source)
@@ -610,16 +610,20 @@ class DirectionalJumpRouter:
     def add_component_count_constraint(self):
         # add component count constraint
         component_used_bool_list = [self.is_component_used[component] for component in self.all_components]
-        self.model += pulp.lpSum(component_used_bool_list) == 4
+        self.model += pulp.lpSum(component_used_bool_list) == 2
 
-        # # add component location constraint
-        # for component in self.all_components:
-        #     # get the location of the component
-        #     (x, y), (dx, dy) = component
+        # add component location constraint
+        for component in self.all_components:
+            # get the location of the component
+            (x, y), (dx, dy), (dx2, dy2) = component
 
-        #     if (x == 5 and y == 5 and dx == -1 and dy == 0):
-        #         # add constraint
-        #         self.model += self.is_component_used[component] == 1            
+            if (x == 6 and y == 8 and dx == 0 and dy == 1 and dx2 == 1 and dy2 == 0):
+                # add constraint
+                self.model += self.is_component_used[component] == 1            
+
+            if (x == 6 and y == 6 and dx == 0 and dy == -1 and dx2 == 1 and dy2 == 0):
+                # add constraint
+                self.model += self.is_component_used[component] == 1            
 
     def add_jump_pad_implication(self):
         # if a jump edge is used, then the corresponding jump pad must be used
@@ -815,16 +819,27 @@ if __name__ == "__main__":
         # ([(6, 0)], 
         #  [(6, 15)]),
 
-        # ([(6, 0)], 
-        # [(6, 15)],
-        # [(0, 6)]),
+        ([(6, 0)], 
+        [(6, 15)],
+        [(0, 6)]),
 
-        ([(6, 0), (7, 0), (8, 0), (9, 0)], 
-         [(6, 15), (7, 15), (8, 15), (9, 15)],
-         [(0, 6), (0, 7), (0, 8), (0, 9)]),
+        # ([(6, 0), (7, 0), (8, 0), (9, 0)], 
+        #  [(6, 15), (7, 15), (8, 15), (9, 15)],
+        #  [(0, 6), (0, 7), (0, 8), (0, 9)]),
+
+        # ([(6, 0), (7, 0), (8, 0)], 
+        #  [(6, 15), (7, 15), (8, 15)],
+        #  [(0, 6), (0, 7), (0, 8)]),
+
+        # ([(6, 0), (7, 0)], 
+        #  [(6, 15), (7, 15)],
+        #  [(0, 6), (0, 7)]),
         ]
     router = DirectionalJumpRouter(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = -1, symmetry = False, use_option=False)
 
 
-    # 169 cost without variable length launcher
+    # 169 cost without variable length launcher for 8 to 32 routing
     # # /var/folders/9f/zk98sm354s964kr7thw5t0980000gn/T/564a50812cc64b7f96e235e5bd1d7f8e-pulp.sol
+
+    # 40 cost for cutter in 1x1
+    # /var/folders/9f/zk98sm354s964kr7thw5t0980000gn/T/cab48f13fec049babcf0b53d7f8d3c99-pulp.sol
