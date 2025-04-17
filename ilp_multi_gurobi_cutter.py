@@ -28,7 +28,7 @@ class DirectionalJumpRouter:
         self.WIDTH = width
         self.HEIGHT = height
 
-        self.num_nets = 2 # start to component, component to goal
+        self.num_nets = 3 # start to component, component to goal
         self.net_sources: Dict[int, List[Node]] = {}
         self.net_sinks: Dict[int, List[Node]] = {}
 
@@ -43,8 +43,8 @@ class DirectionalJumpRouter:
         self.net_sources[2] = []
         self.net_sinks[2] = sinks2
 
-        self.component_source_amount = 1
-        self.component_sink_amount = 1
+        self.component_source_amount = 4
+        self.component_sink_amount = 4
 
         # blocked tile is the border of the map
         self.blocked_tiles = [(x, 0) for x in range(self.WIDTH)] + [(x, self.HEIGHT-1) for x in range(self.WIDTH)] + [(0, y) for y in range(self.HEIGHT)] + [(self.WIDTH-1, y) for y in range(self.HEIGHT)]
@@ -203,6 +203,7 @@ class DirectionalJumpRouter:
     def add_constraints(self):
         self.add_flow_constraints_source_to_components(0)
         self.add_flow_constraints_component_to_goal(1)
+        self.add_flow_constraints_secondary_component_to_goal(2)
 
         for i in range(self.num_nets):
             self.add_overlap_and_one_jump_constraints(i)
@@ -249,7 +250,7 @@ class DirectionalJumpRouter:
             self.model += self.edge_flow_value[i][edge] <= self.is_edge_used[i][edge] * 4
             self.model += self.edge_flow_value[i][edge] >= self.is_edge_used[i][edge]
 
-        sources = self.net_sources[0]
+        sources = self.net_sources[i]
 
         # Flow conservation constraints for each net
         for node in self.all_nodes:
@@ -296,7 +297,7 @@ class DirectionalJumpRouter:
             self.model += self.edge_flow_value[i][edge] <= self.is_edge_used[i][edge] * 4
             self.model += self.edge_flow_value[i][edge] >= self.is_edge_used[i][edge]
 
-        sinks = self.net_sinks[1]
+        sinks = self.net_sinks[i]
 
         # Flow conservation constraints for each net
         for node in self.all_nodes:
@@ -333,7 +334,54 @@ class DirectionalJumpRouter:
                 # Constraint 3: if z == 0 ⇒ in_flow == out_flow
                 self.model += (out_flow - in_flow) <= node_is_component_source * 4
                 self.model += (out_flow - in_flow) >= -node_is_component_source * 4
+
+    def add_flow_constraints_secondary_component_to_goal(self, i):
+        self.edge_flow_value: Dict[int, Dict[Edge, pulp.LpVariable]] = {}
+        self.edge_flow_value[i] = {edge: pulp.LpVariable(f"edge_flow_value_{i}_{edge}", cat='Integer', lowBound=0, upBound=4) for edge in self.all_edges}
+        
+        # Flow is avaiable if the edge is selected
+        for edge in self.all_edges:
+            self.model += self.edge_flow_value[i][edge] <= self.is_edge_used[i][edge] * 4
+            self.model += self.edge_flow_value[i][edge] >= self.is_edge_used[i][edge]
+
+        sinks = self.net_sinks[i]
+
+        # Flow conservation constraints for each net
+        for node in self.all_nodes:
+            node_components = self.node_related_component_secondary_sources[node]
+            node_component_used_bool_list = [self.is_component_used[component] for component in node_components]
+            node_is_component_source = pulp.LpVariable(f"node_is_component_source_{i}_{node}", cat='Binary')
+            if node_component_used_bool_list:
+                # OR trick
+                self.model += node_is_component_source >= pulp.lpSum(node_component_used_bool_list) / len(node_component_used_bool_list)
+                self.model += node_is_component_source <= pulp.lpSum(node_component_used_bool_list)
+            else:
+                self.model += node_is_component_source == 0
+
+            in_flow = pulp.lpSum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[1] == node)
+            out_flow = pulp.lpSum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[0] == node)
             
+            # no matter what
+            self.model += in_flow <= 4
+            self.model += out_flow <= 4
+
+            if node in sinks:
+                self.model += out_flow == 0
+                self.model += in_flow == 4
+            else:
+                # Constraint 1: if z == 1 ⇒ out_flow == 4
+                # IMPLICATION trick
+                M = 4                    
+                self.model += out_flow >= self.component_source_amount - M * (1 - node_is_component_source)
+                self.model += out_flow <= self.component_source_amount + M * (1 - node_is_component_source)
+
+                # Constraint 2: if z == 1 ⇒ in_flow == 0
+                self.model += in_flow <= 4 * (1 - node_is_component_source)
+
+                # Constraint 3: if z == 0 ⇒ in_flow == out_flow
+                self.model += (out_flow - in_flow) <= node_is_component_source * 4
+                self.model += (out_flow - in_flow) >= -node_is_component_source * 4
+                
 
     def add_flow_constraints_v2(self, i):
         for node in self.all_nodes:
@@ -429,8 +477,8 @@ class DirectionalJumpRouter:
         
         # component direction constraint
         for node in self.all_nodes:
-            # if a node has active component source, only jump in the component direction is allowed
-            for component in self.node_related_component_sources[node]:
+            # if a node has active component source and secondary source, only jump in the component direction is allowed
+            for component in self.node_related_component_sources[node] + self.node_related_component_secondary_sources[node]:
                 _, component_direction, _ = component
                 for jump_edge in self.node_related_jump_edges[node]:
                     u, v, direction = jump_edge
@@ -692,8 +740,9 @@ class DirectionalJumpRouter:
         used_components = [c for c in self.all_components if pulp.value(self.is_component_used[c]) == 1]
         for component in used_components:
             (x, y), (dx, dy), (dx2, dy2) = component        # two‑cell component
-            x2, y2 = x + dx2, y + dy2                       # second node
             nx, ny = x + dx, y + dy
+            x2, y2 = x + dx2, y + dy2                       # second node
+            nx2, ny2 = x2 + dx, y2 + dy
 
             margin = 0.2
             ll_x = min(x, x2) + margin
@@ -715,6 +764,7 @@ class DirectionalJumpRouter:
             ax.scatter(x + offset, y + offset, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
             ax.scatter(x2 + offset, y2 + offset, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
             ax.plot([x + offset, nx + offset], [y + offset, ny + offset], c='black', zorder=0)
+            ax.plot([x2 + offset, nx2 + offset], [y2 + offset, ny2 + offset], c='black', zorder=0)
 
         plt.title("Shapez2: Routing using Integer Linear Programming (ILP) -- Jiahao")
 
