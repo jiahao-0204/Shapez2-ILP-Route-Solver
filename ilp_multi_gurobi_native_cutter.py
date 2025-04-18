@@ -46,6 +46,9 @@ class DirectionalJumpRouter:
 
         self.component_source_amount = 1
         self.component_sink_amount = 1
+        self.component_priority = 100
+        self.edge_priority = 50
+        self.flow_priority = 25
 
         # Optimization
         self.model = Model("DirectionalJumpRouter")
@@ -141,6 +144,9 @@ class DirectionalJumpRouter:
         # is component used
         self.is_component_used: Dict[Component, Var] = {}
         self.is_component_used = {component: self.model.addVar(name=f"component_{component}", vtype=GRB.BINARY) for component in self.all_components}
+        # set priority
+        for comonent in self.all_components:
+            self.is_component_used[comonent].setAttr("BranchPriority", self.component_priority)
         
         self.all_edges: List[Edge] = []
         self.step_edges: List[Edge] = []
@@ -176,6 +182,9 @@ class DirectionalJumpRouter:
         self.is_edge_used: Dict[int, Dict[Edge, Var]] = {}
         for i in range(self.num_nets):
             self.is_edge_used[i] = {edge: self.model.addVar(name=f"edge_{i}_{edge}", vtype=GRB.BINARY) for edge in self.all_edges}
+            # set priority
+            for edge in self.all_edges:
+                self.is_edge_used[i][edge].setAttr("BranchPriority", self.edge_priority)
         
         # self.add_variable_is_node_used_by_net()
         self.add_variable_is_node_used_by_step_edges()
@@ -271,6 +280,9 @@ class DirectionalJumpRouter:
     def add_flow_constraints_source_to_components(self, i):
         self.edge_flow_value: Dict[int, Dict[Edge, Var]] = {}
         self.edge_flow_value[i] = {edge: self.model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=4) for edge in self.all_edges}
+        # set priority
+        for edge in self.all_edges:
+            self.edge_flow_value[i][edge].setAttr("BranchPriority", self.flow_priority)
         
         # Flow is avaiable if the edge is selected
         for edge in self.all_edges:
@@ -303,7 +315,10 @@ class DirectionalJumpRouter:
     def add_flow_constraints_component_to_goal(self, i):
         self.edge_flow_value: Dict[int, Dict[Edge, Var]] = {}
         self.edge_flow_value[i] = {edge: self.model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=4) for edge in self.all_edges}
-        
+        # set priority
+        for edge in self.all_edges:
+            self.edge_flow_value[i][edge].setAttr("BranchPriority", self.flow_priority)
+
         # Flow is avaiable if the edge is selected
         for edge in self.all_edges:
             self.model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[i][edge] >= 1)
@@ -335,7 +350,10 @@ class DirectionalJumpRouter:
     def add_flow_constraints_secondary_component_to_goal(self, i):
         self.edge_flow_value: Dict[int, Dict[Edge, Var]] = {}
         self.edge_flow_value[i] = {edge: self.model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=4) for edge in self.all_edges}
-        
+        # set priority
+        for edge in self.all_edges:
+            self.edge_flow_value[i][edge].setAttr("BranchPriority", self.flow_priority)
+
         # Flow is avaiable if the edge is selected
         for edge in self.all_edges:
             self.model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[i][edge] >= 1)
