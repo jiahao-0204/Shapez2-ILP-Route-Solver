@@ -764,6 +764,8 @@ class DirectionalJumpRouter:
         if self.timelimit != -1:
             self.model.setParam('TimeLimit', self.timelimit)
         self.model.setParam('MIPFocus', self.option)
+        self.model.setParam('Presolve', 2)
+        self.model.setParam('Heuristics', 0.5)
         self.model.update()
         self.model.optimize()
         
