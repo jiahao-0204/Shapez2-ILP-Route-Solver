@@ -55,9 +55,10 @@ class DirectionalJumpRouter:
         remove_from_blocked_tiles = [(6, 0), (7, 0), (8, 0), (9, 0)]
         remove_from_blocked_tiles += [(6, self.HEIGHT-1), (7, self.HEIGHT-1), (8, self.HEIGHT-1), (9, self.HEIGHT-1)]
         remove_from_blocked_tiles += [(0, 6), (0, 7), (0, 8), (0, 9)]
-        # remove_from_blocked_tiles += [(self.WIDTH-1, 6), (self.WIDTH-1, 7), (self.WIDTH-1, 8), (self.WIDTH-1, 9)]
+        remove_from_blocked_tiles += [(self.WIDTH-1, 6), (self.WIDTH-1, 7), (self.WIDTH-1, 8), (self.WIDTH-1, 9)]
         for tile in remove_from_blocked_tiles:
             self.blocked_tiles.remove(tile)
+        # self.blocked_tiles += [(1, 1), (2, 1), (3, 1), (4, 1), (5, 1)]
 
         # all nodes
         self.all_nodes: List[Node] = []
@@ -596,26 +597,26 @@ class DirectionalJumpRouter:
     def add_component_pre_placement_constraint(self):
         preplacement_list = []
 
-        # solution 1
-        preplacement_list.append(((3, 3), (0, 1), (1, 0)))
-        preplacement_list.append(((7, 3), (0, 1), (-1, 0)))
-        preplacement_list.append(((9, 3), (0, 1), (1, 0)))
-        preplacement_list.append(((13, 3), (0, 1), (-1, 0)))
+        # # solution 1
+        # preplacement_list.append(((3, 3), (0, 1), (1, 0)))
+        # preplacement_list.append(((7, 3), (0, 1), (-1, 0)))
+        # preplacement_list.append(((9, 3), (0, 1), (1, 0)))
+        # preplacement_list.append(((13, 3), (0, 1), (-1, 0)))
 
-        preplacement_list.append(((3, 5), (0, -1), (1, 0)))
-        preplacement_list.append(((7, 5), (0, -1), (-1, 0)))
-        preplacement_list.append(((9, 5), (0, -1), (1, 0)))
-        preplacement_list.append(((13, 5), (0, -1), (-1, 0)))
+        # preplacement_list.append(((3, 5), (0, -1), (1, 0)))
+        # preplacement_list.append(((7, 5), (0, -1), (-1, 0)))
+        # preplacement_list.append(((9, 5), (0, -1), (1, 0)))
+        # preplacement_list.append(((13, 5), (0, -1), (-1, 0)))
 
         # preplacement_list.append(((2, 12), (0, 1), (1, 0)))
-        preplacement_list.append(((7, 8), (0, 1), (-1, 0)))
-        preplacement_list.append(((9, 8), (0, 1), (1, 0)))
-        preplacement_list.append(((13, 8), (0, 1), (-1, 0)))
+        # preplacement_list.append(((7, 8), (0, 1), (-1, 0)))
+        # preplacement_list.append(((9, 8), (0, 1), (1, 0)))
+        # preplacement_list.append(((13, 8), (0, 1), (-1, 0)))
 
         # preplacement_list.append(((6, 12), (0, 1), (-1, 0)))
-        preplacement_list.append(((7, 10), (0, -1), (-1, 0)))
-        preplacement_list.append(((9, 10), (0, -1), (1, 0)))
-        preplacement_list.append(((13, 10), (0, -1), (-1, 0)))
+        # preplacement_list.append(((7, 10), (0, -1), (-1, 0)))
+        # preplacement_list.append(((9, 10), (0, -1), (1, 0)))
+        # preplacement_list.append(((13, 10), (0, -1), (-1, 0)))
 
         # solution 2
         # preplacement_list.append(((3, 3), (0, 1), (1, 0)))
@@ -637,6 +638,28 @@ class DirectionalJumpRouter:
         # preplacement_list.append(((7, 10), (0, -1), (-1, 0)))
         # preplacement_list.append(((9, 10), (0, -1), (1, 0)))
         # preplacement_list.append(((13, 10), (0, -1), (-1, 0)))
+
+
+        # # T shape output
+        preplacement_list.append(((4, 3), (1, 0), (0, 1)))
+        preplacement_list.append(((4, 7), (1, 0), (0, -1)))
+        preplacement_list.append(((4, 9), (1, 0), (0, 1)))
+        preplacement_list.append(((4, 13), (1, 0), (0, -1)))
+
+        preplacement_list.append(((6, 3), (-1, 0), (0, 1)))
+        preplacement_list.append(((6, 7), (-1, 0), (0, -1)))
+        preplacement_list.append(((6, 9), (-1, 0), (0, 1)))
+        preplacement_list.append(((6, 13), (-1, 0), (0, -1)))
+
+        preplacement_list.append(((9, 3), (1, 0), (0, 1)))
+        preplacement_list.append(((9, 7), (1, 0), (0, -1)))
+        preplacement_list.append(((9, 9), (1, 0), (0, 1)))
+        preplacement_list.append(((9, 13), (1, 0), (0, -1)))
+
+        preplacement_list.append(((11, 3), (-1, 0), (0, 1)))
+        preplacement_list.append(((11, 7), (-1, 0), (0, -1)))
+        preplacement_list.append(((11, 9), (-1, 0), (0, 1)))
+        preplacement_list.append(((11, 13), (-1, 0), (0, -1)))
 
 
         for component in preplacement_list:
@@ -893,9 +916,9 @@ if __name__ == "__main__":
         #  [(7, 15), (8, 15), (9, 15)],
         #  [(0, 6), (0, 7), (0, 8)]),
 
-        ([(6, 0), (7, 0), (8, 0), (9, 0)], 
-         [(6, 15), (7, 15), (8, 15), (9, 15)],
-         [(0, 6), (0, 7), (0, 8), (0, 9)]),
+        # ([(6, 0), (7, 0), (8, 0), (9, 0)], 
+        #  [(6, 15), (7, 15), (8, 15), (9, 15)],
+        #  [(0, 6), (0, 7), (0, 8), (0, 9)]),
 
         # ([(6, 0), (7, 0), (8, 0)], 
         #  [(15, 6), (15, 7), (15, 8)],
@@ -916,6 +939,24 @@ if __name__ == "__main__":
         # ([(6, 0), (7, 0)], 
         #  [(6, 15), (7, 15)],
         #  [(0, 6), (0, 7)]),
+
+
+        # T shape output
+        # ([(6, 0)], 
+        #  [(0, 6)],
+        #  [(15, 6)]),
+
+        # ([(6, 0), (7, 0), (8, 0)], 
+        #  [(0, 6), (0, 7), (0, 8)],
+        #  [(15, 6), (15, 7), (15, 8)]),
+
+        ([(6, 0), (7, 0), (8, 0), (9, 0)], 
+         [(0, 6), (0, 7), (0, 8), (0, 9)],
+         [(15, 6), (15, 7), (15, 8), (15, 9)]),
+
+
+
+        ]
     router = DirectionalJumpRouter(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = -1, symmetry = False, option = 0)
     # option 0: balanced
     # option 1: feasibility
