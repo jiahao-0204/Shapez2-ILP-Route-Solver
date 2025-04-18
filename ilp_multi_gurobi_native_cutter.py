@@ -44,8 +44,8 @@ class DirectionalJumpRouter:
         self.net_sources[2] = []
         self.net_sinks[2] = sinks2
 
-        self.component_source_amount = 2
-        self.component_sink_amount = 2
+        self.component_source_amount = 1
+        self.component_sink_amount = 1
 
         # Optimization
         self.model = Model("DirectionalJumpRouter")
@@ -223,9 +223,9 @@ class DirectionalJumpRouter:
         # self.add_goal_action_constraints()
         self.add_things_overlap_constraints()
 
-        # self.add_component_count_constraint()
-        # self.add_component_pre_placement_constraint()
-        self.add_component_source_sink_overlap_constraints()
+        self.add_component_count_constraint()
+        self.add_component_pre_placement_constraint()
+        # self.add_component_source_sink_overlap_constraints()
 
         if self.symmetry:
             self.add_symmetry_constraints()
@@ -638,12 +638,12 @@ class DirectionalJumpRouter:
         preplacement_list.append(((9, 5), (0, -1), (1, 0)))
         preplacement_list.append(((13, 5), (0, -1), (-1, 0)))
 
-        preplacement_list.append(((2, 12), (0, 1), (1, 0)))
+        # preplacement_list.append(((2, 12), (0, 1), (1, 0)))
         preplacement_list.append(((7, 8), (0, 1), (-1, 0)))
         preplacement_list.append(((9, 8), (0, 1), (1, 0)))
         preplacement_list.append(((13, 8), (0, 1), (-1, 0)))
 
-        preplacement_list.append(((6, 12), (0, 1), (-1, 0)))
+        # preplacement_list.append(((6, 12), (0, 1), (-1, 0)))
         preplacement_list.append(((7, 10), (0, -1), (-1, 0)))
         preplacement_list.append(((9, 10), (0, -1), (1, 0)))
         preplacement_list.append(((13, 10), (0, -1), (-1, 0)))
@@ -933,9 +933,9 @@ if __name__ == "__main__":
 
         # try aws again, this time use this https://support.gurobi.com/hc/en-us/articles/13232844297489-How-do-I-set-up-a-Web-License-Service-WLS-license
 
-        ([(6, 0)], 
-        [(6, 15)],
-        [(0, 6)]),
+        # ([(6, 0)], 
+        # [(6, 15)],
+        # [(0, 6)]),
 
         # ([(6, 0), (7, 0)], 
         # [(6, 15), (7, 15)],
@@ -949,9 +949,9 @@ if __name__ == "__main__":
         #  [(7, 15), (8, 15), (9, 15)],
         #  [(0, 6), (0, 7), (0, 8)]),
 
-        # ([(6, 0), (7, 0), (8, 0), (9, 0)], 
-        #  [(6, 15), (7, 15), (8, 15), (9, 15)],
-        #  [(0, 6), (0, 7), (0, 8), (0, 9)]),
+        ([(6, 0), (7, 0), (8, 0), (9, 0)], 
+         [(6, 15), (7, 15), (8, 15), (9, 15)],
+         [(0, 6), (0, 7), (0, 8), (0, 9)]),
 
         # ([(6, 0), (7, 0), (8, 0)], 
         #  [(15, 6), (15, 7), (15, 8)],
