@@ -814,11 +814,11 @@ class DirectionalJumpRouter:
         handle_start = Line2D([], [], marker='s', color='grey', markersize=9, markeredgecolor='black', linestyle='None', label='Start/Goal')
         handle_jump_pad = Line2D([], [], marker='^', color='grey', markersize=8, markeredgecolor='black', linestyle='None', label='Jump Pad')
         handle_belt = Line2D([], [], marker='o', color='grey', markersize=7, markeredgecolor='black', linestyle='None', label='Belt')
-        handle_component_square = Line2D([], [], marker='s', color='grey', markersize=14, markeredgecolor='black', linestyle='None')
-        handle_component_circle = Line2D([], [], marker='o', color='grey', markersize=13, markeredgecolor='black', linestyle='None')
-        handle_component = (handle_component_square, handle_component_circle)
-        legend_handles = [handle_start, handle_jump_pad, handle_belt, handle_component]
-        legend_labels  = ['Start/Goal', 'Jump Pad', 'Belt', 'Component']
+        # handle_component_square = Line2D([], [], marker='s', color='grey', markersize=14, markeredgecolor='black', linestyle='None')
+        # handle_component_circle = Line2D([], [], marker='o', color='grey', markersize=13, markeredgecolor='black', linestyle='None')
+        # handle_component = (handle_component_square, handle_component_circle)
+        legend_handles = [handle_start, handle_jump_pad, handle_belt]
+        legend_labels  = ['Start/Goal', 'Jump Pad', 'Belt']
         ax.legend(legend_handles, legend_labels, handler_map={tuple: HandlerTuple(ndivide=1)}, loc='upper right')
 
         # show
