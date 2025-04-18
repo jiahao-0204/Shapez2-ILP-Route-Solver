@@ -117,6 +117,10 @@ class DirectionalJumpRouter:
                     ox2 = x + secondary_dx + dx
                     oy2 = y + secondary_dy + dy
 
+                    # skip if secondary location is invalid
+                    if (x2, y2) not in self.all_nodes:
+                        continue
+
                     # skip if input location is invalid
                     if (ix, iy) not in self.all_nodes:
                         continue
