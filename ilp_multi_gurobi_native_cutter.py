@@ -21,7 +21,7 @@ Source = Tuple[Node, Direction, Amount] # location, direction, amount
 Sink = Tuple[Node, Direction, Amount] # location, direction, amount
 
 class DirectionalJumpRouter:
-    def __init__(self, width, height, nets, jump_distances: List[int] = [4], timelimit: int = 60, symmetry: bool = False, use_option: bool = False):
+    def __init__(self, width, height, nets, jump_distances: List[int] = [4], timelimit: int = 60, symmetry: bool = False, option: int = 0):
 
         # allow multiple start
 
@@ -82,7 +82,7 @@ class DirectionalJumpRouter:
         self.jump_distances = jump_distances
         self.timelimit = timelimit
         self.symmetry = symmetry
-        self.use_option = use_option
+        self.option = option
 
         # all possible location and orientation to place the components
         self.all_components: List[Component] = []
@@ -723,8 +723,7 @@ class DirectionalJumpRouter:
     def solve(self):
         if self.timelimit != -1:
             self.model.setParam('TimeLimit', self.timelimit)
-        if self.use_option:
-            self.model.setParam('MIPFocus', 1)  # equivalent to use_option
+        self.model.setParam('MIPFocus', self.option)
         self.model.update()
         self.model.optimize()
         
@@ -916,8 +915,11 @@ if __name__ == "__main__":
         # ([(6, 0), (7, 0)], 
         #  [(6, 15), (7, 15)],
         #  [(0, 6), (0, 7)]),
-        ]
-    router = DirectionalJumpRouter(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = -1, symmetry = False, use_option=True)
+    router = DirectionalJumpRouter(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = -1, symmetry = False, option = 0)
+    # option 0: balanced
+    # option 1: feasibility
+    # option 2: bound
+    # option 3: incumbent improvement
 
 
     # 169 cost without variable length launcher for 8 to 32 routing
