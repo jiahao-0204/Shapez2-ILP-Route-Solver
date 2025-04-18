@@ -44,8 +44,8 @@ class DirectionalJumpRouter:
         self.net_sources[2] = []
         self.net_sinks[2] = sinks2
 
-        self.component_source_amount = 1
-        self.component_sink_amount = 1
+        self.component_source_amount = 2
+        self.component_sink_amount = 2
 
         # Optimization
         self.model = Model("DirectionalJumpRouter")
@@ -217,8 +217,8 @@ class DirectionalJumpRouter:
         # self.add_goal_action_constraints()
         self.add_things_overlap_constraints()
 
-        self.add_component_count_constraint()
-        self.add_component_pre_placement_constraint()
+        # self.add_component_count_constraint()
+        # self.add_component_pre_placement_constraint()
         self.add_component_source_sink_overlap_constraints()
 
         if self.symmetry:
@@ -874,6 +874,10 @@ if __name__ == "__main__":
 
         # try aws again, this time use this https://support.gurobi.com/hc/en-us/articles/13232844297489-How-do-I-set-up-a-Web-License-Service-WLS-license
 
+        ([(6, 0)], 
+        [(6, 15)],
+        [(0, 6)]),
+
         # ([(6, 0), (7, 0)], 
         # [(6, 15), (7, 15)],
         # [(0, 6), (0, 7)]),
@@ -886,9 +890,9 @@ if __name__ == "__main__":
         #  [(7, 15), (8, 15), (9, 15)],
         #  [(0, 6), (0, 7), (0, 8)]),
 
-        ([(6, 0), (7, 0), (8, 0), (9, 0)], 
-         [(6, 15), (7, 15), (8, 15), (9, 15)],
-         [(0, 6), (0, 7), (0, 8), (0, 9)]),
+        # ([(6, 0), (7, 0), (8, 0), (9, 0)], 
+        #  [(6, 15), (7, 15), (8, 15), (9, 15)],
+        #  [(0, 6), (0, 7), (0, 8), (0, 9)]),
 
         # ([(6, 0), (7, 0), (8, 0)], 
         #  [(15, 6), (15, 7), (15, 8)],
