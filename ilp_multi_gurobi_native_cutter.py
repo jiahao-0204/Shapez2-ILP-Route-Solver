@@ -621,25 +621,47 @@ class DirectionalJumpRouter:
     def add_component_pre_placement_constraint(self):
         preplacement_list = []
 
-        # preplacement_list.append(((3, 3), (0, 1), (1, 0)))
+        # solution 1
+        preplacement_list.append(((3, 3), (0, 1), (1, 0)))
         preplacement_list.append(((7, 3), (0, 1), (-1, 0)))
         preplacement_list.append(((9, 3), (0, 1), (1, 0)))
         preplacement_list.append(((13, 3), (0, 1), (-1, 0)))
 
-        # preplacement_list.append(((3, 5), (0, -1), (1, 0)))
+        preplacement_list.append(((3, 5), (0, -1), (1, 0)))
         preplacement_list.append(((7, 5), (0, -1), (-1, 0)))
         preplacement_list.append(((9, 5), (0, -1), (1, 0)))
         preplacement_list.append(((13, 5), (0, -1), (-1, 0)))
 
-        # preplacement_list.append(((3, 8), (0, 1), (1, 0)))
+        preplacement_list.append(((2, 12), (0, 1), (1, 0)))
         preplacement_list.append(((7, 8), (0, 1), (-1, 0)))
         preplacement_list.append(((9, 8), (0, 1), (1, 0)))
         preplacement_list.append(((13, 8), (0, 1), (-1, 0)))
 
-        # preplacement_list.append(((3, 10), (0, -1), (1, 0)))
+        preplacement_list.append(((6, 12), (0, 1), (-1, 0)))
         preplacement_list.append(((7, 10), (0, -1), (-1, 0)))
         preplacement_list.append(((9, 10), (0, -1), (1, 0)))
         preplacement_list.append(((13, 10), (0, -1), (-1, 0)))
+
+        # solution 2
+        # preplacement_list.append(((3, 3), (0, 1), (1, 0)))
+        # preplacement_list.append(((7, 3), (0, 1), (-1, 0)))
+        # preplacement_list.append(((9, 3), (0, 1), (1, 0)))
+        # preplacement_list.append(((13, 3), (0, 1), (-1, 0)))
+
+        # preplacement_list.append(((3, 5), (0, -1), (1, 0)))
+        # preplacement_list.append(((7, 5), (0, -1), (-1, 0)))
+        # preplacement_list.append(((9, 5), (0, -1), (1, 0)))
+        # preplacement_list.append(((13, 5), (0, -1), (-1, 0)))
+
+        # preplacement_list.append(((4, 12), (1, 0), (0, -1)))
+        # preplacement_list.append(((7, 8), (0, 1), (-1, 0)))
+        # preplacement_list.append(((9, 8), (0, 1), (1, 0)))
+        # preplacement_list.append(((13, 8), (0, 1), (-1, 0)))
+
+        # preplacement_list.append(((6, 12), (-1, 0), (0, -1)))
+        # preplacement_list.append(((7, 10), (0, -1), (-1, 0)))
+        # preplacement_list.append(((9, 10), (0, -1), (1, 0)))
+        # preplacement_list.append(((13, 10), (0, -1), (-1, 0)))
 
 
         for component in preplacement_list:
