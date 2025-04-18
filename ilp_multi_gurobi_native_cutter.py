@@ -91,6 +91,7 @@ class DirectionalJumpRouter:
         self.node_related_component_sources: Dict[Node, List[Component]] = defaultdict(list) # to record source
         self.node_related_component_secondary_sources: Dict[Node, List[Component]] = defaultdict(list) # to record secondary source
         self.node_related_component_sinks: Dict[Node, List[Component]] = defaultdict(list) # to record sink
+        self.node_related_component_input_location: Dict[Node, List[Component]] = defaultdict(list) # to record input location
         for node in self.all_nodes:
             x, y = node
             for dx, dy in DIRECTIONS:
@@ -101,6 +102,10 @@ class DirectionalJumpRouter:
                 
                 for secondary_dx, secondary_dy in secondary_direction:
                     component = ((x, y), (dx, dy), (secondary_dx, secondary_dy))
+
+                    # secondary location
+                    x2 = x + secondary_dx
+                    y2 = y + secondary_dy
 
                     # input location (sink)
                     ix = x - dx
@@ -122,10 +127,11 @@ class DirectionalJumpRouter:
 
                     self.all_components.append(component)
                     self.node_related_components[(x, y)].append(component)
-                    self.node_related_secondary_components[(x + secondary_dx, y + secondary_dy)].append(component)
+                    self.node_related_secondary_components[(x2, y2)].append(component)
                     self.node_related_component_sources[(ox1, oy1)].append(component)
                     self.node_related_component_secondary_sources[(ox2, oy2)].append(component)
                     self.node_related_component_sinks[(x, y)].append(component)
+                    self.node_related_component_input_location[(ix, iy)].append(component)
 
         # is component used
         self.is_component_used: Dict[Component, Var] = {}
@@ -673,12 +679,65 @@ class DirectionalJumpRouter:
         #         self.is_component_used[component].Start = 1
 
     def add_component_source_sink_overlap_constraints(self):
-        # here sink means one space behind the actual sink
-        # for each component, if it is active, then, at component location and secondary compoent location, can't not have any component source or sink
-        # at its source location, can not have secondary source or sink
-        # at its secondary source location, can not have any component source or sink
-        # at its sink location, can not have any source
-        pass
+        for node in self.all_nodes:
+            # node related component parts
+            node_related_primary_component = self.node_related_components[node]
+            node_related_secondary_component = self.node_related_secondary_components[node]
+            node_related_sources = self.node_related_component_sources[node]
+            node_related_secondary_sources = self.node_related_component_secondary_sources[node]
+            node_related_input_location = self.node_related_component_input_location[node]
+
+            # node occupied by componet parts bool list
+            node_used_by_primary_component_bool_list = [self.is_component_used[component] for component in node_related_primary_component]
+            node_used_by_secondary_component_bool_list = [self.is_component_used[component] for component in node_related_secondary_component]
+            node_used_by_source_bool_list = [self.is_component_used[component] for component in node_related_sources]
+            node_used_by_secondary_source_bool_list = [self.is_component_used[component] for component in node_related_secondary_sources]
+            node_used_by_input_location_bool_list = [self.is_component_used[component] for component in node_related_input_location]
+
+            # node occupied by componet parts bool var
+            node_used_by_primary_component_bool = self.model.addVar(name = f"node_used_by_primary_component_bool_{node}", vtype=GRB.BINARY)
+            node_used_by_secondary_component_bool = self.model.addVar(name = f"node_used_by_secondary_component_bool_{node}", vtype=GRB.BINARY)
+            node_used_by_source_bool = self.model.addVar(name = f"node_used_by_source_bool_{node}", vtype=GRB.BINARY)
+            node_used_by_secondary_source_bool = self.model.addVar(name = f"node_used_by_secondary_source_bool_{node}", vtype=GRB.BINARY)
+            node_used_by_input_location_bool = self.model.addVar(name = f"node_used_by_input_location_bool_{node}", vtype=GRB.BINARY)
+
+            # OR trick - dynamic compute bool var
+            if node_used_by_primary_component_bool_list:
+                self.model.addConstr(quicksum(node_used_by_primary_component_bool_list) >= node_used_by_primary_component_bool)
+                self.model.addConstr(quicksum(node_used_by_primary_component_bool_list) <= len(node_used_by_primary_component_bool_list) * node_used_by_primary_component_bool)
+            else:
+                self.model.addConstr(node_used_by_primary_component_bool == 0)
+
+            if node_used_by_secondary_component_bool_list:
+                self.model.addConstr(quicksum(node_used_by_secondary_component_bool_list) >= node_used_by_secondary_component_bool)
+                self.model.addConstr(quicksum(node_used_by_secondary_component_bool_list) <= len(node_used_by_secondary_component_bool_list) * node_used_by_secondary_component_bool)
+            else:
+                self.model.addConstr(node_used_by_secondary_component_bool == 0)
+
+            if node_used_by_source_bool_list:
+                self.model.addConstr(quicksum(node_used_by_source_bool_list) >= node_used_by_source_bool)
+                self.model.addConstr(quicksum(node_used_by_source_bool_list) <= len(node_used_by_source_bool_list) * node_used_by_source_bool)
+            else:
+                self.model.addConstr(node_used_by_source_bool == 0)
+
+            if node_used_by_secondary_source_bool_list:
+                self.model.addConstr(quicksum(node_used_by_secondary_source_bool_list) >= node_used_by_secondary_source_bool)
+                self.model.addConstr(quicksum(node_used_by_secondary_source_bool_list) <= len(node_used_by_secondary_source_bool_list) * node_used_by_secondary_source_bool)
+            else:
+                self.model.addConstr(node_used_by_secondary_source_bool == 0)
+
+            if node_used_by_input_location_bool_list:
+                self.model.addConstr(quicksum(node_used_by_input_location_bool_list) >= node_used_by_input_location_bool)
+                self.model.addConstr(quicksum(node_used_by_input_location_bool_list) <= len(node_used_by_input_location_bool_list) * node_used_by_input_location_bool)
+            else:
+                self.model.addConstr(node_used_by_input_location_bool == 0)
+
+            # only one can be true
+            self.model.addConstr(node_used_by_primary_component_bool + \
+                                node_used_by_secondary_component_bool + \
+                                node_used_by_source_bool + \
+                                node_used_by_secondary_source_bool + \
+                                node_used_by_input_location_bool <= 1)
 
     def add_jump_pad_implication(self):
         # if a jump edge is used, then the corresponding jump pad must be used
