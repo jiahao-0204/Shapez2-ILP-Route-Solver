@@ -171,11 +171,23 @@ class DirectionalJumpRouter:
 
         
         
-        # Dynamic variables
+        # is edge used
         self.is_edge_used: Dict[int, Dict[Edge, Var]] = {}
         for i in range(self.num_nets):
             self.is_edge_used[i] = {edge: self.model.addVar(name=f"edge_{i}_{edge}", vtype=GRB.BINARY) for edge in self.all_edges}
         
+        self.is_node_used_by_net: Dict[int, Dict[Node, Var]] = defaultdict(lambda: defaultdict(Var))
+        for i in range(self.num_nets):
+            for node in self.all_nodes:
+
+                step_edges_from_node = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[node]]
+                jump_edges_related_to_node = [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[node]]
+                
+                self.is_node_used_by_net[i][node] = self.model.addVar(name=f"node_{i}_{node}", vtype=GRB.BINARY)
+                # self.model.addConstr(len(step_edges_from_node) * is_node_used_by_net[i][node] >= quicksum(step_edges_from_node) + len(step_edges_from_node) * quicksum(jump_edges_related_to_node))
+                self.model.addConstr(self.is_node_used_by_net[i][node] >= quicksum(step_edges_from_node) / len(step_edges_from_node) + quicksum(jump_edges_related_to_node))
+                self.model.addConstr(self.is_node_used_by_net[i][node] <= quicksum(step_edges_from_node) + quicksum(jump_edges_related_to_node))
+
         # self.add_variable_is_node_used_by_step_edges()
 
         # Objective function
