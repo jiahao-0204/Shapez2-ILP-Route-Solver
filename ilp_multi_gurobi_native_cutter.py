@@ -176,19 +176,8 @@ class DirectionalJumpRouter:
         for i in range(self.num_nets):
             self.is_edge_used[i] = {edge: self.model.addVar(name=f"edge_{i}_{edge}", vtype=GRB.BINARY) for edge in self.all_edges}
         
-        self.is_node_used_by_net: Dict[int, Dict[Node, Var]] = defaultdict(lambda: defaultdict(Var))
-        for i in range(self.num_nets):
-            for node in self.all_nodes:
-
-                step_edges_from_node = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[node]]
-                jump_edges_related_to_node = [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[node]]
-                
-                self.is_node_used_by_net[i][node] = self.model.addVar(name=f"node_{i}_{node}", vtype=GRB.BINARY)
-                # self.model.addConstr(len(step_edges_from_node) * is_node_used_by_net[i][node] >= quicksum(step_edges_from_node) + len(step_edges_from_node) * quicksum(jump_edges_related_to_node))
-                self.model.addConstr(self.is_node_used_by_net[i][node] >= quicksum(step_edges_from_node) / len(step_edges_from_node) + quicksum(jump_edges_related_to_node))
-                self.model.addConstr(self.is_node_used_by_net[i][node] <= quicksum(step_edges_from_node) + quicksum(jump_edges_related_to_node))
-
-        # self.add_variable_is_node_used_by_step_edges()
+        # self.add_variable_is_node_used_by_net()
+        self.add_variable_is_node_used_by_step_edges()
 
         # Objective function
         self.add_objective()
@@ -201,6 +190,19 @@ class DirectionalJumpRouter:
 
         # Plot
         self.plot()
+
+    def add_variable_is_node_used_by_net(self):
+        self.is_node_used_by_net: Dict[int, Dict[Node, Var]] = defaultdict(lambda: defaultdict(Var))
+        for i in range(self.num_nets):
+            for node in self.all_nodes:
+
+                step_edges_from_node = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[node]]
+                jump_edges_related_to_node = [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[node]]
+                
+                self.is_node_used_by_net[i][node] = self.model.addVar(name=f"node_{i}_{node}", vtype=GRB.BINARY)
+                # self.model.addConstr(len(step_edges_from_node) * is_node_used_by_net[i][node] >= quicksum(step_edges_from_node) + len(step_edges_from_node) * quicksum(jump_edges_related_to_node))
+                self.model.addConstr(self.is_node_used_by_net[i][node] >= quicksum(step_edges_from_node) / len(step_edges_from_node) + quicksum(jump_edges_related_to_node))
+                self.model.addConstr(self.is_node_used_by_net[i][node] <= quicksum(step_edges_from_node) + quicksum(jump_edges_related_to_node))
 
     def add_variable_is_node_used_by_step_edges(self):
         self.is_node_used_by_step_edge: Dict[int, Dict[Node, Var]] = defaultdict(lambda: defaultdict(Var))
@@ -233,7 +235,7 @@ class DirectionalJumpRouter:
         self.add_flow_constraints_secondary_component_to_goal(2)
 
         for i in range(self.num_nets):
-            self.add_no_step_jump_overlap_constraints(i)
+            # self.add_no_step_jump_overlap_constraints(i)
             self.add_directional_constraints_w_component(i)
 
         # self.add_goal_action_constraints()
@@ -622,8 +624,11 @@ class DirectionalJumpRouter:
         # between belts / pads / components
         for node in self.all_nodes:
             list_of_things_using_node = []
+            # for i in range(self.num_nets):
+            #     list_of_things_using_node.append(self.is_node_used_by_net[i][node])
             for i in range(self.num_nets):
-                list_of_things_using_node.append(self.is_node_used_by_net[i][node])
+                list_of_things_using_node.append(self.is_node_used_by_step_edge[i][node])
+                list_of_things_using_node += [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[node]]
             for component in self.node_related_components[node]:
                 list_of_things_using_node.append(self.is_component_used[component])
             for component in self.node_related_secondary_components[node]:
