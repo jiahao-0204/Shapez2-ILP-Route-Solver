@@ -221,7 +221,7 @@ class DirectionalJumpRouter:
         self.add_flow_constraints_secondary_component_to_goal(2)
 
         for i in range(self.num_nets):
-            self.add_overlap_and_one_jump_constraints(i)
+            self.add_no_step_jump_overlap_constraints(i)
             self.add_directional_constraints_w_component(i)
 
         # self.add_goal_action_constraints()
@@ -537,19 +537,16 @@ class DirectionalJumpRouter:
                     self.model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
                 
 
-    def add_overlap_and_one_jump_constraints(self, i):
+    def add_no_step_jump_overlap_constraints(self, i):
         for node in self.all_nodes:
             # list of all step edges from this node
-            step_edges_from_node = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[node]]
+            node_step_edges_bool_list = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[node]]
 
             # list of all jump edges of this node
-            jump_edges_related_to_node = [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[node]]
+            node_jump_edges_bool_list = [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[node]]
 
             # the constraint
-            self.model.addConstr(
-                # quicksum(step_edges_from_node) + len(step_edges_from_node) * quicksum(jump_edges_related_to_node) <= len(step_edges_from_node)
-                quicksum(step_edges_from_node) / len(step_edges_from_node) + quicksum(jump_edges_related_to_node) <= 1
-            )
+            self.model.addConstr(quicksum(node_step_edges_bool_list) / len(node_step_edges_bool_list) + quicksum(node_jump_edges_bool_list) <= 1)
 
     # def add_overlap_constraints_v3(self):
     #     for node in self.all_nodes[0]:
