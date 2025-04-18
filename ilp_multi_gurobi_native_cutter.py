@@ -476,32 +476,33 @@ class DirectionalJumpRouter:
                 self.model.addConstr(self.is_edge_used[i][jump_edge] == 0)
         
         # component direction constraint
+        # for each node
         for node in self.all_nodes:
-            # if a node has active component source and secondary source, only jump in the component direction is allowed
+            # for each possible component source that can be placed at this node
             for component in self.node_related_component_sources[node] + self.node_related_component_secondary_sources[node]:
                 _, component_direction, _ = component
+
+                # if this component is active, jumps in different direction are not allowed
                 for jump_edge in self.node_related_jump_edges[node]:
                     u, v, direction = jump_edge
-                    if u == node:
-                        if direction == component_direction:
-                            continue
-                        else:
-                            self.model.addConstr(self.is_edge_used[i][jump_edge] + self.is_component_used[component] <= 1)
+                    if u == node and direction == component_direction:
+                        continue
                     else:
+                        # self.model.addGenConstrIndicator(self.is_component_used[component], True, self.is_edge_used[i][jump_edge] == 0)
                         self.model.addConstr(self.is_edge_used[i][jump_edge] + self.is_component_used[component] <= 1)
             
-            # if a node has active component sink, only jump in the component direction is allowed
+            # for each possible component sink that can be placed at this node
             for component in self.node_related_component_sinks[node]:
                 _, component_direction, _ = component
                 related_jump_edge = [edge for edge in self.all_edges if edge[1] == node]
+
+                # if this component is active, jumps in different direction are not allowed
                 for jump_edge in related_jump_edge:
                     u, v, direction = jump_edge
-                    if v == node: # this is landing jump edge
-                        if direction == component_direction:
-                            continue
-                        else:
-                            self.model.addConstr(self.is_edge_used[i][jump_edge] + self.is_component_used[component] <= 1)
+                    if v == node and direction == component_direction:
+                        continue
                     else:
+                        # self.model.addGenConstrIndicator(self.is_component_used[component], True, self.is_edge_used[i][jump_edge] == 0)
                         self.model.addConstr(self.is_edge_used[i][jump_edge] + self.is_component_used[component] <= 1)
 
         # for each edge, if the edge is used, then the end node must not have jump edge at different direction
@@ -511,14 +512,11 @@ class DirectionalJumpRouter:
             # if the edge is used, then the end node must not have starting jump edge at different direction, and must not have any landing jump edge
             for jump_edge in self.node_related_jump_edges[v]:
                 u2, v2, jump_direction = jump_edge
-                if u2 == v: # starting jump edge
-                    if direction == jump_direction:
-                        continue
-                    else:
-                        self.model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1)
+                if u2 == v and direction == jump_direction: # starting jump edge
+                    continue
                 else:
+                    # self.model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.is_edge_used[i][jump_edge] == 0)
                     self.model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
-                
 
     def add_no_step_jump_overlap_constraints(self, i):
         for node in self.all_nodes:
