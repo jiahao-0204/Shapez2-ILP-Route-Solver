@@ -210,12 +210,7 @@ class DirectionalJumpRouter:
             for node in self.all_nodes:
                 node_step_edges_bool_list = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[node]]
                 self.is_node_used_by_step_edge[i][node] = self.model.addVar(name=f"node_{i}_{node}", vtype=GRB.BINARY)
-                if node_step_edges_bool_list:
-                    # OR trick
-                    self.model.addConstr(self.is_node_used_by_step_edge[i][node] >= quicksum(node_step_edges_bool_list) / len(node_step_edges_bool_list))
-                    self.model.addConstr(self.is_node_used_by_step_edge[i][node] <= quicksum(node_step_edges_bool_list))
-                else:
-                    self.model.addConstr(self.is_node_used_by_step_edge[i][node] == 0)
+                self.model.addGenConstrOr(self.is_node_used_by_step_edge[i][node], node_step_edges_bool_list)
 
     def add_objective(self):
         step_cost_list = []
@@ -278,8 +273,8 @@ class DirectionalJumpRouter:
         
         # Flow is avaiable if the edge is selected
         for edge in self.all_edges:
-            self.model.addConstr(self.edge_flow_value[i][edge] <= self.is_edge_used[i][edge] * 4)
-            self.model.addConstr(self.edge_flow_value[i][edge] >= self.is_edge_used[i][edge])
+            self.model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[i][edge] >= 1)
+            self.model.addGenConstrIndicator(self.is_edge_used[i][edge], False, self.edge_flow_value[i][edge] == 0)
 
         sources = self.net_sources[i]
 
@@ -288,12 +283,7 @@ class DirectionalJumpRouter:
             node_components = self.node_related_components[node]
             node_component_used_bool_list = [self.is_component_used[component] for component in node_components]
             node_is_component_sink = self.model.addVar(name = f"node_is_component_sink_{i}_{node}", vtype=GRB.BINARY)
-            if node_component_used_bool_list:
-                # OR trick
-                self.model.addConstr(node_is_component_sink >= quicksum(node_component_used_bool_list) / len(node_component_used_bool_list))
-                self.model.addConstr(node_is_component_sink <= quicksum(node_component_used_bool_list))
-            else:
-                self.model.addConstr(node_is_component_sink == 0)
+            self.model.addGenConstrOr(node_is_component_sink, node_component_used_bool_list)
 
             in_flow = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[1] == node)
             out_flow = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[0] == node)
@@ -306,18 +296,8 @@ class DirectionalJumpRouter:
                 self.model.addConstr(in_flow == 0)
                 self.model.addConstr(out_flow == 4)
             else:
-                # Constraint 1: if z == 1 ⇒ in_flow == 4
-                # IMPLICATION trick
-                M = 4                    
-                self.model.addConstr(in_flow >= self.component_sink_amount - M * (1 - node_is_component_sink))
-                self.model.addConstr(in_flow <= self.component_sink_amount + M * (1 - node_is_component_sink))
-
-                # Constraint 2: if z == 1 ⇒ out_flow == 0
-                self.model.addConstr(out_flow <= 4 * (1 - node_is_component_sink))
-
-                # Constraint 3: if z == 0 ⇒ in_flow == out_flow
-                self.model.addConstr((out_flow - in_flow) <= node_is_component_sink * 4)
-                self.model.addConstr((out_flow - in_flow) >= -node_is_component_sink * 4)
+                self.model.addGenConstrIndicator(node_is_component_sink, True, in_flow - out_flow == self.component_sink_amount)
+                self.model.addGenConstrIndicator(node_is_component_sink, False, in_flow - out_flow == 0)
     
     def add_flow_constraints_component_to_goal(self, i):
         self.edge_flow_value: Dict[int, Dict[Edge, Var]] = {}
@@ -325,8 +305,8 @@ class DirectionalJumpRouter:
         
         # Flow is avaiable if the edge is selected
         for edge in self.all_edges:
-            self.model.addConstr(self.edge_flow_value[i][edge] <= self.is_edge_used[i][edge] * 4)
-            self.model.addConstr(self.edge_flow_value[i][edge] >= self.is_edge_used[i][edge])
+            self.model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[i][edge] >= 1)
+            self.model.addGenConstrIndicator(self.is_edge_used[i][edge], False, self.edge_flow_value[i][edge] == 0)
 
         sinks = self.net_sinks[i]
 
@@ -335,12 +315,7 @@ class DirectionalJumpRouter:
             node_components = self.node_related_component_sources[node]
             node_component_used_bool_list = [self.is_component_used[component] for component in node_components]
             node_is_component_source = self.model.addVar(name = f"node_is_component_source_{i}_{node}", vtype=GRB.BINARY)
-            if node_component_used_bool_list:
-                # OR trick
-                self.model.addConstr(node_is_component_source >= quicksum(node_component_used_bool_list) / len(node_component_used_bool_list))
-                self.model.addConstr(node_is_component_source <= quicksum(node_component_used_bool_list))
-            else:
-                self.model.addConstr(node_is_component_source == 0)
+            self.model.addGenConstrOr(node_is_component_source, node_component_used_bool_list)
 
             in_flow = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[1] == node)
             out_flow = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[0] == node)
@@ -353,18 +328,8 @@ class DirectionalJumpRouter:
                 self.model.addConstr(out_flow == 0)
                 self.model.addConstr(in_flow == 4)
             else:
-                # Constraint 1: if z == 1 ⇒ out_flow == component_source_amount * sum(node_component_used_bool_list)
-                # IMPLICATION trick
-                M = 4                    
-                self.model.addConstr(out_flow >= self.component_source_amount * quicksum(node_component_used_bool_list) - M * (1 - node_is_component_source))
-                self.model.addConstr(out_flow <= self.component_source_amount * quicksum(node_component_used_bool_list) + M * (1 - node_is_component_source))
-
-                # Constraint 2: if z == 1 ⇒ in_flow == 0
-                self.model.addConstr(in_flow <= 4 * (1 - node_is_component_source))
-
-                # Constraint 3: if z == 0 ⇒ in_flow == out_flow
-                self.model.addConstr((out_flow - in_flow) <= node_is_component_source * 4)
-                self.model.addConstr((out_flow - in_flow) >= -node_is_component_source * 4)
+                self.model.addGenConstrIndicator(node_is_component_source, True, out_flow - in_flow == self.component_source_amount * quicksum(node_component_used_bool_list))                
+                self.model.addGenConstrIndicator(node_is_component_source, False, out_flow - in_flow == 0)
 
     def add_flow_constraints_secondary_component_to_goal(self, i):
         self.edge_flow_value: Dict[int, Dict[Edge, Var]] = {}
@@ -372,8 +337,8 @@ class DirectionalJumpRouter:
         
         # Flow is avaiable if the edge is selected
         for edge in self.all_edges:
-            self.model.addConstr(self.edge_flow_value[i][edge] <= self.is_edge_used[i][edge] * 4)
-            self.model.addConstr(self.edge_flow_value[i][edge] >= self.is_edge_used[i][edge])
+            self.model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[i][edge] >= 1)
+            self.model.addGenConstrIndicator(self.is_edge_used[i][edge], False, self.edge_flow_value[i][edge] == 0)
 
         sinks = self.net_sinks[i]
 
@@ -382,12 +347,7 @@ class DirectionalJumpRouter:
             node_components = self.node_related_component_secondary_sources[node]
             node_component_used_bool_list = [self.is_component_used[component] for component in node_components]
             node_is_component_source = self.model.addVar(name = f"node_is_component_source_{i}_{node}", vtype=GRB.BINARY)
-            if node_component_used_bool_list:
-                # OR trick
-                self.model.addConstr(node_is_component_source >= quicksum(node_component_used_bool_list) / len(node_component_used_bool_list))
-                self.model.addConstr(node_is_component_source <= quicksum(node_component_used_bool_list))
-            else:
-                self.model.addConstr(node_is_component_source == 0)
+            self.model.addGenConstrOr(node_is_component_source, node_component_used_bool_list)
 
             in_flow = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[1] == node)
             out_flow = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[0] == node)
@@ -400,18 +360,8 @@ class DirectionalJumpRouter:
                 self.model.addConstr(out_flow == 0)
                 self.model.addConstr(in_flow == 4)
             else:
-                # Constraint 1: if z == 1 ⇒ out_flow == 4
-                # IMPLICATION trick
-                M = 4                    
-                self.model.addConstr(out_flow >= self.component_source_amount * quicksum(node_component_used_bool_list) - M * (1 - node_is_component_source))
-                self.model.addConstr(out_flow <= self.component_source_amount * quicksum(node_component_used_bool_list) + M * (1 - node_is_component_source))
-
-                # Constraint 2: if z == 1 ⇒ in_flow == 0
-                self.model.addConstr(in_flow <= 4 * (1 - node_is_component_source))
-
-                # Constraint 3: if z == 0 ⇒ in_flow == out_flow
-                self.model.addConstr((out_flow - in_flow) <= node_is_component_source * 4)
-                self.model.addConstr((out_flow - in_flow) >= -node_is_component_source * 4)
+                self.model.addGenConstrIndicator(node_is_component_source, True, out_flow - in_flow == self.component_source_amount * quicksum(node_component_used_bool_list))
+                self.model.addGenConstrIndicator(node_is_component_source, False, out_flow - in_flow == 0)
                 
 
     def add_flow_constraints_v2(self, i):
@@ -461,14 +411,14 @@ class DirectionalJumpRouter:
                     continue
 
             # Collect all edges (step and jump) that go into `u` from direction `direction`
-            incoming_edges_in_same_direction = []
+            incoming_edges_in_same_direction_bool_list = []
             for edge in self.all_edges:
                 _, target, dir_step = edge
                 if target == u and dir_step == direction:
-                    incoming_edges_in_same_direction.append(self.is_edge_used[i][edge])
+                    incoming_edges_in_same_direction_bool_list.append(self.is_edge_used[i][edge])
 
             # create a variable that sums up the incoming edges in the same direction
-            sum_of_incoming_edge_in_same_direction = quicksum(incoming_edges_in_same_direction)
+            sum_of_incoming_edge_in_same_direction = quicksum(incoming_edges_in_same_direction_bool_list)
 
             # Enforce that jump flow is only allowed if incoming flow matches direction
             self.model.addConstr(self.is_edge_used[i][jump_edge] <= sum_of_incoming_edge_in_same_direction)
@@ -719,43 +669,19 @@ class DirectionalJumpRouter:
             node_used_by_secondary_source_bool = self.model.addVar(name = f"node_used_by_secondary_source_bool_{node}", vtype=GRB.BINARY)
             node_used_by_input_location_bool = self.model.addVar(name = f"node_used_by_input_location_bool_{node}", vtype=GRB.BINARY)
 
-            # OR trick - dynamic compute bool var
-            if node_used_by_primary_component_bool_list:
-                self.model.addConstr(quicksum(node_used_by_primary_component_bool_list) >= node_used_by_primary_component_bool)
-                self.model.addConstr(quicksum(node_used_by_primary_component_bool_list) <= len(node_used_by_primary_component_bool_list) * node_used_by_primary_component_bool)
-            else:
-                self.model.addConstr(node_used_by_primary_component_bool == 0)
-
-            if node_used_by_secondary_component_bool_list:
-                self.model.addConstr(quicksum(node_used_by_secondary_component_bool_list) >= node_used_by_secondary_component_bool)
-                self.model.addConstr(quicksum(node_used_by_secondary_component_bool_list) <= len(node_used_by_secondary_component_bool_list) * node_used_by_secondary_component_bool)
-            else:
-                self.model.addConstr(node_used_by_secondary_component_bool == 0)
-
-            if node_used_by_source_bool_list:
-                self.model.addConstr(quicksum(node_used_by_source_bool_list) >= node_used_by_source_bool)
-                self.model.addConstr(quicksum(node_used_by_source_bool_list) <= len(node_used_by_source_bool_list) * node_used_by_source_bool)
-            else:
-                self.model.addConstr(node_used_by_source_bool == 0)
-
-            if node_used_by_secondary_source_bool_list:
-                self.model.addConstr(quicksum(node_used_by_secondary_source_bool_list) >= node_used_by_secondary_source_bool)
-                self.model.addConstr(quicksum(node_used_by_secondary_source_bool_list) <= len(node_used_by_secondary_source_bool_list) * node_used_by_secondary_source_bool)
-            else:
-                self.model.addConstr(node_used_by_secondary_source_bool == 0)
-
-            if node_used_by_input_location_bool_list:
-                self.model.addConstr(quicksum(node_used_by_input_location_bool_list) >= node_used_by_input_location_bool)
-                self.model.addConstr(quicksum(node_used_by_input_location_bool_list) <= len(node_used_by_input_location_bool_list) * node_used_by_input_location_bool)
-            else:
-                self.model.addConstr(node_used_by_input_location_bool == 0)
+            # OR 
+            self.model.addGenConstrOr(node_used_by_primary_component_bool, node_used_by_primary_component_bool_list)
+            self.model.addGenConstrOr(node_used_by_secondary_component_bool, node_used_by_secondary_component_bool_list)
+            self.model.addGenConstrOr(node_used_by_source_bool, node_used_by_source_bool_list)
+            self.model.addGenConstrOr(node_used_by_secondary_source_bool, node_used_by_secondary_source_bool_list)
+            self.model.addGenConstrOr(node_used_by_input_location_bool, node_used_by_input_location_bool_list)
 
             # only one can be true
-            self.model.addConstr(node_used_by_primary_component_bool + \
-                                node_used_by_secondary_component_bool + \
-                                node_used_by_source_bool + \
-                                node_used_by_secondary_source_bool + \
-                                node_used_by_input_location_bool <= 1)
+            self.model.addConstr(quicksum([node_used_by_primary_component_bool, 
+                                           node_used_by_secondary_component_bool, 
+                                           node_used_by_source_bool, 
+                                           node_used_by_secondary_source_bool, 
+                                           node_used_by_input_location_bool]) <= 1)
 
     def add_jump_pad_implication(self):
         # if a jump edge is used, then the corresponding jump pad must be used
