@@ -53,9 +53,9 @@ class DirectionalJumpRouter:
         # blocked tile is the border of the map
         self.blocked_tiles = [(x, 0) for x in range(self.WIDTH)] + [(x, self.HEIGHT-1) for x in range(self.WIDTH)] + [(0, y) for y in range(self.HEIGHT)] + [(self.WIDTH-1, y) for y in range(self.HEIGHT)]
         remove_from_blocked_tiles = [(6, 0), (7, 0), (8, 0), (9, 0)]
-        remove_from_blocked_tiles += [(6, 15), (7, 15), (8, 15), (9, 15)]
+        remove_from_blocked_tiles += [(6, self.HEIGHT-1), (7, self.HEIGHT-1), (8, self.HEIGHT-1), (9, self.HEIGHT-1)]
         remove_from_blocked_tiles += [(0, 6), (0, 7), (0, 8), (0, 9)]
-        remove_from_blocked_tiles += [(15, 6), (15, 7), (15, 8), (15, 9)]
+        # remove_from_blocked_tiles += [(self.WIDTH-1, 6), (self.WIDTH-1, 7), (self.WIDTH-1, 8), (self.WIDTH-1, 9)]
         for tile in remove_from_blocked_tiles:
             self.blocked_tiles.remove(tile)
 
@@ -217,7 +217,9 @@ class DirectionalJumpRouter:
         # self.add_goal_action_constraints()
         self.add_things_overlap_constraints()
 
-        # self.add_component_count_constraint()
+        self.add_component_count_constraint()
+        self.add_component_pre_placement_constraint()
+        self.add_component_source_sink_overlap_constraints()
 
         if self.symmetry:
             self.add_symmetry_constraints()
@@ -616,18 +618,45 @@ class DirectionalJumpRouter:
         component_used_bool_list = [self.is_component_used[component] for component in self.all_components]
         self.model.addConstr(quicksum(component_used_bool_list) == 16)
 
-        # add component location constraint
-        for component in self.all_components:
-            # get the location of the component
-            (x, y), (dx, dy), (dx2, dy2) = component
+    def add_component_pre_placement_constraint(self):
+        preplacement_list = []
 
-            if (x == 6 and y == 6 and dx == 0 and dy == 1 and dx2 == 1 and dy2 == 0):
-                # add constraint
-                self.model.addConstr(self.is_component_used[component] == 1            )
+        # preplacement_list.append(((3, 3), (0, 1), (1, 0)))
+        preplacement_list.append(((7, 3), (0, 1), (-1, 0)))
+        preplacement_list.append(((9, 3), (0, 1), (1, 0)))
+        preplacement_list.append(((13, 3), (0, 1), (-1, 0)))
 
-            if (x == 6 and y == 8 and dx == 0 and dy == -1 and dx2 == 1 and dy2 == 0):
-                # add constraint
-                self.model.addConstr(self.is_component_used[component] == 1            )
+        # preplacement_list.append(((3, 5), (0, -1), (1, 0)))
+        preplacement_list.append(((7, 5), (0, -1), (-1, 0)))
+        preplacement_list.append(((9, 5), (0, -1), (1, 0)))
+        preplacement_list.append(((13, 5), (0, -1), (-1, 0)))
+
+        # preplacement_list.append(((3, 8), (0, 1), (1, 0)))
+        preplacement_list.append(((7, 8), (0, 1), (-1, 0)))
+        preplacement_list.append(((9, 8), (0, 1), (1, 0)))
+        preplacement_list.append(((13, 8), (0, 1), (-1, 0)))
+
+        # preplacement_list.append(((3, 10), (0, -1), (1, 0)))
+        preplacement_list.append(((7, 10), (0, -1), (-1, 0)))
+        preplacement_list.append(((9, 10), (0, -1), (1, 0)))
+        preplacement_list.append(((13, 10), (0, -1), (-1, 0)))
+
+
+        for component in preplacement_list:
+            # add constraint
+            self.model.addConstr(self.is_component_used[component] == 1)
+
+        # for component in self.all_components:
+        #     if component in preplacement_list:
+        #         self.is_component_used[component].Start = 1
+
+    def add_component_source_sink_overlap_constraints(self):
+        # here sink means one space behind the actual sink
+        # for each component, if it is active, then, at component location and secondary compoent location, can't not have any component source or sink
+        # at its source location, can not have secondary source or sink
+        # at its secondary source location, can not have any component source or sink
+        # at its sink location, can not have any source
+        pass
 
     def add_jump_pad_implication(self):
         # if a jump edge is used, then the corresponding jump pad must be used
@@ -823,9 +852,17 @@ if __name__ == "__main__":
 
         # try aws again, this time use this https://support.gurobi.com/hc/en-us/articles/13232844297489-How-do-I-set-up-a-Web-License-Service-WLS-license
 
-        # ([(6, 0)], 
-        # [(6, 15)],
-        # [(0, 6)]),
+        # ([(6, 0), (7, 0)], 
+        # [(6, 15), (7, 15)],
+        # [(0, 6), (0, 7)]),
+
+        # ([(6, 0), (7, 0), (8, 0)], 
+        # [(6, 15), (7, 15), (8, 15)],
+        # [(0, 6), (0, 7), (0, 8)]),
+
+        # ([(7, 0), (8, 0), (9, 0)], 
+        #  [(7, 15), (8, 15), (9, 15)],
+        #  [(0, 6), (0, 7), (0, 8)]),
 
         ([(6, 0), (7, 0), (8, 0), (9, 0)], 
          [(6, 15), (7, 15), (8, 15), (9, 15)],
@@ -851,7 +888,7 @@ if __name__ == "__main__":
         #  [(6, 15), (7, 15)],
         #  [(0, 6), (0, 7)]),
         ]
-    router = DirectionalJumpRouter(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = -1, symmetry = False, use_option=False)
+    router = DirectionalJumpRouter(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = -1, symmetry = False, use_option=True)
 
 
     # 169 cost without variable length launcher for 8 to 32 routing
