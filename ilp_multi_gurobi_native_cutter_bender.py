@@ -69,6 +69,12 @@ class DirectionalJumpRouter:
         self.port_location += [(1, 6), (1, 7), (1, 8), (1, 9)]
         self.port_location += [(self.WIDTH-2, 6), (self.WIDTH-2, 7), (self.WIDTH-2, 8), (self.WIDTH-2, 9)]
 
+        self.port_center_location = []
+        self.port_center_location += [(7, 1), (8, 1)]
+        self.port_center_location += [(7, self.HEIGHT-2), (8, self.HEIGHT-2)]
+        self.port_center_location += [(1, 7), (1, 8)]
+        self.port_center_location += [(self.WIDTH-2, 7), (self.WIDTH-2, 8)]
+
         self.blocked_tiles = self.border.copy()
         
         remove_from_blocked_tiles = [] 
@@ -131,6 +137,10 @@ class DirectionalJumpRouter:
 
                     # skip if input location is invalid
                     if (ix, iy) not in self.all_nodes or (ix, iy) in self.border:
+                        continue
+
+                    # skip if input location is at port center
+                    if (ix, iy) in self.port_center_location:
                         continue
 
                     # skip if output location is invalid
