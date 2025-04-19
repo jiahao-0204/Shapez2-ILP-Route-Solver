@@ -219,11 +219,11 @@ class DirectionalJumpRouter:
 
         self.model.optimize(self.benders_callback)
 
-        self.model.computeIIS()
-        if self.model.status == GRB.INFEASIBLE:
-            for c in self.model.getConstrs():
-                if c.IISConstr:
-                    print(f"Constraint {c.constrName} is in the IIS")
+        # self.model.computeIIS()
+        # if self.model.status == GRB.INFEASIBLE:
+        #     for c in self.model.getConstrs():
+        #         if c.IISConstr:
+        #             print(f"Constraint {c.constrName} is in the IIS")
 
         # # Objective function
         # self.add_objective()
