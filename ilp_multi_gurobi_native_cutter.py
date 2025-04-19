@@ -44,6 +44,9 @@ class DirectionalJumpRouter:
         self.net_sources[2] = []
         self.net_sinks[2] = sinks2
 
+        self.flow_cap = 4
+        self.start_amount = 4
+        self.goal_amount = 4
         self.component_source_amount = 1
         self.component_sink_amount = 1
         # self.component_count = 12
@@ -281,7 +284,7 @@ class DirectionalJumpRouter:
     
     def add_flow_constraints_source_to_components(self, i):
         self.edge_flow_value: Dict[int, Dict[Edge, Var]] = {}
-        self.edge_flow_value[i] = {edge: self.model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=4) for edge in self.all_edges}
+        self.edge_flow_value[i] = {edge: self.model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=self.flow_cap) for edge in self.all_edges}
         # set priority
         for edge in self.all_edges:
             self.edge_flow_value[i][edge].setAttr("BranchPriority", self.flow_priority)
@@ -304,19 +307,19 @@ class DirectionalJumpRouter:
             out_flow = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[0] == node)
             
             # no matter what
-            self.model.addConstr(in_flow <= 4)
-            self.model.addConstr(out_flow <= 4)
+            self.model.addConstr(in_flow <= self.flow_cap)
+            self.model.addConstr(out_flow <= self.flow_cap)
 
             if node in sources:
                 self.model.addConstr(in_flow == 0)
-                self.model.addConstr(out_flow == 4)
+                self.model.addConstr(out_flow == self.start_amount)
             else:
                 self.model.addGenConstrIndicator(node_is_component_sink, True, in_flow - out_flow == self.component_sink_amount)
                 self.model.addGenConstrIndicator(node_is_component_sink, False, in_flow - out_flow == 0)
     
     def add_flow_constraints_component_to_goal(self, i):
         self.edge_flow_value: Dict[int, Dict[Edge, Var]] = {}
-        self.edge_flow_value[i] = {edge: self.model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=4) for edge in self.all_edges}
+        self.edge_flow_value[i] = {edge: self.model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=self.flow_cap) for edge in self.all_edges}
         # set priority
         for edge in self.all_edges:
             self.edge_flow_value[i][edge].setAttr("BranchPriority", self.flow_priority)
@@ -339,19 +342,19 @@ class DirectionalJumpRouter:
             out_flow = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[0] == node)
             
             # no matter what
-            self.model.addConstr(in_flow <= 4)
-            self.model.addConstr(out_flow <= 4)
+            self.model.addConstr(in_flow <= self.flow_cap)
+            self.model.addConstr(out_flow <= self.flow_cap)
 
             if node in sinks:
                 self.model.addConstr(out_flow == 0)
-                self.model.addConstr(in_flow == 4)
+                self.model.addConstr(in_flow == self.goal_amount)
             else:
                 self.model.addGenConstrIndicator(node_is_component_source, True, out_flow - in_flow == self.component_source_amount * quicksum(node_component_used_bool_list))                
                 self.model.addGenConstrIndicator(node_is_component_source, False, out_flow - in_flow == 0)
 
     def add_flow_constraints_secondary_component_to_goal(self, i):
         self.edge_flow_value: Dict[int, Dict[Edge, Var]] = {}
-        self.edge_flow_value[i] = {edge: self.model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=4) for edge in self.all_edges}
+        self.edge_flow_value[i] = {edge: self.model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=self.flow_cap) for edge in self.all_edges}
         # set priority
         for edge in self.all_edges:
             self.edge_flow_value[i][edge].setAttr("BranchPriority", self.flow_priority)
@@ -374,12 +377,12 @@ class DirectionalJumpRouter:
             out_flow = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[0] == node)
             
             # no matter what
-            self.model.addConstr(in_flow <= 4)
-            self.model.addConstr(out_flow <= 4)
+            self.model.addConstr(in_flow <= self.flow_cap)
+            self.model.addConstr(out_flow <= self.flow_cap)
 
             if node in sinks:
                 self.model.addConstr(out_flow == 0)
-                self.model.addConstr(in_flow == 4)
+                self.model.addConstr(in_flow == self.goal_amount)
             else:
                 self.model.addGenConstrIndicator(node_is_component_source, True, out_flow - in_flow == self.component_source_amount * quicksum(node_component_used_bool_list))
                 self.model.addGenConstrIndicator(node_is_component_source, False, out_flow - in_flow == 0)
