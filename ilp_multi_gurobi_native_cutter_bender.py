@@ -223,6 +223,11 @@ class DirectionalJumpRouter:
             # get solution
             is_component_used = {component: model.cbGetSolution(self.is_component_used[component]) for component in self.all_components}
 
+            # # plot location of components
+            # components_used = [component for component, value in is_component_used.items() if value > 0.5]
+            # print("Components used: ", len(components_used))
+            # print("whose node is: ", [component[0] for component in components_used])
+
             # draw components
             self.draw_components(is_component_used)
 
@@ -251,7 +256,7 @@ class DirectionalJumpRouter:
             ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='lightgrey', linewidth=2))
 
         # draw components
-        used_components = [c for c in self.all_components if is_component_used[c] == 1]
+        used_components = [c for c in self.all_components if is_component_used[c] > 0.5]
         for component in used_components:
             (x, y), (dx, dy), (dx2, dy2) = component        # two‑cell component
             nx, ny = x + dx, y + dy
