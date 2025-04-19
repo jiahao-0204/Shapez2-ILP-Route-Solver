@@ -246,6 +246,10 @@ class DirectionalJumpRouter:
             # get master solution
             is_component_used = {component: model.cbGetSolution(self.is_component_used[component]) for component in self.all_components}
 
+            # plot location of components
+            components_used = [component for component, value in is_component_used.items() if value > 0.5]
+            print("Solving subproblem with", [component[0] for component in components_used])
+
             # solve subproblem
             feasible, cost, is_edge_used = self.solve_subproblem(is_component_used)
 
@@ -262,20 +266,15 @@ class DirectionalJumpRouter:
                     self.sub_problem_is_edge_used = is_edge_used
                     model.cbLazy(self.sub_problem_cost >= cost)
 
-            # # plot location of components
-            # components_used = [component for component, value in is_component_used.items() if value > 0.5]
-            # print("Components used: ", len(components_used))
-            # print("whose node is: ", [component[0] for component in components_used])
-
             # # draw components
             # self.draw_components(is_component_used)
 
     def solve_subproblem(self, is_component_used):
         sub_model = Model("subproblem")
-        # sub_model.Params.OutputFlag = 0  # silent
+        sub_model.Params.OutputFlag = 0  # silent
         if self.timelimit != -1:
             sub_model.Params.TimeLimit = self.timelimit
-        sub_model.Params.MIPFocus = self.option
+        sub_model.Params.MIPFocus = 1
         sub_model.Params.Presolve = 2
 
         sub_problem_data = {
