@@ -60,7 +60,9 @@ class DirectionalJumpRouter:
         self.model = Model("DirectionalJumpRouter")
 
         # blocked tile is the border of the map
-        self.blocked_tiles = [(x, 0) for x in range(self.WIDTH)] + [(x, self.HEIGHT-1) for x in range(self.WIDTH)] + [(0, y) for y in range(self.HEIGHT)] + [(self.WIDTH-1, y) for y in range(self.HEIGHT)]
+        self.border = [(x, 0) for x in range(self.WIDTH)] + [(x, self.HEIGHT-1) for x in range(self.WIDTH)] + [(0, y) for y in range(self.HEIGHT)] + [(self.WIDTH-1, y) for y in range(self.HEIGHT)]
+        self.corner = [(1, 1), (self.WIDTH-2, 1), (1, self.HEIGHT-2), (self.WIDTH-2, self.HEIGHT-2)]
+        self.blocked_tiles = self.border.copy()
         remove_from_blocked_tiles = [(6, 0), (7, 0), (8, 0), (9, 0)]
         remove_from_blocked_tiles += [(6, self.HEIGHT-1), (7, self.HEIGHT-1), (8, self.HEIGHT-1), (9, self.HEIGHT-1)]
         remove_from_blocked_tiles += [(0, 6), (0, 7), (0, 8), (0, 9)]
@@ -109,16 +111,24 @@ class DirectionalJumpRouter:
                     ox2 = x + secondary_dx + dx
                     oy2 = y + secondary_dy + dy
 
+                    # skip if primary location is invalid (in in border)
+                    if (x, y) in self.border:
+                        continue
+
                     # skip if secondary location is invalid
-                    if (x2, y2) not in self.all_nodes:
+                    if (x2, y2) not in self.all_nodes or (x2, y2) in self.border:
                         continue
 
                     # skip if input location is invalid
-                    if (ix, iy) not in self.all_nodes:
+                    if (ix, iy) not in self.all_nodes or (ix, iy) in self.border:
                         continue
 
                     # skip if output location is invalid
-                    if (ox1, oy1) not in self.all_nodes or (ox2, oy2) not in self.all_nodes:
+                    if (ox1, oy1) not in self.all_nodes or (ox2, oy2) not in self.all_nodes or (ox1, oy1) in self.border or (ox2, oy2) in self.border:
+                        continue
+
+                    # skip if output location is at corner
+                    if (ox1, oy1) in self.corner or (ox2, oy2) in self.corner:
                         continue
 
                     self.all_components.append(component)
