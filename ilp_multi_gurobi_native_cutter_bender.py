@@ -217,8 +217,13 @@ class DirectionalJumpRouter:
         self.model.setParam('Presolve', 2)
         self.model.setParam('Heuristics', 0.5)
 
-        # Optimize with Benders callback
         self.model.optimize(self.benders_callback)
+
+        self.model.computeIIS()
+        if self.model.status == GRB.INFEASIBLE:
+            for c in self.model.getConstrs():
+                if c.IISConstr:
+                    print(f"Constraint {c.constrName} is in the IIS")
 
         # # Objective function
         # self.add_objective()
@@ -516,7 +521,7 @@ class DirectionalJumpRouter:
     def add_component_count_constraint(self):
         # add component count constraint
         component_used_bool_list = [self.is_component_used[component] for component in self.all_components]
-        self.model.addConstr(quicksum(component_used_bool_list) == self.component_count)
+        self.model.addConstr(quicksum(component_used_bool_list) == self.component_count, name="component_count_constraint")
 
     def add_component_pre_placement_constraint(self):
         preplacement_list = []
@@ -545,7 +550,7 @@ class DirectionalJumpRouter:
 
         for component in preplacement_list:
             # add constraint
-            self.model.addConstr(self.is_component_used[component] == 1)
+            self.model.addConstr(self.is_component_used[component] == 1, name=f"component_pre_placement_{component}")
 
         # for component in self.all_components:
         #     if component in preplacement_list:
@@ -560,7 +565,7 @@ class DirectionalJumpRouter:
             for component in self.node_related_secondary_components[node]:
                 list_of_things_using_node.append(self.is_component_used[component])
             # constraint: at most one thing can use a node
-            self.model.addConstr(quicksum(list_of_things_using_node) <= 1)
+            self.model.addConstr(quicksum(list_of_things_using_node) <= 1, name=f"component_overlap_{node}")
 
     def add_node_is_used_by_component_parts(self):
         self.node_used_by_primary_component_bool = {node: self.model.addVar(name=f"node_used_by_primary_component_bool_{node}", vtype=GRB.BINARY) for node in self.all_nodes}
@@ -601,7 +606,7 @@ class DirectionalJumpRouter:
                 self.node_used_by_source_bool[node],
                 self.node_used_by_secondary_source_bool[node],
                 self.node_used_by_input_location_bool[node]
-            ]) <= 1)
+            ]) <= 1, name=f"component_source_sink_overlap_{node}")
 
     def add_component_isolation_constraints(self):
         # These three dicts map node → list of components that place that role there
@@ -613,7 +618,7 @@ class DirectionalJumpRouter:
             self.node_used_by_input_location_bool
         ]
 
-        for role in role_list:
+        for i, role in enumerate(role_list):
             # for each node
             for node in self.all_nodes:
                 
@@ -629,7 +634,7 @@ class DirectionalJumpRouter:
                         other_role_neighbors_bool_list.append(other_role[neighbor_node])
 
                 # if this node is used by this role, then the neighboring nodes must not all be used by other role
-                self.model.addGenConstrIndicator(role[node], True, quicksum(other_role_neighbors_bool_list) <= len(neighbor_nodes) - 1)
+                self.model.addGenConstrIndicator(role[node], True, quicksum(other_role_neighbors_bool_list) <= len(neighbor_nodes) - 1, name=f"component_isolation_{node}_{i}")
 
     def solve(self):
         if self.timelimit != -1:
