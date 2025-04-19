@@ -231,10 +231,9 @@ class DirectionalJumpRouter:
 
         # self.model.optimize()
 
-        is_component_used = {component: self.is_component_used[component].X for component in self.all_components}
         # self.draw_components(is_component_used)
 
-        self.plot(self.sub_problem_is_edge_used, is_component_used)
+        self.plot(self.sub_problem_is_edge_used, self.sub_problem_is_component_used)
 
         # self.model.computeIIS()
         # if self.model.status == GRB.INFEASIBLE:
@@ -259,6 +258,7 @@ class DirectionalJumpRouter:
             else:
                 if cost > model.cbGetSolution(self.sub_problem_cost) + 1e-6:
                     # here the solution is feasible
+                    self.sub_problem_is_component_used = is_component_used
                     self.sub_problem_is_edge_used = is_edge_used
                     model.cbLazy(self.sub_problem_cost >= cost)
 
