@@ -17,9 +17,6 @@ Amount = int # amount of flow
 Edge = Tuple[Node, Node, Direction] # start, end, direciton
 Component = Tuple[Node, Direction] # location, direction
 
-Source = Tuple[Node, Direction, Amount] # location, direction, amount
-Sink = Tuple[Node, Direction, Amount] # location, direction, amount
-
 class DirectionalJumpRouter:
     def __init__(self, width, height, nets, jump_distances: List[int] = [4], timelimit: int = 60, symmetry: bool = False, option: int = 0):
 
