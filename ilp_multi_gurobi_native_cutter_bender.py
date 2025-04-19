@@ -619,6 +619,10 @@ class DirectionalJumpRouter:
         ]
 
         for i, role in enumerate(role_list):
+            # skip if is primary and secondary component
+            if i == 0 or i == 1:
+                continue
+
             # for each node
             for node in self.all_nodes:
                 
