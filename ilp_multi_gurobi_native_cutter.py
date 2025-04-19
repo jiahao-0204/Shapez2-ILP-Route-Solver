@@ -46,6 +46,8 @@ class DirectionalJumpRouter:
 
         self.component_source_amount = 1
         self.component_sink_amount = 1
+        # self.component_count = 12
+        self.component_count = len(self.net_sources[0]) * (4/self.component_source_amount)
         self.component_priority = 100
         self.edge_priority = 50
         self.flow_priority = 25
@@ -607,8 +609,7 @@ class DirectionalJumpRouter:
     def add_component_count_constraint(self):
         # add component count constraint
         component_used_bool_list = [self.is_component_used[component] for component in self.all_components]
-        print("n = ", len(self.net_sources[0]) * (4/self.component_source_amount))
-        self.model.addConstr(quicksum(component_used_bool_list) == len(self.net_sources[0]) * (4/self.component_source_amount))
+        self.model.addConstr(quicksum(component_used_bool_list) == self.component_count)
 
     def add_component_pre_placement_constraint(self):
         preplacement_list = []
