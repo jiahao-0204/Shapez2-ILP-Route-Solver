@@ -212,8 +212,17 @@ class DirectionalJumpRouter:
         
         # self.add_variable_is_node_used_by_step_edges()
 
-        self.sub_problem_cost = self.model.addVar(lb=0.0, name="sub_problem_cost")
-        self.model.setObjective(self.sub_problem_cost, GRB.MINIMIZE)
+        # self.sub_problem_cost = self.model.addVar(lb=0.0, name="sub_problem_cost")
+        # self.model.setObjective(self.sub_problem_cost, GRB.MINIMIZE)
+
+        # set objective to be number of nodes occupied by primary, secondary sources and input location
+        node_used_by_component_io_bool_list = []
+        for node in self.all_nodes:
+            node_used_by_component_io_bool_list.append(self.node_used_by_input_location_bool[node])
+            node_used_by_component_io_bool_list.append(self.node_used_by_source_bool[node])
+            node_used_by_component_io_bool_list.append(self.node_used_by_secondary_source_bool[node])
+        self.model.setObjective(quicksum(node_used_by_component_io_bool_list), GRB.MINIMIZE)
+
         self.add_component_count_constraint()
         self.add_component_basic_overlap_constraints()
         self.add_component_source_sink_overlap_constraints()
@@ -227,7 +236,13 @@ class DirectionalJumpRouter:
         self.model.setParam('Presolve', 2)
         self.model.setParam('Heuristics', 0.5)
 
-        self.model.optimize(self.benders_callback)
+        # self.model.optimize(self.benders_callback)
+        self.model.optimize()
+
+        is_component_used = {component: self.is_component_used[component].X for component in self.all_components}
+        self.draw_components(is_component_used)
+
+
 
         # self.model.computeIIS()
         # if self.model.status == GRB.INFEASIBLE:
