@@ -193,6 +193,7 @@ class DirectionalJumpRouter:
         self.add_component_count_constraint()
         self.add_component_basic_overlap_constraints()
         self.add_component_source_sink_overlap_constraints()
+        self.add_component_isolation_constraints()
         self.add_component_pre_placement_constraint()
 
         self.model.Params.LazyConstraints = 1
@@ -582,6 +583,34 @@ class DirectionalJumpRouter:
                 self.node_used_by_secondary_source_bool[node],
                 self.node_used_by_input_location_bool[node]
             ]) <= 1)
+
+    def add_component_isolation_constraints(self):
+        # These three dicts map node → list of components that place that role there
+        role_list = [
+            self.node_used_by_primary_component_bool,
+            self.node_used_by_secondary_component_bool,
+            self.node_used_by_source_bool,
+            self.node_used_by_secondary_source_bool,
+            self.node_used_by_input_location_bool
+        ]
+
+        for role in role_list:
+            # for each node
+            for node in self.all_nodes:
+                
+                # neighboring nodes
+                neighbor_nodes = [(node[0] + dx, node[1] + dy) for dx, dy in DIRECTIONS if (node[0] + dx, node[1] + dy) in self.all_nodes]
+
+                # neighboring nodes used by other role
+                other_role_neighbors_bool_list = [] 
+                for other_role in role_list:
+                    if other_role is role:
+                        continue
+                    for neighbor_node in neighbor_nodes:
+                        other_role_neighbors_bool_list.append(other_role[neighbor_node])
+
+                # if this node is used by this role, then the neighboring nodes must not all be used by other role
+                self.model.addGenConstrIndicator(role[node], True, quicksum(other_role_neighbors_bool_list) <= len(neighbor_nodes) - 1)
 
     def solve(self):
         if self.timelimit != -1:
