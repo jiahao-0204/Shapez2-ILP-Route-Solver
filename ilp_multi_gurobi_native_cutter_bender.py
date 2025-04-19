@@ -62,11 +62,21 @@ class DirectionalJumpRouter:
         # blocked tile is the border of the map
         self.border = [(x, 0) for x in range(self.WIDTH)] + [(x, self.HEIGHT-1) for x in range(self.WIDTH)] + [(0, y) for y in range(self.HEIGHT)] + [(self.WIDTH-1, y) for y in range(self.HEIGHT)]
         self.corner = [(1, 1), (self.WIDTH-2, 1), (1, self.HEIGHT-2), (self.WIDTH-2, self.HEIGHT-2)]
+
+        self.port_location = []
+        self.port_location += [(6, 1), (7, 1), (8, 1), (9, 1)]
+        self.port_location += [(6, self.HEIGHT-2), (7, self.HEIGHT-2), (8, self.HEIGHT-2), (9, self.HEIGHT-2)]
+        self.port_location += [(1, 6), (1, 7), (1, 8), (1, 9)]
+        self.port_location += [(self.WIDTH-2, 6), (self.WIDTH-2, 7), (self.WIDTH-2, 8), (self.WIDTH-2, 9)]
+
         self.blocked_tiles = self.border.copy()
-        remove_from_blocked_tiles = [(6, 0), (7, 0), (8, 0), (9, 0)]
+        
+        remove_from_blocked_tiles = [] 
+        remove_from_blocked_tiles += [(6, 0), (7, 0), (8, 0), (9, 0)]
         remove_from_blocked_tiles += [(6, self.HEIGHT-1), (7, self.HEIGHT-1), (8, self.HEIGHT-1), (9, self.HEIGHT-1)]
         remove_from_blocked_tiles += [(0, 6), (0, 7), (0, 8), (0, 9)]
         remove_from_blocked_tiles += [(self.WIDTH-1, 6), (self.WIDTH-1, 7), (self.WIDTH-1, 8), (self.WIDTH-1, 9)]
+
         for tile in remove_from_blocked_tiles:
             self.blocked_tiles.remove(tile)
         # self.blocked_tiles += [(1, 1), (2, 1), (3, 1), (4, 1), (5, 1)]
@@ -112,11 +122,11 @@ class DirectionalJumpRouter:
                     oy2 = y + secondary_dy + dy
 
                     # skip if primary location is invalid (in in border)
-                    if (x, y) in self.border:
+                    if (x, y) not in self.all_nodes or (x, y) in self.border or (x, y) in self.port_location:
                         continue
 
                     # skip if secondary location is invalid
-                    if (x2, y2) not in self.all_nodes or (x2, y2) in self.border:
+                    if (x2, y2) not in self.all_nodes or (x2, y2) in self.border or (x2, y2) in self.port_location:
                         continue
 
                     # skip if input location is invalid
@@ -129,6 +139,10 @@ class DirectionalJumpRouter:
 
                     # skip if output location is at corner
                     if (ox1, oy1) in self.corner or (ox2, oy2) in self.corner:
+                        continue
+
+                    # ski pif output location is at port location
+                    if (ox1, oy1) in self.port_location or (ox2, oy2) in self.port_location:
                         continue
 
                     self.all_components.append(component)
