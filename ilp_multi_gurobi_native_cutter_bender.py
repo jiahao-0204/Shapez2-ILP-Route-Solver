@@ -212,16 +212,21 @@ class DirectionalJumpRouter:
         
         # self.add_variable_is_node_used_by_step_edges()
 
-        # self.sub_problem_cost = self.model.addVar(lb=0.0, name="sub_problem_cost")
         # self.model.setObjective(self.sub_problem_cost, GRB.MINIMIZE)
 
+        # master problem cost
         # set objective to be number of nodes occupied by primary, secondary sources and input location
         node_used_by_component_io_bool_list = []
         for node in self.all_nodes:
             node_used_by_component_io_bool_list.append(self.node_used_by_input_location_bool[node])
             node_used_by_component_io_bool_list.append(self.node_used_by_source_bool[node])
             node_used_by_component_io_bool_list.append(self.node_used_by_secondary_source_bool[node])
-        self.model.setObjective(quicksum(node_used_by_component_io_bool_list), GRB.MINIMIZE)
+
+        # sub problem cost
+        self.sub_problem_cost = self.model.addVar(lb=0.0, name="sub_problem_cost")
+
+        # set objective
+        self.model.setObjective(quicksum(node_used_by_component_io_bool_list) + self.sub_problem_cost, GRB.MINIMIZE)
 
         self.add_component_count_constraint()
         self.add_component_basic_overlap_constraints()
@@ -236,8 +241,9 @@ class DirectionalJumpRouter:
         self.model.setParam('Presolve', 2)
         self.model.setParam('Heuristics', 0.5)
 
-        # self.model.optimize(self.benders_callback)
-        self.model.optimize()
+        self.model.optimize(self.benders_callback)
+
+        # self.model.optimize()
 
         is_component_used = {component: self.is_component_used[component].X for component in self.all_components}
         self.draw_components(is_component_used)
@@ -264,22 +270,38 @@ class DirectionalJumpRouter:
 
     def benders_callback(self, model, where):
         if where == GRB.Callback.MIPSOL:
-            # get solution
+            # get master solution
             is_component_used = {component: model.cbGetSolution(self.is_component_used[component]) for component in self.all_components}
+
+            # solve subproblem
+            feasible, cost = self.solve_subproblem(is_component_used)
+
+            # cut the component used if combination not feasible
+            if not feasible:
+                used_components = [c for c in self.all_components if is_component_used[c] > 0.5]
+                expr = quicksum(self.is_component_used[component] for component in used_components)
+                model.cbLazy(expr <= len(used_components)-1)
+                return
+            
+            # here the solution is feasible
+            model.cbLazy(self.sub_problem_cost >= cost)
 
             # # plot location of components
             # components_used = [component for component, value in is_component_used.items() if value > 0.5]
             # print("Components used: ", len(components_used))
             # print("whose node is: ", [component[0] for component in components_used])
 
-            # draw components
-            self.draw_components(is_component_used)
+            # # draw components
+            # self.draw_components(is_component_used)
 
-            # cut the component used
-            used_components = [c for c in self.all_components if is_component_used[c] > 0.5]
-            expr = quicksum(self.is_component_used[component] for component in used_components)
-            model.cbLazy(expr <= len(used_components)-1)
+    def solve_subproblem(self, is_component_used):
+        # sub_model = Model("subproblem")
+        # sub_model.Params.OutputFlag = 0  # silent
+        # sub_model.Params.TimeLimit = self.timelimit
+        # sub_model.Params.MIPFocus = self.option
+        # sub_model.Params.Presolve = 2
 
+        return True, 0
 
     def draw_components(self, is_component_used):
         plt.figure(figsize=(12, 6))
@@ -551,27 +573,32 @@ class DirectionalJumpRouter:
     def add_component_pre_placement_constraint(self):
         preplacement_list = []
 
+        # preplacement_list.append(((6, 8), (0, 1), (1, 0)))
+        # preplacement_list.append(((7, 7), (1, 0), (0, -1)))
+        # # preplacement_list.append(((6, 6), (0, -1), (-1, 0)))
+        # preplacement_list.append(((5, 7), (-1, 0), (0, 1)))
+
         # preplacement_list.append(((3, 2), (0, 1), (-1, 0)))
-        preplacement_list.append(((6, 3), (0, 1), (1, 0)))
-        preplacement_list.append(((10, 3), (0, 1), (-1, 0)))
-        preplacement_list.append(((12, 3), (0, 1), (1, 0)))
+        # preplacement_list.append(((6, 3), (0, 1), (1, 0)))
+        # preplacement_list.append(((10, 3), (0, 1), (-1, 0)))
+        # preplacement_list.append(((12, 3), (0, 1), (1, 0)))
 
         # preplacement_list.append(((3, 4), (0, -1), (-1, 0)))
-        preplacement_list.append(((6, 5), (0, -1), (1, 0)))
-        preplacement_list.append(((10, 5), (0, -1), (-1, 0)))
-        preplacement_list.append(((12, 5), (0, -1), (1, 0)))
+        # preplacement_list.append(((6, 5), (0, -1), (1, 0)))
+        # preplacement_list.append(((10, 5), (0, -1), (-1, 0)))
+        # preplacement_list.append(((12, 5), (0, -1), (1, 0)))
 
-        # preplacement_list.append(((5, 10), (0, -1), (-1, 0)))
-        # preplacement_list.append(((5, 11), (-1, 0), (0, 1))) # this next
-        # preplacement_list.append(((5, 12), (0, 1), (1, 0))) # this next 2
-        preplacement_list.append(((6, 8), (0, 1), (1, 0)))
-        preplacement_list.append(((10, 8), (0, 1), (-1, 0)))
-        preplacement_list.append(((12, 8), (0, 1), (1, 0)))
+        # # preplacement_list.append(((5, 10), (0, -1), (-1, 0)))
+        # # preplacement_list.append(((5, 11), (-1, 0), (0, 1))) # this next
+        # # preplacement_list.append(((5, 12), (0, 1), (1, 0))) # this next 2
+        # preplacement_list.append(((6, 8), (0, 1), (1, 0)))
+        # preplacement_list.append(((10, 8), (0, 1), (-1, 0)))
+        # preplacement_list.append(((12, 8), (0, 1), (1, 0)))
 
-        # preplacement_list.append(((3, 12), (0, 1), (-1, 0))) # this next 2
-        preplacement_list.append(((6, 10), (0, -1), (1, 0)))
-        preplacement_list.append(((10, 10), (0, -1), (-1, 0)))
-        preplacement_list.append(((12, 10), (0, -1), (1, 0)))
+        # # preplacement_list.append(((3, 12), (0, 1), (-1, 0))) # this next 2
+        # preplacement_list.append(((6, 10), (0, -1), (1, 0)))
+        # preplacement_list.append(((10, 10), (0, -1), (-1, 0)))
+        # preplacement_list.append(((12, 10), (0, -1), (1, 0)))
 
         for component in preplacement_list:
             # add constraint
@@ -827,7 +854,7 @@ if __name__ == "__main__":
          [(6, 15), (7, 15), (8, 15), (9, 15)]),
 
         ]
-    router = DirectionalJumpRouter(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = -1, symmetry = False, option = 1)
+    router = DirectionalJumpRouter(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = -1, symmetry = False, option = 3)
     # option 0: balanced
     # option 1: feasibility
     # option 2: bound
