@@ -28,6 +28,10 @@ class DirectionalJumpRouter:
         # Input parameters
         self.WIDTH = width
         self.HEIGHT = height
+        self.jump_distances = jump_distances
+        self.timelimit = timelimit
+        self.symmetry = symmetry
+        self.option = option
 
         self.num_nets = 3 # start to component, component to goal
         self.net_sources: Dict[int, List[Node]] = {}
@@ -74,24 +78,6 @@ class DirectionalJumpRouter:
             for y in range(self.HEIGHT):
                 if (x, y) not in self.blocked_tiles:
                     self.all_nodes.append((x, y))
-
-        # here, add start as source for net 0, add component sink as sink for net 0
-
-        # then, add component source as source for net 1, add goal as sink for net 1
-
-        # thus for add_flow_constraint, i need to pass in list of component source, a list of component sink, and try to connect them
-
-        # component is used means the source and sink of it is also used.
-
-        # pass in potential_component_whose_source_is_at_this_node
-        # pass in potential_component_whose_sink_is_at_this_node
-
-        # each potential sources have corresponding used flag
-        
-        self.jump_distances = jump_distances
-        self.timelimit = timelimit
-        self.symmetry = symmetry
-        self.option = option
 
         # all possible location and orientation to place the components
         self.all_components: List[Component] = []
@@ -191,7 +177,6 @@ class DirectionalJumpRouter:
             for edge in self.all_edges:
                 self.is_edge_used[i][edge].setAttr("BranchPriority", self.edge_priority)
         
-        # self.add_variable_is_node_used_by_net()
         self.add_variable_is_node_used_by_step_edges()
 
         # Objective function
@@ -205,19 +190,6 @@ class DirectionalJumpRouter:
 
         # Plot
         self.plot()
-
-    def add_variable_is_node_used_by_net(self):
-        self.is_node_used_by_net: Dict[int, Dict[Node, Var]] = defaultdict(lambda: defaultdict(Var))
-        for i in range(self.num_nets):
-            for node in self.all_nodes:
-
-                step_edges_from_node = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[node]]
-                jump_edges_related_to_node = [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[node]]
-                
-                self.is_node_used_by_net[i][node] = self.model.addVar(name=f"node_{i}_{node}", vtype=GRB.BINARY)
-                # self.model.addConstr(len(step_edges_from_node) * is_node_used_by_net[i][node] >= quicksum(step_edges_from_node) + len(step_edges_from_node) * quicksum(jump_edges_related_to_node))
-                self.model.addConstr(self.is_node_used_by_net[i][node] >= quicksum(step_edges_from_node) / len(step_edges_from_node) + quicksum(jump_edges_related_to_node))
-                self.model.addConstr(self.is_node_used_by_net[i][node] <= quicksum(step_edges_from_node) + quicksum(jump_edges_related_to_node))
 
     def add_variable_is_node_used_by_step_edges(self):
         self.is_node_used_by_step_edge: Dict[int, Dict[Node, Var]] = defaultdict(lambda: defaultdict(Var))
@@ -248,7 +220,6 @@ class DirectionalJumpRouter:
             # self.add_no_step_jump_overlap_constraints(i)
             self.add_directional_constraints_w_component(i)
 
-        # self.add_goal_action_constraints()
         self.add_things_overlap_constraints()
 
         self.add_component_count_constraint()
@@ -258,30 +229,6 @@ class DirectionalJumpRouter:
         if self.symmetry:
             self.add_symmetry_constraints()
 
-    def add_flow_constraints(self, i):
-        self.edge_flow_value: Dict[int, Dict[Edge, Var]] = {}
-        self.edge_flow_value[i] = {edge: self.model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype = GRB.INTEGER, lb=0, ub=4) for edge in self.all_edges}
-        
-        # Flow is avaiable if the edge is selected
-        for edge in self.all_edges:
-            self.model.addConstr(self.edge_flow_value[i][edge] <= self.is_edge_used[i][edge] * 4)
-            self.model.addConstr(self.edge_flow_value[i][edge] >= self.is_edge_used[i][edge])
-
-        # Flow conservation constraints
-        for node in self.all_nodes:
-            in_flow = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[1] == node)
-            out_flow = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[0] == node)
-
-            if node in self.net_sources[i]:
-                self.model.addConstr(in_flow == 0)
-                self.model.addConstr(out_flow == 4)
-            elif node in self.net_sinks[i]:
-                self.model.addConstr(in_flow == 4)
-                self.model.addConstr(out_flow == 0)
-            else:
-                self.model.addConstr(sum(in_flow) <= 4)
-                self.model.addConstr((out_flow - in_flow == 0))
-    
     def add_flow_constraints_source_to_components(self, i):
         self.edge_flow_value: Dict[int, Dict[Edge, Var]] = {}
         self.edge_flow_value[i] = {edge: self.model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=self.flow_cap) for edge in self.all_edges}
@@ -386,93 +333,7 @@ class DirectionalJumpRouter:
             else:
                 self.model.addGenConstrIndicator(node_is_component_source, True, out_flow - in_flow == self.component_source_amount * quicksum(node_component_used_bool_list))
                 self.model.addGenConstrIndicator(node_is_component_source, False, out_flow - in_flow == 0)
-                
-
-    def add_flow_constraints_v2(self, i):
-        for node in self.all_nodes:
-            in_flow = [self.is_edge_used[i][edge] for edge in self.all_edges if edge[1] == node]
-            out_flow = [self.is_edge_used[i][edge] for edge in self.all_edges if edge[0] == node]
-
-            if node in self.net_sources[i]:
-                self.model.addConstr(sum(in_flow) == 0)
-                self.model.addConstr(sum(out_flow) == 1)
-            elif node in self.net_sinks[i]:
-                self.model.addConstr(sum(in_flow) == 1)
-                self.model.addConstr(sum(out_flow) == 0)
-            else:
-                # if have in_flow, then must have out_flow
-                self.model.addConstr(sum(in_flow) / len(in_flow) <= sum(out_flow))
-                # self.model.addConstr(sum(in_flow) <= sum(out_flow) * len(in_flow))
-                # if have out_flow, then must have in_flow
-                self.model.addConstr(sum(out_flow) / len(out_flow) <= sum(in_flow))
-                # self.model.addConstr(sum(out_flow) <= sum(in_flow) * len(out_flow))
-
-        # the flow in and flow out must not be cyclic
-        max_level = self.WIDTH + self.HEIGHT  # rough upper bound for longest path
-        node_level = {}
-
-        for node in self.all_nodes:
-            node_level[node] = self.model.addVar(name=f"node_level_{node}", vtype=GRB.INTEGER)
-                
-        # Acyclic constraint using topological levels
-        M = max_level + 1
-        for edge in self.all_edges:
-            u, v, _ = edge
-            self.model.addConstr(node_level[v] >= node_level[u] + 1 - M * (1 - self.is_edge_used[i][edge]))
-
-    def add_directional_constraints(self, i):
-        for jump_edge in self.jump_edges:
-            u, v, direction = jump_edge
-            # A jump from u to v in direction `direction` is only allowed
-            # if there is incoming flow to u from the same direction.
-
-            # if u is at start, then only up jump is allowed
-            if u in self.net_sources[i]:
-                if direction == (0, 1):
-                    continue
-                else:
-                    self.model.addConstr(self.is_edge_used[i][jump_edge] == 0)
-                    continue
-
-            # Collect all edges (step and jump) that go into `u` from direction `direction`
-            incoming_edges_in_same_direction_bool_list = []
-            for edge in self.all_edges:
-                _, target, dir_step = edge
-                if target == u and dir_step == direction:
-                    incoming_edges_in_same_direction_bool_list.append(self.is_edge_used[i][edge])
-
-            # create a variable that sums up the incoming edges in the same direction
-            sum_of_incoming_edge_in_same_direction = quicksum(incoming_edges_in_same_direction_bool_list)
-
-            # Enforce that jump flow is only allowed if incoming flow matches direction
-            self.model.addConstr(self.is_edge_used[i][jump_edge] <= sum_of_incoming_edge_in_same_direction)
-
-    def add_directional_constraints_v2(self, i):
-        # for jump edge at start, only up direction is allowed
-        for jump_edge in self.jump_edges:
-            u, v, direction = jump_edge
-            if u in self.net_sources[i]:
-                if direction == (0, 1):
-                    continue
-                else:
-                    self.model.addConstr(self.is_edge_used[i][jump_edge] == 0)
-                    continue
-
-        # for each edge, if the edge is used, then the end node must not have jump edge at different direction
-        for edge in self.all_edges:
-            u, v, direction = edge
-
-            # if the edge is used, then the end node must not have starting jump edge at different direction, and must not have any landing jump edge
-            for jump_edge in self.node_related_jump_edges[v]:
-                u2, v2, jump_direction = jump_edge
-                if u2 == v: # starting jump edge
-                    if direction == jump_direction:
-                        continue
-                    else:
-                        self.model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1)
-                else:
-                    self.model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
-                
+                  
     def add_directional_constraints_w_component(self, i):
         # no jump edge at start
         for jump_edge in self.jump_edges:
@@ -523,75 +384,6 @@ class DirectionalJumpRouter:
                     # self.model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.is_edge_used[i][jump_edge] == 0)
                     self.model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
 
-    def add_no_step_jump_overlap_constraints(self, i):
-        for node in self.all_nodes:
-            # list of all step edges from this node
-            node_step_edges_bool_list = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[node]]
-
-            # list of all jump edges of this node
-            node_jump_edges_bool_list = [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[node]]
-
-            # the constraint
-            self.model.addConstr(quicksum(node_step_edges_bool_list) / len(node_step_edges_bool_list) + quicksum(node_jump_edges_bool_list) <= 1)
-
-    # def add_overlap_constraints_v3(self):
-    #     for node in self.all_nodes[0]:
-    #         step_edges_of_net: Dict[int, List[Edge]] = defaultdict(list)
-    #         jump_edges_of_net: Dict[int, List[Edge]] = defaultdict(list)
-
-    #         for i in range(self.num_nets):
-    #             step_edges_of_net[i] = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[node]]
-    #             jump_edges_of_net[i] = [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[node]]
-
-    #         # the constraint
-    #         self.model.addConstr(()
-    #             quicksum(quicksum(step_edges_of_net[i]) / len(step_edges_of_net[i]) for i in range(self.num_nets)) + 
-    #             quicksum(quicksum(jump_edges_of_net[i]) for i in range(self.num_nets)) <= 1)
-
-    # def add_overlap_constraints(self, i):
-    #     for node in self.all_nodes:
-    #         # Constraint: a node cannot be used by both step and jump
-    #         self.model.addConstr(()
-    #             self.is_node_used_by_step_edge[i][node] + self.is_node_used_by_jump_edge[i][node] <= 1
-    #         )
-
-    # def add_one_jump_constraints(self, i):
-    #     # at most one jump edge allowed in each node
-    #     for node in self.all_nodes:
-    #         # create a variable that sums up the jump edges in the same node
-    #         num_of_jump_edges_per_node = quicksum(self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[node])
-
-    #         # Enforce that at most one jump edge is allowed in each node
-    #         self.model.addConstr(num_of_jump_edges_per_node <= 1)
-
-
-    def add_goal_action_constraints(self):
-        # no action is to be taken at the goal nodes for any net
-        for i in range(self.num_nets):
-            for j in range(self.num_nets):
-                for goal in self.net_sinks[j]:
-                    self.model.addConstr(self.is_node_used_by_net[i][goal] == 0)
-
-    def add_net_overlap_constraints(self):
-        # no overlap between nets
-        for node in self.all_nodes:
-            list_of_nets_using_node = []
-            for i in range(self.num_nets):
-                list_of_nets_using_node.append(self.is_node_used_by_net[i][node])
-            
-            # constraint: at most one net can use a node
-            self.model.addConstr(quicksum(list_of_nets_using_node) <= 1)
-
-    def add_component_overlap_constraints(self):
-        # no overlap between components
-        for node in self.all_nodes:
-            list_of_components_bool_using_node = []
-            for component in self.node_related_components[node]:
-                list_of_components_bool_using_node.append(self.is_component_used[component])
-            
-            # constraint: at most one component can use a node
-            self.model.addConstr(quicksum(list_of_components_bool_using_node) <= 1)
-
     def add_things_overlap_constraints(self):
         # between belts / pads / components
         for node in self.all_nodes:
@@ -616,97 +408,6 @@ class DirectionalJumpRouter:
 
     def add_component_pre_placement_constraint(self):
         preplacement_list = []
-
-        # # solution 1
-        # preplacement_list.append(((3, 3), (0, 1), (1, 0)))
-        # preplacement_list.append(((7, 3), (0, 1), (-1, 0)))
-        # preplacement_list.append(((9, 3), (0, 1), (1, 0)))
-        # preplacement_list.append(((13, 3), (0, 1), (-1, 0)))
-
-        # preplacement_list.append(((3, 5), (0, -1), (1, 0)))
-        # preplacement_list.append(((7, 5), (0, -1), (-1, 0)))
-        # preplacement_list.append(((9, 5), (0, -1), (1, 0)))
-        # preplacement_list.append(((13, 5), (0, -1), (-1, 0)))
-
-        # preplacement_list.append(((2, 12), (0, 1), (1, 0)))
-        # preplacement_list.append(((7, 8), (0, 1), (-1, 0)))
-        # preplacement_list.append(((9, 8), (0, 1), (1, 0)))
-        # preplacement_list.append(((13, 8), (0, 1), (-1, 0)))
-
-        # preplacement_list.append(((6, 12), (0, 1), (-1, 0)))
-        # preplacement_list.append(((7, 10), (0, -1), (-1, 0)))
-        # preplacement_list.append(((9, 10), (0, -1), (1, 0)))
-        # preplacement_list.append(((13, 10), (0, -1), (-1, 0)))
-
-        # solution 2
-        # preplacement_list.append(((3, 3), (0, 1), (1, 0)))
-        # preplacement_list.append(((7, 3), (0, 1), (-1, 0)))
-        # preplacement_list.append(((9, 3), (0, 1), (1, 0)))
-        # preplacement_list.append(((13, 3), (0, 1), (-1, 0)))
-
-        # preplacement_list.append(((3, 5), (0, -1), (1, 0)))
-        # preplacement_list.append(((7, 5), (0, -1), (-1, 0)))
-        # preplacement_list.append(((9, 5), (0, -1), (1, 0)))
-        # preplacement_list.append(((13, 5), (0, -1), (-1, 0)))
-
-        # preplacement_list.append(((4, 12), (1, 0), (0, -1)))
-        # preplacement_list.append(((7, 8), (0, 1), (-1, 0)))
-        # preplacement_list.append(((9, 8), (0, 1), (1, 0)))
-        # preplacement_list.append(((13, 8), (0, 1), (-1, 0)))
-
-        # preplacement_list.append(((6, 12), (-1, 0), (0, -1)))
-        # preplacement_list.append(((7, 10), (0, -1), (-1, 0)))
-        # preplacement_list.append(((9, 10), (0, -1), (1, 0)))
-        # preplacement_list.append(((13, 10), (0, -1), (-1, 0)))
-
-
-        # # # T shape output
-        # preplacement_list.append(((4, 3), (1, 0), (0, 1)))
-        # preplacement_list.append(((4, 7), (1, 0), (0, -1)))
-        # preplacement_list.append(((4, 9), (1, 0), (0, 1)))
-        # preplacement_list.append(((4, 13), (1, 0), (0, -1)))
-
-        # preplacement_list.append(((6, 3), (-1, 0), (0, 1)))
-        # preplacement_list.append(((6, 7), (-1, 0), (0, -1)))
-        # preplacement_list.append(((6, 9), (-1, 0), (0, 1)))
-        # preplacement_list.append(((6, 13), (-1, 0), (0, -1)))
-
-        # preplacement_list.append(((9, 3), (1, 0), (0, 1)))
-        # preplacement_list.append(((9, 7), (1, 0), (0, -1)))
-        # preplacement_list.append(((9, 9), (1, 0), (0, 1)))
-        # preplacement_list.append(((9, 13), (1, 0), (0, -1)))
-
-        # preplacement_list.append(((11, 3), (-1, 0), (0, 1)))
-        # preplacement_list.append(((11, 7), (-1, 0), (0, -1)))
-        # preplacement_list.append(((11, 9), (-1, 0), (0, 1)))
-        # preplacement_list.append(((11, 13), (-1, 0), (0, -1)))
-
-
-
-
-        # regular but reverse output
-        # # preplacement_list.append(((3, 3), (0, 1), (1, 0)))
-        # # preplacement_list.append(((7, 3), (0, 1), (-1, 0)))
-        # preplacement_list.append(((9, 3), (0, 1), (1, 0)))
-        # preplacement_list.append(((13, 3), (0, 1), (-1, 0)))
-
-        # # preplacement_list.append(((3, 5), (0, -1), (1, 0)))
-        # # preplacement_list.append(((7, 5), (0, -1), (-1, 0)))
-        # preplacement_list.append(((9, 5), (0, -1), (1, 0)))
-        # preplacement_list.append(((13, 5), (0, -1), (-1, 0)))
-
-        # # preplacement_list.append(((4, 12), (1, 0), (0, -1)))
-        # # preplacement_list.append(((7, 8), (0, 1), (-1, 0)))
-        # preplacement_list.append(((9, 8), (0, 1), (1, 0)))
-        # preplacement_list.append(((13, 8), (0, 1), (-1, 0)))
-
-        # # preplacement_list.append(((6, 12), (-1, 0), (0, -1)))
-        # # preplacement_list.append(((7, 10), (0, -1), (-1, 0)))
-        # preplacement_list.append(((9, 10), (0, -1), (1, 0)))
-        # preplacement_list.append(((13, 10), (0, -1), (-1, 0)))
-
-
-
 
         # preplacement_list.append(((3, 2), (0, 1), (-1, 0)))
         preplacement_list.append(((6, 3), (0, 1), (1, 0)))
@@ -774,43 +475,6 @@ class DirectionalJumpRouter:
                                            node_used_by_source_bool, 
                                            node_used_by_secondary_source_bool, 
                                            node_used_by_input_location_bool]) <= 1)
-
-    def add_jump_pad_implication(self):
-        # if a jump edge is used, then the corresponding jump pad must be used
-        for i in range(self.num_nets):
-            for jump_edge in self.jump_edges:
-                u, v, direction = jump_edge
-                # A jump from u to v in direction `direction` is only allowed
-                # if there is incoming flow to u from the same direction.
-
-                # Collect all edges (step and jump) that go into `u` from direction `direction`
-                incoming_edges_in_same_direction = []
-                for edge in self.all_edges:
-                    _, target, dir_step = edge
-                    if target == u and dir_step == direction:
-                        incoming_edges_in_same_direction.append(self.is_edge_used[i][edge])
-
-                # create a variable that sums up the incoming edges in the same direction
-                sum_of_incoming_edge_in_same_direction = quicksum(incoming_edges_in_same_direction)
-
-                # Enforce that jump pad flow is only allowed if incoming flow matches direction
-                self.model.addConstr(self.is_edge_used[i][jump_edge] <= sum_of_incoming_edge_in_same_direction)
-
-    def add_symmetry_constraints(self):
-        # net i should reflex net K-i
-        for i in range(int(self.num_nets / 2)):
-            j = self.num_nets - i - 1
-            for edge in self.all_edges:
-                u, v, d = edge
-                sym_ux = self.WIDTH - u[0] - 1
-                sym_suy = u[1]
-                sym_svx = self.WIDTH - v[0] - 1
-                sym_svy = v[1]
-                sym_u = (sym_ux, sym_suy)
-                sym_v = (sym_svx, sym_svy)
-                sym_d = (-d[0], d[1])
-                if ((sym_u, sym_v, sym_d) in self.all_edges):
-                    self.model.addConstr(self.is_edge_used[i][edge] == self.is_edge_used[j][(sym_u, sym_v, sym_d)])
 
     def solve(self):
         if self.timelimit != -1:
@@ -945,85 +609,8 @@ class DirectionalJumpRouter:
 
 # Example usage
 if __name__ == "__main__":
-    # nets = [
-    #     # ([(5, 0)], 
-    #     #  [(1, 6), (3, 6), (5, 6), (8, 6)]),
-    #     # ([(28, 0)], 
-    #     #  [(26, 6), (28, 6), (30, 6), (32, 6)]),
-
-    #     # ([(5, 0), (6, 0), (7, 0), (8, 0)], 
-    #     #  [(1, 6), (3, 6), (5, 6), (7, 6), (9, 6), (11, 6), (13, 6), (15, 6), (17, 6), (19, 6), (21, 6), (23, 6), (25, 6), (27, 6), (29, 6), (31, 6)]),
-    #     # ([(25, 0), (26, 0), (27, 0), (28, 0)], 
-    #     #  [(2, 6), (4, 6), (6, 6), (8, 6), (10, 6), (12, 6), (14, 6), (16, 6), (18, 6), (20, 6), (22, 6), (24, 6), (26, 6), (28, 6), (30, 6), (32, 6)]),
-
-    #     ([(5, 0), (6, 0), (7, 0), (8, 0)], 
-    #      [(1, 6), (4, 6), (5, 6), (8, 6), (9, 6), (12, 6), (13, 6), (16, 6), (17, 6), (20, 6), (21, 6), (24, 6), (25, 6), (28, 6), (29, 6), (32, 6)]),
-    #     ([(25, 0), (26, 0), (27, 0), (28, 0)], 
-    #      [(2, 6), (3, 6), (6, 6), (7, 6), (10, 6), (11, 6), (14, 6), (15, 6), (18, 6), (19, 6), (22, 6), (23, 6), (26, 6), (27, 6), (30, 6), (31, 6)]),
-    #     ]
-    # router = DirectionalJumpRouter(width=34, height=7, nets=nets, jump_distances= [4], timelimit = 300, symmetry = False)
-
-
     nets = [        
-        # ([(6, 0)], 
-        #  [(6, 15)]),
-
         # try aws again, this time use this https://support.gurobi.com/hc/en-us/articles/13232844297489-How-do-I-set-up-a-Web-License-Service-WLS-license
-
-        # ([(6, 0)], 
-        # [(6, 15)],
-        # [(0, 6)]),
-
-        # ([(6, 0), (7, 0)], 
-        # [(6, 15), (7, 15)],
-        # [(0, 6), (0, 7)]),
-
-        # ([(6, 0), (7, 0), (8, 0)], 
-        # [(6, 15), (7, 15), (8, 15)],
-        # [(0, 6), (0, 7), (0, 8)]),
-
-        # ([(7, 0), (8, 0), (9, 0)], 
-        #  [(7, 15), (8, 15), (9, 15)],
-        #  [(0, 6), (0, 7), (0, 8)]),
-
-        # ([(6, 0), (7, 0), (8, 0), (9, 0)], 
-        #  [(6, 15), (7, 15), (8, 15), (9, 15)],
-        #  [(0, 6), (0, 7), (0, 8), (0, 9)]),
-
-        # ([(6, 0), (7, 0), (8, 0)], 
-        #  [(15, 6), (15, 7), (15, 8)],
-        #  [(0, 6), (0, 7), (0, 8)]),
-
-        # ([(6, 0)], 
-        # [(15, 6)],
-        # [(0, 6)]),
-
-        # ([(6, 0), (7, 0)], 
-        # [(15, 6), (15, 7)],
-        # [(0, 6), (0, 7)]),
-
-        # ([(6, 0), (7, 0), (8, 0)], 
-        #  [(6, 15), (7, 15), (8, 15)],
-        #  [(0, 6), (0, 7), (0, 8)]),
-
-        # ([(6, 0), (7, 0)], 
-        #  [(6, 15), (7, 15)],
-        #  [(0, 6), (0, 7)]),
-
-
-        # T shape output
-        # ([(6, 0)], 
-        #  [(0, 6)],
-        #  [(15, 6)]),
-
-        # ([(6, 0), (7, 0), (8, 0)], 
-        #  [(0, 6), (0, 7), (0, 8)],
-        #  [(15, 6), (15, 7), (15, 8)]),
-
-        # ([(6, 0), (7, 0), (8, 0), (9, 0)], 
-        #  [(0, 6), (0, 7), (0, 8), (0, 9)],
-        #  [(15, 6), (15, 7), (15, 8), (15, 9)]),
-
 
         # regular output but up and left reversed
         # ([(6, 0)], 
