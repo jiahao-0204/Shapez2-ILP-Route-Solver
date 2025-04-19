@@ -146,6 +146,8 @@ class DirectionalJumpRouter:
         for comonent in self.all_components:
             self.is_component_used[comonent].setAttr("BranchPriority", self.component_priority)
         
+        self.add_node_is_used_by_component_parts()
+
         # self.all_edges: List[Edge] = []
         # self.step_edges: List[Edge] = []
         # self.jump_edges: List[Edge] = []
@@ -540,7 +542,13 @@ class DirectionalJumpRouter:
             # constraint: at most one thing can use a node
             self.model.addConstr(quicksum(list_of_things_using_node) <= 1)
 
-    def add_component_source_sink_overlap_constraints(self):
+    def add_node_is_used_by_component_parts(self):
+        self.node_used_by_primary_component_bool = {node: self.model.addVar(name=f"node_used_by_primary_component_bool_{node}", vtype=GRB.BINARY) for node in self.all_nodes}
+        self.node_used_by_secondary_component_bool = {node: self.model.addVar(name=f"node_used_by_secondary_component_bool_{node}", vtype=GRB.BINARY) for node in self.all_nodes}
+        self.node_used_by_source_bool = {node: self.model.addVar(name=f"node_used_by_source_bool_{node}", vtype=GRB.BINARY) for node in self.all_nodes}
+        self.node_used_by_secondary_source_bool = {node: self.model.addVar(name=f"node_used_by_secondary_source_bool_{node}", vtype=GRB.BINARY) for node in self.all_nodes}
+        self.node_used_by_input_location_bool = {node: self.model.addVar(name=f"node_used_by_input_location_bool_{node}", vtype=GRB.BINARY) for node in self.all_nodes}
+
         for node in self.all_nodes:
             # node related component parts
             node_related_primary_component = self.node_related_components[node]
@@ -556,26 +564,24 @@ class DirectionalJumpRouter:
             node_used_by_secondary_source_bool_list = [self.is_component_used[component] for component in node_related_secondary_sources]
             node_used_by_input_location_bool_list = [self.is_component_used[component] for component in node_related_input_location]
 
-            # node occupied by componet parts bool var
-            node_used_by_primary_component_bool = self.model.addVar(name = f"node_used_by_primary_component_bool_{node}", vtype=GRB.BINARY)
-            node_used_by_secondary_component_bool = self.model.addVar(name = f"node_used_by_secondary_component_bool_{node}", vtype=GRB.BINARY)
-            node_used_by_source_bool = self.model.addVar(name = f"node_used_by_source_bool_{node}", vtype=GRB.BINARY)
-            node_used_by_secondary_source_bool = self.model.addVar(name = f"node_used_by_secondary_source_bool_{node}", vtype=GRB.BINARY)
-            node_used_by_input_location_bool = self.model.addVar(name = f"node_used_by_input_location_bool_{node}", vtype=GRB.BINARY)
-
             # OR 
-            self.model.addGenConstrOr(node_used_by_primary_component_bool, node_used_by_primary_component_bool_list)
-            self.model.addGenConstrOr(node_used_by_secondary_component_bool, node_used_by_secondary_component_bool_list)
-            self.model.addGenConstrOr(node_used_by_source_bool, node_used_by_source_bool_list)
-            self.model.addGenConstrOr(node_used_by_secondary_source_bool, node_used_by_secondary_source_bool_list)
-            self.model.addGenConstrOr(node_used_by_input_location_bool, node_used_by_input_location_bool_list)
+            self.model.addGenConstrOr(self.node_used_by_primary_component_bool[node], node_used_by_primary_component_bool_list)
+            self.model.addGenConstrOr(self.node_used_by_secondary_component_bool[node], node_used_by_secondary_component_bool_list)
+            self.model.addGenConstrOr(self.node_used_by_source_bool[node], node_used_by_source_bool_list)
+            self.model.addGenConstrOr(self.node_used_by_secondary_source_bool[node], node_used_by_secondary_source_bool_list)
+            self.model.addGenConstrOr(self.node_used_by_input_location_bool[node], node_used_by_input_location_bool_list)
 
+
+    def add_component_source_sink_overlap_constraints(self):
+        for node in self.all_nodes:
             # only one can be true
-            self.model.addConstr(quicksum([node_used_by_primary_component_bool, 
-                                           node_used_by_secondary_component_bool, 
-                                           node_used_by_source_bool, 
-                                           node_used_by_secondary_source_bool, 
-                                           node_used_by_input_location_bool]) <= 1)
+            self.model.addConstr(quicksum([
+                self.node_used_by_primary_component_bool[node],
+                self.node_used_by_secondary_component_bool[node],
+                self.node_used_by_source_bool[node],
+                self.node_used_by_secondary_source_bool[node],
+                self.node_used_by_input_location_bool[node]
+            ]) <= 1)
 
     def solve(self):
         if self.timelimit != -1:
