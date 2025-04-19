@@ -136,57 +136,144 @@ class DirectionalJumpRouter:
         for comonent in self.all_components:
             self.is_component_used[comonent].setAttr("BranchPriority", self.component_priority)
         
-        self.all_edges: List[Edge] = []
-        self.step_edges: List[Edge] = []
-        self.jump_edges: List[Edge] = []
-        self.node_related_step_edges: Dict[Node, List[Edge]] = defaultdict(list)
-        self.node_related_jump_edges: Dict[Node, List[Edge]] = defaultdict(list)
-        for node in self.all_nodes:
-            x, y = node
-            for dx, dy in DIRECTIONS:
+        # self.all_edges: List[Edge] = []
+        # self.step_edges: List[Edge] = []
+        # self.jump_edges: List[Edge] = []
+        # self.node_related_step_edges: Dict[Node, List[Edge]] = defaultdict(list)
+        # self.node_related_jump_edges: Dict[Node, List[Edge]] = defaultdict(list)
+        # for node in self.all_nodes:
+        #     x, y = node
+        #     for dx, dy in DIRECTIONS:
 
-                # Step edge
-                nx, ny = x + dx, y + dy
-                if (nx, ny) in self.all_nodes:
-                    edge = ((x, y), (nx, ny), (dx, dy))
-                    self.all_edges.append(edge)
-                    self.step_edges.append(edge)
-                    self.node_related_step_edges[node].append(edge)
+        #         # Step edge
+        #         nx, ny = x + dx, y + dy
+        #         if (nx, ny) in self.all_nodes:
+        #             edge = ((x, y), (nx, ny), (dx, dy))
+        #             self.all_edges.append(edge)
+        #             self.step_edges.append(edge)
+        #             self.node_related_step_edges[node].append(edge)
                 
-                for jump_distance in self.jump_distances:
-                    nx, ny = x + dx * (jump_distance + 2), y + dy * (jump_distance + 2)
-                    jx, jy = x + dx * (jump_distance + 1), y + dy * (jump_distance + 1)
-                    pad_node = (jx, jy)
-                    if (nx, ny) in self.all_nodes:
-                        edge = ((x, y), (nx, ny), (dx, dy))
-                        self.all_edges.append(edge)
-                        self.jump_edges.append(edge)
-                        self.node_related_jump_edges[node].append(edge)
-                        self.node_related_jump_edges[pad_node].append(edge)
+        #         for jump_distance in self.jump_distances:
+        #             nx, ny = x + dx * (jump_distance + 2), y + dy * (jump_distance + 2)
+        #             jx, jy = x + dx * (jump_distance + 1), y + dy * (jump_distance + 1)
+        #             pad_node = (jx, jy)
+        #             if (nx, ny) in self.all_nodes:
+        #                 edge = ((x, y), (nx, ny), (dx, dy))
+        #                 self.all_edges.append(edge)
+        #                 self.jump_edges.append(edge)
+        #                 self.node_related_jump_edges[node].append(edge)
+        #                 self.node_related_jump_edges[pad_node].append(edge)
 
         
         
-        # is edge used
-        self.is_edge_used: Dict[int, Dict[Edge, Var]] = {}
-        for i in range(self.num_nets):
-            self.is_edge_used[i] = {edge: self.model.addVar(name=f"edge_{i}_{edge}", vtype=GRB.BINARY) for edge in self.all_edges}
-            # set priority
-            for edge in self.all_edges:
-                self.is_edge_used[i][edge].setAttr("BranchPriority", self.edge_priority)
+        # # is edge used
+        # self.is_edge_used: Dict[int, Dict[Edge, Var]] = {}
+        # for i in range(self.num_nets):
+        #     self.is_edge_used[i] = {edge: self.model.addVar(name=f"edge_{i}_{edge}", vtype=GRB.BINARY) for edge in self.all_edges}
+        #     # set priority
+        #     for edge in self.all_edges:
+        #         self.is_edge_used[i][edge].setAttr("BranchPriority", self.edge_priority)
         
-        self.add_variable_is_node_used_by_step_edges()
+        # self.add_variable_is_node_used_by_step_edges()
 
-        # Objective function
-        self.add_objective()
+        self.sub_problem_cost = self.model.addVar(lb=0.0, name="sub_problem_cost")
+        self.model.setObjective(self.sub_problem_cost, GRB.MINIMIZE)
+        self.add_component_count_constraint()
+        self.add_component_basic_overlap_constraints()
+        self.add_component_source_sink_overlap_constraints()
+        self.add_component_pre_placement_constraint()
 
-        # Constraints
-        self.add_constraints()
+        self.model.Params.LazyConstraints = 1
+        if self.timelimit != -1:
+            self.model.setParam('TimeLimit', self.timelimit)
+        self.model.setParam('MIPFocus', self.option)
+        self.model.setParam('Presolve', 2)
+        self.model.setParam('Heuristics', 0.5)
 
-        # Solve
-        self.solve()
+        # Optimize with Benders callback
+        self.model.optimize(self.benders_callback)
 
-        # Plot
-        self.plot()
+        # # Objective function
+        # self.add_objective()
+
+        # # Constraints
+        # self.add_constraints()
+
+        # # Solve
+        # self.solve()
+
+        # # Plot
+        # self.plot()
+
+    def benders_callback(self, model, where):
+        if where == GRB.Callback.MIPSOL:
+            # get solution
+            is_component_used = {component: model.cbGetSolution(self.is_component_used[component]) for component in self.all_components}
+
+            # draw components
+            self.draw_components(is_component_used)
+
+            # cut the component used
+            used_components = [c for c in self.all_components if is_component_used[c] > 0.5]
+            expr = quicksum(self.is_component_used[component] for component in used_components)
+            model.cbLazy(expr <= len(used_components)-1)
+
+
+    def draw_components(self, is_component_used):
+        plt.figure(figsize=(12, 6))
+        ax = plt.gca()
+        ax.set_xlim(0, self.WIDTH)
+        ax.set_ylim(0, self.HEIGHT)
+        ax.set_xticks(range(self.WIDTH))
+        ax.set_yticks(range(self.HEIGHT))
+        ax.set_aspect('equal')
+        ax.grid(True)
+
+        offset = 0.5
+
+        # draw blocked tiles
+        for (x, y) in self.blocked_tiles:
+            # ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='none', hatch='////'))
+            # ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='lightgrey', edgecolor='black', linewidth=2))
+            ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='lightgrey', linewidth=2))
+
+        # draw components
+        used_components = [c for c in self.all_components if is_component_used[c] == 1]
+        for component in used_components:
+            (x, y), (dx, dy), (dx2, dy2) = component        # two‑cell component
+            nx, ny = x + dx, y + dy
+            x2, y2 = x + dx2, y + dy2                       # second node
+            nx2, ny2 = x2 + dx, y2 + dy
+
+            ix, iy = x - dx, y - dy
+
+            margin = 0.2
+            ll_x = min(x, x2) + margin
+            ll_y = min(y, y2) + margin
+            width  = abs(x2 - x) + 1 - 2 * margin       # +1 because each node is 1×1
+            height = abs(y2 - y) + 1 - 2 * margin
+
+            rect = plt.Rectangle((ll_x, ll_y), width, height, facecolor='grey', edgecolor='black', linewidth=1.2, zorder=1)
+            ax.add_patch(rect)
+            d = (dx, dy)
+            if d == (0, 1):
+                marker = '^'
+            elif d == (0, -1):
+                marker = 'v'
+            elif d == (1, 0):
+                marker = '>'
+            elif d == (-1, 0):
+                marker = '<'
+            ax.scatter(x + offset, y + offset, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
+            ax.scatter(x2 + offset, y2 + offset, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
+            ax.plot([ix + offset, x + offset], [iy + offset, y + offset], c='black', zorder=0)
+            ax.plot([x + offset, nx + offset], [y + offset, ny + offset], c='black', zorder=0)
+            ax.plot([x2 + offset, nx2 + offset], [y2 + offset, ny2 + offset], c='black', zorder=0)
+
+        plt.title("Shapez2: Routing using Integer Linear Programming (ILP) -- Jiahao")
+
+        # show
+        plt.show()
 
     def add_variable_is_node_used_by_step_edges(self):
         self.is_node_used_by_step_edge: Dict[int, Dict[Node, Var]] = defaultdict(lambda: defaultdict(Var))
@@ -218,10 +305,6 @@ class DirectionalJumpRouter:
             self.add_directional_constraints_w_component(i)
 
         self.add_things_overlap_constraints()
-
-        self.add_component_count_constraint()
-        self.add_component_pre_placement_constraint()
-        self.add_component_source_sink_overlap_constraints()
 
         if self.symmetry:
             self.add_symmetry_constraints()
@@ -436,6 +519,17 @@ class DirectionalJumpRouter:
         #     if component in preplacement_list:
         #         self.is_component_used[component].Start = 1
 
+    def add_component_basic_overlap_constraints(self):
+        # between components
+        for node in self.all_nodes:
+            list_of_things_using_node = []
+            for component in self.node_related_components[node]:
+                list_of_things_using_node.append(self.is_component_used[component])
+            for component in self.node_related_secondary_components[node]:
+                list_of_things_using_node.append(self.is_component_used[component])
+            # constraint: at most one thing can use a node
+            self.model.addConstr(quicksum(list_of_things_using_node) <= 1)
+
     def add_component_source_sink_overlap_constraints(self):
         for node in self.all_nodes:
             # node related component parts
@@ -626,13 +720,13 @@ if __name__ == "__main__":
         #  [(0, 6), (0, 7), (0, 8)],
         #  [(6, 15), (7, 15), (8, 15)]),
 
-        ([(7, 0), (8, 0), (9, 0)], 
-         [(0, 7), (0, 8), (0, 9)],
-         [(7, 15), (8, 15), (9, 15)]),
+        # ([(7, 0), (8, 0), (9, 0)], 
+        #  [(0, 7), (0, 8), (0, 9)],
+        #  [(7, 15), (8, 15), (9, 15)]),
 
-        # ([(6, 0), (7, 0), (8, 0), (9, 0)], 
-        #  [(0, 6), (0, 7), (0, 8), (0, 9)],
-        #  [(6, 15), (7, 15), (8, 15), (9, 15)]),
+        ([(6, 0), (7, 0), (8, 0), (9, 0)], 
+         [(0, 6), (0, 7), (0, 8), (0, 9)],
+         [(6, 15), (7, 15), (8, 15), (9, 15)]),
 
         ]
     router = DirectionalJumpRouter(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = -1, symmetry = False, option = 1)
