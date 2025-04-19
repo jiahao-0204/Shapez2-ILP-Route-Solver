@@ -227,6 +227,9 @@ class DirectionalJumpRouter:
         self.model.setParam('Presolve', 2)
         self.model.setParam('Heuristics', 0.5)
 
+        plt.figure(figsize=(12, 6))
+        self.ax = plt.gca()
+        plt.show(block=False)
         self.model.optimize(self.benders_callback)
 
         # self.model.optimize()
@@ -250,6 +253,9 @@ class DirectionalJumpRouter:
             components_used = [component for component, value in is_component_used.items() if value > 0.5]
             print("Solving subproblem with", [component[0] for component in components_used])
 
+            # draw components
+            self.draw_components(is_component_used)
+
             # solve subproblem
             feasible, cost, is_edge_used = self.solve_subproblem(is_component_used)
 
@@ -265,9 +271,6 @@ class DirectionalJumpRouter:
                     self.sub_problem_is_component_used = is_component_used
                     self.sub_problem_is_edge_used = is_edge_used
                     model.cbLazy(self.sub_problem_cost >= cost)
-
-            # # draw components
-            # self.draw_components(is_component_used)
 
     def solve_subproblem(self, is_component_used):
         sub_model = Model("subproblem")
@@ -315,8 +318,8 @@ class DirectionalJumpRouter:
         # self.plot()
 
     def draw_components(self, is_component_used):
-        plt.figure(figsize=(12, 6))
-        ax = plt.gca()
+        ax = self.ax
+        ax.clear()
         ax.set_xlim(0, self.WIDTH)
         ax.set_ylim(0, self.HEIGHT)
         ax.set_xticks(range(self.WIDTH))
@@ -367,8 +370,8 @@ class DirectionalJumpRouter:
 
         plt.title("Shapez2: Routing using Integer Linear Programming (ILP) -- Jiahao")
 
-        # show
-        plt.show()
+        plt.draw()
+        plt.pause(0.1)
 
     def add_variable_is_node_used_by_step_edges(self, sub_model, sub_problem_data):
         sub_problem_data["is_node_used_by_step_edge"] = defaultdict(lambda: defaultdict(Var))
