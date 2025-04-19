@@ -243,7 +243,7 @@ class DirectionalJumpRouter:
     def benders_callback(self, model, where):
         if where == GRB.Callback.MIPSOL:
             # get master solution
-            is_component_used = {component: model.cbGetSolution(self.is_component_used[component]) for component in self.all_components}}
+            is_component_used = {component: model.cbGetSolution(self.is_component_used[component]) for component in self.all_components}
 
             # solve subproblem
             feasible, cost = self.solve_subproblem(is_component_used)
@@ -299,7 +299,10 @@ class DirectionalJumpRouter:
         self.solve(sub_model)
 
         # get solution
-        return sub_model.status == GRB.OPTIMAL, sub_model.ObjVal
+        if sub_model.Status == GRB.INFEASIBLE:
+            return False, None
+        else:
+            return True, sub_model.ObjVal
 
         # # Plot
         # self.plot()
@@ -408,9 +411,8 @@ class DirectionalJumpRouter:
         # Flow conservation constraints for each net
         for node in self.all_nodes:
             node_components = self.node_related_components[node]
-            node_component_used_bool_list = [is_component_used[component] for component in node_components]
-            node_is_component_sink = sub_model.addVar(name = f"node_is_component_sink_{i}_{node}", vtype=GRB.BINARY)
-            sub_model.addGenConstrOr(node_is_component_sink, node_component_used_bool_list)
+            node_component_used_bool_list = [is_component_used[component] > 0.5 for component in node_components]
+            node_is_component_sink = any(node_component_used_bool_list)
 
             in_flow = quicksum(sub_problem_data["edge_flow_value"][i][edge] for edge in self.all_edges if edge[1] == node)
             out_flow = quicksum(sub_problem_data["edge_flow_value"][i][edge] for edge in self.all_edges if edge[0] == node)
@@ -423,8 +425,10 @@ class DirectionalJumpRouter:
                 sub_model.addConstr(in_flow == 0)
                 sub_model.addConstr(out_flow == self.start_amount)
             else:
-                sub_model.addGenConstrIndicator(node_is_component_sink, True, in_flow - out_flow == self.component_sink_amount)
-                sub_model.addGenConstrIndicator(node_is_component_sink, False, in_flow - out_flow == 0)
+                if node_is_component_sink:
+                    sub_model.addConstr(in_flow - out_flow == self.component_sink_amount)
+                else:
+                    sub_model.addConstr(in_flow - out_flow == 0)
     
     def add_flow_constraints_component_to_goal(self, i, sub_model, sub_problem_data, is_component_used):
         sub_problem_data["edge_flow_value"] = {}
@@ -443,9 +447,8 @@ class DirectionalJumpRouter:
         # Flow conservation constraints for each net
         for node in self.all_nodes:
             node_components = self.node_related_component_sources[node]
-            node_component_used_bool_list = [is_component_used[component] for component in node_components]
-            node_is_component_source = sub_model.addVar(name = f"node_is_component_source_{i}_{node}", vtype=GRB.BINARY)
-            sub_model.addGenConstrOr(node_is_component_source, node_component_used_bool_list)
+            node_component_used_bool_list = [is_component_used[component] > 0.5 for component in node_components]
+            node_is_component_source = any(node_component_used_bool_list)
 
             in_flow = quicksum(sub_problem_data["edge_flow_value"][i][edge] for edge in self.all_edges if edge[1] == node)
             out_flow = quicksum(sub_problem_data["edge_flow_value"][i][edge] for edge in self.all_edges if edge[0] == node)
@@ -458,8 +461,10 @@ class DirectionalJumpRouter:
                 sub_model.addConstr(out_flow == 0)
                 sub_model.addConstr(in_flow == self.goal_amount)
             else:
-                sub_model.addGenConstrIndicator(node_is_component_source, True, out_flow - in_flow == self.component_source_amount * quicksum(node_component_used_bool_list))                
-                sub_model.addGenConstrIndicator(node_is_component_source, False, out_flow - in_flow == 0)
+                if node_is_component_source:
+                    sub_model.addConstr(out_flow - in_flow == self.component_source_amount * quicksum(node_component_used_bool_list))
+                else:
+                    sub_model.addConstr(out_flow - in_flow == 0)
 
     def add_flow_constraints_secondary_component_to_goal(self, i, sub_model, sub_problem_data, is_component_used):
         sub_problem_data["edge_flow_value"] = {}
@@ -478,9 +483,8 @@ class DirectionalJumpRouter:
         # Flow conservation constraints for each net
         for node in self.all_nodes:
             node_components = self.node_related_component_secondary_sources[node]
-            node_component_used_bool_list = [is_component_used[component] for component in node_components]
-            node_is_component_source = sub_model.addVar(name = f"node_is_component_source_{i}_{node}", vtype=GRB.BINARY)
-            sub_model.addGenConstrOr(node_is_component_source, node_component_used_bool_list)
+            node_component_used_bool_list = [is_component_used[component] > 0.5 for component in node_components]
+            node_is_component_source = any(node_component_used_bool_list)
 
             in_flow = quicksum(sub_problem_data["edge_flow_value"][i][edge] for edge in self.all_edges if edge[1] == node)
             out_flow = quicksum(sub_problem_data["edge_flow_value"][i][edge] for edge in self.all_edges if edge[0] == node)
@@ -493,8 +497,10 @@ class DirectionalJumpRouter:
                 sub_model.addConstr(out_flow == 0)
                 sub_model.addConstr(in_flow == self.goal_amount)
             else:
-                sub_model.addGenConstrIndicator(node_is_component_source, True, out_flow - in_flow == self.component_source_amount * quicksum(node_component_used_bool_list))
-                sub_model.addGenConstrIndicator(node_is_component_source, False, out_flow - in_flow == 0)
+                if node_is_component_source:
+                    sub_model.addConstr(out_flow - in_flow == self.component_source_amount * quicksum(node_component_used_bool_list))
+                else:
+                    sub_model.addConstr(out_flow - in_flow == 0)
                   
     def add_directional_constraints_w_component(self, i, sub_model, sub_problem_data, is_component_used):
         # no jump edge at start
@@ -517,7 +523,8 @@ class DirectionalJumpRouter:
                         continue
                     else:
                         # sub_model.addGenConstrIndicator(is_component_used[component], True, sub_problem_data["is_edge_used"][i][jump_edge] == 0)
-                        sub_model.addConstr(sub_problem_data["is_edge_used"][i][jump_edge] + is_component_used[component] <= 1)
+                        if is_component_used[component] > 0.5:
+                            sub_model.addConstr(sub_problem_data["is_edge_used"][i][jump_edge] == 0)
             
             # for each possible component sink that can be placed at this node
             for component in self.node_related_component_sinks[node]:
@@ -531,7 +538,8 @@ class DirectionalJumpRouter:
                         continue
                     else:
                         # sub_model.addGenConstrIndicator(is_component_used[component], True, sub_problem_data["is_edge_used"][i][jump_edge] == 0)
-                        sub_model.addConstr(sub_problem_data["is_edge_used"][i][jump_edge] + is_component_used[component] <= 1)
+                        if is_component_used[component] > 0.5:
+                            sub_model.addConstr(sub_problem_data["is_edge_used"][i][jump_edge] == 0)
 
         # for each edge, if the edge is used, then the end node must not have jump edge at different direction
         for edge in self.all_edges:
@@ -550,18 +558,25 @@ class DirectionalJumpRouter:
         # between belts / pads / components
         for node in self.all_nodes:
             list_of_things_using_node = []
+            occupied = False
             # for i in range(self.num_nets):
             #     list_of_things_using_node.append(self.is_node_used_by_net[i][node])
             for i in range(self.num_nets):
                 list_of_things_using_node.append(sub_problem_data["is_node_used_by_step_edge"][i][node])
                 list_of_things_using_node += [sub_problem_data["is_edge_used"][i][edge] for edge in self.node_related_jump_edges[node]]
             for component in self.node_related_components[node]:
-                list_of_things_using_node.append(is_component_used[component])
+                if is_component_used[component] > 0.5:
+                    occupied = True
             for component in self.node_related_secondary_components[node]:
-                list_of_things_using_node.append(is_component_used[component])
+                if is_component_used[component] > 0.5:
+                    occupied = True
             
-            # constraint: at most one thing can use a node
-            sub_model.addConstr(quicksum(list_of_things_using_node) <= 1)
+            if occupied:
+                # no things can occupy this
+                sub_model.addConstr(quicksum(list_of_things_using_node) == 0)
+            else:
+                # constraint: at most one thing can use a node
+                sub_model.addConstr(quicksum(list_of_things_using_node) <= 1)
 
     def add_component_count_constraint(self):
         # add component count constraint
