@@ -232,7 +232,9 @@ class DirectionalJumpRouter:
         # self.model.optimize()
 
         is_component_used = {component: self.is_component_used[component].X for component in self.all_components}
-        self.draw_components(is_component_used)
+        # self.draw_components(is_component_used)
+
+        self.plot(self.sub_problem_is_edge_used, is_component_used)
 
         # self.model.computeIIS()
         # if self.model.status == GRB.INFEASIBLE:
@@ -246,7 +248,7 @@ class DirectionalJumpRouter:
             is_component_used = {component: model.cbGetSolution(self.is_component_used[component]) for component in self.all_components}
 
             # solve subproblem
-            feasible, cost = self.solve_subproblem(is_component_used)
+            feasible, cost, is_edge_used = self.solve_subproblem(is_component_used)
 
             # cut the component used if combination not feasible
             if not feasible:
@@ -254,9 +256,11 @@ class DirectionalJumpRouter:
                 expr = quicksum(self.is_component_used[component] for component in used_components)
                 model.cbLazy(expr <= len(used_components)-1)
                 return
-            
-            # here the solution is feasible
-            model.cbLazy(self.sub_problem_cost >= cost)
+            else:
+                if cost > model.cbGetSolution(self.sub_problem_cost) + 1e-6:
+                    # here the solution is feasible
+                    self.sub_problem_is_edge_used = is_edge_used
+                    model.cbLazy(self.sub_problem_cost >= cost)
 
             # # plot location of components
             # components_used = [component for component, value in is_component_used.items() if value > 0.5]
@@ -268,7 +272,7 @@ class DirectionalJumpRouter:
 
     def solve_subproblem(self, is_component_used):
         sub_model = Model("subproblem")
-        sub_model.Params.OutputFlag = 0  # silent
+        # sub_model.Params.OutputFlag = 0  # silent
         if self.timelimit != -1:
             sub_model.Params.TimeLimit = self.timelimit
         sub_model.Params.MIPFocus = self.option
@@ -300,9 +304,13 @@ class DirectionalJumpRouter:
 
         # get solution
         if sub_model.Status == GRB.INFEASIBLE:
-            return False, None
+            return False, None, None
         else:
-            return True, sub_model.ObjVal
+            is_edge_used = {}
+            for i in range(self.num_nets):
+                is_edge_used[i] = {edge: sub_model.getVarByName(f"edge_{i}_{edge}").X for edge in self.all_edges}
+                sub_problem_data["is_edge_used"][i] = is_edge_used[i]
+            return True, sub_model.ObjVal, is_edge_used
 
         # # Plot
         # self.plot()
@@ -613,6 +621,28 @@ class DirectionalJumpRouter:
         # preplacement_list.append(((10, 10), (0, -1), (-1, 0)))
         # preplacement_list.append(((12, 10), (0, -1), (1, 0)))
 
+
+        # easy T shape output
+        preplacement_list.append(((4, 3), (1, 0), (0, 1)))
+        preplacement_list.append(((4, 7), (1, 0), (0, -1)))
+        preplacement_list.append(((4, 9), (1, 0), (0, 1)))
+        preplacement_list.append(((4, 13), (1, 0), (0, -1)))
+
+        preplacement_list.append(((6, 3), (-1, 0), (0, 1)))
+        preplacement_list.append(((6, 7), (-1, 0), (0, -1)))
+        preplacement_list.append(((6, 9), (-1, 0), (0, 1)))
+        preplacement_list.append(((6, 13), (-1, 0), (0, -1)))
+
+        preplacement_list.append(((9, 3), (1, 0), (0, 1)))
+        preplacement_list.append(((9, 7), (1, 0), (0, -1)))
+        preplacement_list.append(((9, 9), (1, 0), (0, 1)))
+        preplacement_list.append(((9, 13), (1, 0), (0, -1)))
+
+        preplacement_list.append(((11, 3), (-1, 0), (0, 1)))
+        preplacement_list.append(((11, 7), (-1, 0), (0, -1)))
+        preplacement_list.append(((11, 9), (-1, 0), (0, 1)))
+        preplacement_list.append(((11, 13), (-1, 0), (0, -1)))
+
         for component in preplacement_list:
             # add constraint
             self.model.addConstr(self.is_component_used[component] == 1, name=f"component_pre_placement_{component}")
@@ -719,7 +749,7 @@ class DirectionalJumpRouter:
         # relaxed_model.feasRelaxS(0, False, False, True)
         # relaxed_model.optimize()
 
-    def plot(self, sub_problem_data, is_component_used):
+    def plot(self, sub_problem_is_edge_used, is_component_used):
         plt.figure(figsize=(12, 6))
         ax = plt.gca()
         ax.set_xlim(0, self.WIDTH)
@@ -742,8 +772,8 @@ class DirectionalJumpRouter:
         for i in range(self.num_nets):
             color = colors[i % len(colors)]
 
-            used_step_edges = [e for e in self.step_edges if sub_problem_data["is_edge_used"][i][e].X == 1]
-            used_jump_edges = [e for e in self.jump_edges if sub_problem_data["is_edge_used"][i][e].X == 1]
+            used_step_edges = [e for e in self.step_edges if sub_problem_is_edge_used[i][e] == 1]
+            used_jump_edges = [e for e in self.jump_edges if sub_problem_is_edge_used[i][e] == 1]
 
             # Plot start and goal
             for start in self.net_sources[i]:
@@ -790,7 +820,7 @@ class DirectionalJumpRouter:
                 ax.scatter(u2x + offset, u2y + offset, c=color, marker=marker, s=80, edgecolors='black', zorder = 2)
         
         # draw components
-        used_components = [c for c in self.all_components if is_component_used[c].X == 1]
+        used_components = [c for c in self.all_components if is_component_used[c] == 1]
         for component in used_components:
             (x, y), (dx, dy), (dx2, dy2) = component        # two‑cell component
             nx, ny = x + dx, y + dy
@@ -862,12 +892,18 @@ if __name__ == "__main__":
         #  [(0, 7), (0, 8), (0, 9)],
         #  [(7, 15), (8, 15), (9, 15)]),
 
+        # ([(6, 0), (7, 0), (8, 0), (9, 0)], 
+        #  [(0, 6), (0, 7), (0, 8), (0, 9)],
+        #  [(6, 15), (7, 15), (8, 15), (9, 15)]),
+
+        
+        # easy T shape output
         ([(6, 0), (7, 0), (8, 0), (9, 0)], 
          [(0, 6), (0, 7), (0, 8), (0, 9)],
-         [(6, 15), (7, 15), (8, 15), (9, 15)]),
+         [(15, 6), (15, 7), (15, 8), (15, 9)]),
 
         ]
-    router = DirectionalJumpRouter(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = -1, symmetry = False, option = 3)
+    router = DirectionalJumpRouter(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = -1, symmetry = False, option = 1)
     # option 0: balanced
     # option 1: feasibility
     # option 2: bound
