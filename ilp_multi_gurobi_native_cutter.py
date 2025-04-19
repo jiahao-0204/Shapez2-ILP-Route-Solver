@@ -253,7 +253,7 @@ class DirectionalJumpRouter:
 
         self.add_component_count_constraint()
         self.add_component_pre_placement_constraint()
-        # self.add_component_source_sink_overlap_constraints()
+        self.add_component_source_sink_overlap_constraints()
 
         if self.symmetry:
             self.add_symmetry_constraints()
@@ -660,27 +660,75 @@ class DirectionalJumpRouter:
         # preplacement_list.append(((13, 10), (0, -1), (-1, 0)))
 
 
-        # # T shape output
-        preplacement_list.append(((4, 3), (1, 0), (0, 1)))
-        preplacement_list.append(((4, 7), (1, 0), (0, -1)))
-        preplacement_list.append(((4, 9), (1, 0), (0, 1)))
-        preplacement_list.append(((4, 13), (1, 0), (0, -1)))
+        # # # T shape output
+        # preplacement_list.append(((4, 3), (1, 0), (0, 1)))
+        # preplacement_list.append(((4, 7), (1, 0), (0, -1)))
+        # preplacement_list.append(((4, 9), (1, 0), (0, 1)))
+        # preplacement_list.append(((4, 13), (1, 0), (0, -1)))
 
-        preplacement_list.append(((6, 3), (-1, 0), (0, 1)))
-        preplacement_list.append(((6, 7), (-1, 0), (0, -1)))
-        preplacement_list.append(((6, 9), (-1, 0), (0, 1)))
-        preplacement_list.append(((6, 13), (-1, 0), (0, -1)))
+        # preplacement_list.append(((6, 3), (-1, 0), (0, 1)))
+        # preplacement_list.append(((6, 7), (-1, 0), (0, -1)))
+        # preplacement_list.append(((6, 9), (-1, 0), (0, 1)))
+        # preplacement_list.append(((6, 13), (-1, 0), (0, -1)))
 
-        preplacement_list.append(((9, 3), (1, 0), (0, 1)))
-        preplacement_list.append(((9, 7), (1, 0), (0, -1)))
-        preplacement_list.append(((9, 9), (1, 0), (0, 1)))
-        preplacement_list.append(((9, 13), (1, 0), (0, -1)))
+        # preplacement_list.append(((9, 3), (1, 0), (0, 1)))
+        # preplacement_list.append(((9, 7), (1, 0), (0, -1)))
+        # preplacement_list.append(((9, 9), (1, 0), (0, 1)))
+        # preplacement_list.append(((9, 13), (1, 0), (0, -1)))
 
-        preplacement_list.append(((11, 3), (-1, 0), (0, 1)))
-        preplacement_list.append(((11, 7), (-1, 0), (0, -1)))
-        preplacement_list.append(((11, 9), (-1, 0), (0, 1)))
-        preplacement_list.append(((11, 13), (-1, 0), (0, -1)))
+        # preplacement_list.append(((11, 3), (-1, 0), (0, 1)))
+        # preplacement_list.append(((11, 7), (-1, 0), (0, -1)))
+        # preplacement_list.append(((11, 9), (-1, 0), (0, 1)))
+        # preplacement_list.append(((11, 13), (-1, 0), (0, -1)))
 
+
+
+
+        # regular but reverse output
+        # # preplacement_list.append(((3, 3), (0, 1), (1, 0)))
+        # # preplacement_list.append(((7, 3), (0, 1), (-1, 0)))
+        # preplacement_list.append(((9, 3), (0, 1), (1, 0)))
+        # preplacement_list.append(((13, 3), (0, 1), (-1, 0)))
+
+        # # preplacement_list.append(((3, 5), (0, -1), (1, 0)))
+        # # preplacement_list.append(((7, 5), (0, -1), (-1, 0)))
+        # preplacement_list.append(((9, 5), (0, -1), (1, 0)))
+        # preplacement_list.append(((13, 5), (0, -1), (-1, 0)))
+
+        # # preplacement_list.append(((4, 12), (1, 0), (0, -1)))
+        # # preplacement_list.append(((7, 8), (0, 1), (-1, 0)))
+        # preplacement_list.append(((9, 8), (0, 1), (1, 0)))
+        # preplacement_list.append(((13, 8), (0, 1), (-1, 0)))
+
+        # # preplacement_list.append(((6, 12), (-1, 0), (0, -1)))
+        # # preplacement_list.append(((7, 10), (0, -1), (-1, 0)))
+        # preplacement_list.append(((9, 10), (0, -1), (1, 0)))
+        # preplacement_list.append(((13, 10), (0, -1), (-1, 0)))
+
+
+
+
+        # preplacement_list.append(((3, 2), (0, 1), (-1, 0)))
+        preplacement_list.append(((6, 3), (0, 1), (1, 0)))
+        preplacement_list.append(((10, 3), (0, 1), (-1, 0)))
+        preplacement_list.append(((12, 3), (0, 1), (1, 0)))
+
+        # preplacement_list.append(((3, 4), (0, -1), (-1, 0)))
+        preplacement_list.append(((6, 5), (0, -1), (1, 0)))
+        preplacement_list.append(((10, 5), (0, -1), (-1, 0)))
+        preplacement_list.append(((12, 5), (0, -1), (1, 0)))
+
+        # preplacement_list.append(((5, 10), (0, -1), (-1, 0)))
+        # preplacement_list.append(((5, 11), (-1, 0), (0, 1))) # this next
+        # preplacement_list.append(((5, 12), (0, 1), (1, 0))) # this next 2
+        preplacement_list.append(((6, 8), (0, 1), (1, 0)))
+        preplacement_list.append(((10, 8), (0, 1), (-1, 0)))
+        preplacement_list.append(((12, 8), (0, 1), (1, 0)))
+
+        # preplacement_list.append(((3, 12), (0, 1), (-1, 0))) # this next 2
+        preplacement_list.append(((6, 10), (0, -1), (1, 0)))
+        preplacement_list.append(((10, 10), (0, -1), (-1, 0)))
+        preplacement_list.append(((12, 10), (0, -1), (1, 0)))
 
         for component in preplacement_list:
             # add constraint
@@ -972,14 +1020,38 @@ if __name__ == "__main__":
         #  [(0, 6), (0, 7), (0, 8)],
         #  [(15, 6), (15, 7), (15, 8)]),
 
-        ([(6, 0), (7, 0), (8, 0), (9, 0)], 
-         [(0, 6), (0, 7), (0, 8), (0, 9)],
-         [(15, 6), (15, 7), (15, 8), (15, 9)]),
+        # ([(6, 0), (7, 0), (8, 0), (9, 0)], 
+        #  [(0, 6), (0, 7), (0, 8), (0, 9)],
+        #  [(15, 6), (15, 7), (15, 8), (15, 9)]),
 
 
+        # regular output but up and left reversed
+        # ([(6, 0)], 
+        #  [(0, 6)],
+        #  [(6, 15)]),
+
+        # ([(6, 0), (7, 0)], 
+        # [(0, 6), (0, 7)],
+        # [(6, 15), (7, 15)]),
+
+        # ([(6, 0), (8, 0)], 
+        #  [(0, 6), (0, 8)],
+        #  [(6, 15), (8, 15)]),
+
+        # ([(6, 0), (7, 0), (8, 0)], 
+        #  [(0, 6), (0, 7), (0, 8)],
+        #  [(6, 15), (7, 15), (8, 15)]),
+
+        ([(7, 0), (8, 0), (9, 0)], 
+         [(0, 7), (0, 8), (0, 9)],
+         [(7, 15), (8, 15), (9, 15)]),
+
+        # ([(6, 0), (7, 0), (8, 0), (9, 0)], 
+        #  [(0, 6), (0, 7), (0, 8), (0, 9)],
+        #  [(6, 15), (7, 15), (8, 15), (9, 15)]),
 
         ]
-    router = DirectionalJumpRouter(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = -1, symmetry = False, option = 0)
+    router = DirectionalJumpRouter(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = -1, symmetry = False, option = 1)
     # option 0: balanced
     # option 1: feasibility
     # option 2: bound
