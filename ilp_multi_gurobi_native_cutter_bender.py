@@ -45,6 +45,30 @@ class DirectionalJumpRouter:
         self.net_sources[2] = []
         self.net_sinks[2] = sinks2
 
+        self.preplacement_list = []
+        self.preplacement_list.append(((3, 2), (0, 1), (-1, 0)))
+        self.preplacement_list.append(((6, 3), (0, 1), (1, 0)))
+        self.preplacement_list.append(((10, 3), (0, 1), (-1, 0)))
+        self.preplacement_list.append(((12, 3), (0, 1), (1, 0)))
+
+        self.preplacement_list.append(((3, 4), (0, -1), (-1, 0)))
+        self.preplacement_list.append(((6, 5), (0, -1), (1, 0)))
+        self.preplacement_list.append(((10, 5), (0, -1), (-1, 0)))
+        self.preplacement_list.append(((12, 5), (0, -1), (1, 0)))
+
+        # preplacement_list.append(((5, 10), (0, -1), (-1, 0)))
+        self.preplacement_list.append(((6, 8), (0, 1), (1, 0)))
+        self.preplacement_list.append(((10, 8), (0, 1), (-1, 0)))
+        self.preplacement_list.append(((12, 8), (0, 1), (1, 0)))
+
+        # preplacement_list.append(((3, 12), (0, 1), (-1, 0))) # this next 2
+        self.preplacement_list.append(((6, 10), (0, -1), (1, 0)))
+        self.preplacement_list.append(((10, 10), (0, -1), (-1, 0)))
+        self.preplacement_list.append(((12, 10), (0, -1), (1, 0)))
+
+        # self.preplacement_list.append(((4, 11), (1, 0), (0, -1)))
+        self.preplacement_list.append(((2, 10), (0, 1), (1, 0)))
+
         self.flow_cap = 4
         self.start_amount = 4
         self.goal_amount = 4
@@ -594,58 +618,7 @@ class DirectionalJumpRouter:
         self.model.addConstr(quicksum(component_used_bool_list) == self.component_count, name="component_count_constraint")
 
     def add_component_pre_placement_constraint(self):
-        preplacement_list = []
-
-        # preplacement_list.append(((6, 8), (0, 1), (1, 0)))
-        # preplacement_list.append(((7, 7), (1, 0), (0, -1)))
-        # # preplacement_list.append(((6, 6), (0, -1), (-1, 0)))
-        # preplacement_list.append(((5, 7), (-1, 0), (0, 1)))
-
-        # # preplacement_list.append(((3, 2), (0, 1), (-1, 0)))
-        # preplacement_list.append(((6, 3), (0, 1), (1, 0)))
-        # preplacement_list.append(((10, 3), (0, 1), (-1, 0)))
-        # preplacement_list.append(((12, 3), (0, 1), (1, 0)))
-
-        # # preplacement_list.append(((3, 4), (0, -1), (-1, 0)))
-        # preplacement_list.append(((6, 5), (0, -1), (1, 0)))
-        # preplacement_list.append(((10, 5), (0, -1), (-1, 0)))
-        # preplacement_list.append(((12, 5), (0, -1), (1, 0)))
-
-        # # preplacement_list.append(((5, 10), (0, -1), (-1, 0)))
-        # # preplacement_list.append(((5, 11), (-1, 0), (0, 1))) # this next
-        # # preplacement_list.append(((5, 12), (0, 1), (1, 0))) # this next 2
-        # preplacement_list.append(((6, 8), (0, 1), (1, 0)))
-        # preplacement_list.append(((10, 8), (0, 1), (-1, 0)))
-        # preplacement_list.append(((12, 8), (0, 1), (1, 0)))
-
-        # # preplacement_list.append(((3, 12), (0, 1), (-1, 0))) # this next 2
-        # preplacement_list.append(((6, 10), (0, -1), (1, 0)))
-        # preplacement_list.append(((10, 10), (0, -1), (-1, 0)))
-        # preplacement_list.append(((12, 10), (0, -1), (1, 0)))
-
-
-        # # easy T shape output
-        # preplacement_list.append(((4, 3), (1, 0), (0, 1)))
-        # preplacement_list.append(((4, 7), (1, 0), (0, -1)))
-        # preplacement_list.append(((4, 9), (1, 0), (0, 1)))
-        # preplacement_list.append(((4, 13), (1, 0), (0, -1)))
-
-        # preplacement_list.append(((6, 3), (-1, 0), (0, 1)))
-        # preplacement_list.append(((6, 7), (-1, 0), (0, -1)))
-        # preplacement_list.append(((6, 9), (-1, 0), (0, 1)))
-        # preplacement_list.append(((6, 13), (-1, 0), (0, -1)))
-
-        # preplacement_list.append(((9, 3), (1, 0), (0, 1)))
-        # preplacement_list.append(((9, 7), (1, 0), (0, -1)))
-        # preplacement_list.append(((9, 9), (1, 0), (0, 1)))
-        # # preplacement_list.append(((9, 13), (1, 0), (0, -1)))
-
-        # preplacement_list.append(((11, 3), (-1, 0), (0, 1)))
-        # preplacement_list.append(((11, 7), (-1, 0), (0, -1)))
-        # preplacement_list.append(((11, 9), (-1, 0), (0, 1)))
-        # # preplacement_list.append(((11, 13), (-1, 0), (0, -1)))
-
-        for component in preplacement_list:
+        for component in self.preplacement_list:
             # add constraint
             self.model.addConstr(self.is_component_used[component] == 1, name=f"component_pre_placement_{component}")
 
