@@ -74,8 +74,11 @@ class DirectionalJumpRouter:
         self.goal_amount = 4
         self.component_source_amount = 1
         self.component_sink_amount = 1
-        # self.component_count = 12
-        self.component_count = len(self.net_sources[0]) * (4/self.component_source_amount)
+        self.component_count = len(self.preplacement_list)
+        self.total_start_amount = self.component_count * self.component_sink_amount
+        self.total_goal_amount = self.component_count * self.component_source_amount
+        self.total_secondary_goal_amount = self.component_count * self.component_source_amount
+        # self.component_count = len(self.net_sources[0]) * (4/self.component_source_amount)
         self.component_priority = 100
         self.edge_priority = 50
         self.flow_priority = 25
@@ -457,7 +460,9 @@ class DirectionalJumpRouter:
 
             if node in sources:
                 sub_model.addConstr(in_flow == 0)
-                sub_model.addConstr(out_flow == self.start_amount)
+                start_amount = min(self.start_amount, self.total_start_amount)
+                self.total_start_amount -= start_amount
+                sub_model.addConstr(out_flow == start_amount)
             else:
                 if node_is_component_sink:
                     sub_model.addConstr(in_flow - out_flow == self.component_sink_amount)
@@ -493,7 +498,9 @@ class DirectionalJumpRouter:
 
             if node in sinks:
                 sub_model.addConstr(out_flow == 0)
-                sub_model.addConstr(in_flow == self.goal_amount)
+                goal_amount = min(self.goal_amount, self.total_goal_amount)
+                self.total_goal_amount -= goal_amount
+                sub_model.addConstr(in_flow == goal_amount)
             else:
                 if node_is_component_source:
                     sub_model.addConstr(out_flow - in_flow == self.component_source_amount * quicksum(node_component_used_bool_list))
@@ -529,7 +536,9 @@ class DirectionalJumpRouter:
 
             if node in sinks:
                 sub_model.addConstr(out_flow == 0)
-                sub_model.addConstr(in_flow == self.goal_amount)
+                goal_amount = min(self.goal_amount, self.total_secondary_goal_amount)
+                self.total_secondary_goal_amount -= goal_amount
+                sub_model.addConstr(in_flow == goal_amount)
             else:
                 if node_is_component_source:
                     sub_model.addConstr(out_flow - in_flow == self.component_source_amount * quicksum(node_component_used_bool_list))
