@@ -46,28 +46,25 @@ class DirectionalJumpRouter:
         self.net_sinks[2] = sinks2
 
         self.preplacement_list = []
-        self.preplacement_list.append(((3, 2), (0, 1), (-1, 0)))
-        self.preplacement_list.append(((6, 3), (0, 1), (1, 0)))
-        self.preplacement_list.append(((10, 3), (0, 1), (-1, 0)))
-        self.preplacement_list.append(((12, 3), (0, 1), (1, 0)))
+        self.preplacement_list.append(((4, 3), (1, 0), (0, 1)))
+        self.preplacement_list.append(((4, 7), (1, 0), (0, -1)))
+        self.preplacement_list.append(((4, 9), (1, 0), (0, 1)))
+        self.preplacement_list.append(((4, 13), (1, 0), (0, -1)))
 
-        self.preplacement_list.append(((3, 4), (0, -1), (-1, 0)))
-        self.preplacement_list.append(((6, 5), (0, -1), (1, 0)))
-        self.preplacement_list.append(((10, 5), (0, -1), (-1, 0)))
-        self.preplacement_list.append(((12, 5), (0, -1), (1, 0)))
+        self.preplacement_list.append(((6, 3), (-1, 0), (0, 1)))
+        self.preplacement_list.append(((6, 7), (-1, 0), (0, -1)))
+        self.preplacement_list.append(((6, 9), (-1, 0), (0, 1)))
+        self.preplacement_list.append(((6, 13), (-1, 0), (0, -1)))
 
-        # preplacement_list.append(((5, 10), (0, -1), (-1, 0)))
-        self.preplacement_list.append(((6, 8), (0, 1), (1, 0)))
-        self.preplacement_list.append(((10, 8), (0, 1), (-1, 0)))
-        self.preplacement_list.append(((12, 8), (0, 1), (1, 0)))
+        self.preplacement_list.append(((9, 3), (1, 0), (0, 1)))
+        self.preplacement_list.append(((9, 7), (1, 0), (0, -1)))
+        self.preplacement_list.append(((9, 9), (1, 0), (0, 1)))
+        self.preplacement_list.append(((9, 13), (1, 0), (0, -1)))
 
-        # preplacement_list.append(((3, 12), (0, 1), (-1, 0))) # this next 2
-        self.preplacement_list.append(((6, 10), (0, -1), (1, 0)))
-        self.preplacement_list.append(((10, 10), (0, -1), (-1, 0)))
-        self.preplacement_list.append(((12, 10), (0, -1), (1, 0)))
-
-        # self.preplacement_list.append(((4, 11), (1, 0), (0, -1)))
-        self.preplacement_list.append(((2, 10), (0, 1), (1, 0)))
+        self.preplacement_list.append(((11, 3), (-1, 0), (0, 1)))
+        self.preplacement_list.append(((11, 7), (-1, 0), (0, -1)))
+        self.preplacement_list.append(((11, 9), (-1, 0), (0, 1)))
+        self.preplacement_list.append(((11, 13), (-1, 0), (0, -1)))
 
         self.flow_cap = 4
         self.start_amount = 4
@@ -298,6 +295,10 @@ class DirectionalJumpRouter:
                     self.sub_problem_is_component_used = is_component_used
                     self.sub_problem_is_edge_used = is_edge_used
                     model.cbLazy(self.sub_problem_cost >= cost)
+
+                    self.plot(is_edge_used, is_component_used)
+
+                    exit(0)
 
     def solve_subproblem(self, is_component_used):
         sub_model = Model("subproblem")
@@ -876,15 +877,15 @@ if __name__ == "__main__":
         #  [(0, 7), (0, 8), (0, 9)],
         #  [(7, 15), (8, 15), (9, 15)]),
 
-        ([(6, 0), (7, 0), (8, 0), (9, 0)], 
-         [(0, 6), (0, 7), (0, 8), (0, 9)],
-         [(6, 15), (7, 15), (8, 15), (9, 15)]),
-
-        
-        # # easy T shape output
         # ([(6, 0), (7, 0), (8, 0), (9, 0)], 
         #  [(0, 6), (0, 7), (0, 8), (0, 9)],
-        #  [(15, 6), (15, 7), (15, 8), (15, 9)]),
+        #  [(6, 15), (7, 15), (8, 15), (9, 15)]),
+
+        
+        # easy T shape output
+        ([(6, 0), (7, 0), (8, 0), (9, 0)], 
+         [(0, 6), (0, 7), (0, 8), (0, 9)],
+         [(15, 6), (15, 7), (15, 8), (15, 9)]),
 
         ]
     router = DirectionalJumpRouter(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = -1, symmetry = False, option = 1)
