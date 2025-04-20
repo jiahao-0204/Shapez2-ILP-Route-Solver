@@ -274,7 +274,7 @@ class DirectionalJumpRouter:
 
     def solve_subproblem(self, is_component_used):
         sub_model = Model("subproblem")
-        sub_model.Params.OutputFlag = 0  # silent
+        # sub_model.Params.OutputFlag = 0  # silent
         if self.timelimit != -1:
             sub_model.Params.TimeLimit = self.timelimit
         sub_model.Params.MIPFocus = 1
