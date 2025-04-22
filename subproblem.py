@@ -108,6 +108,7 @@ class SubProblem:
 
         # constraints (in order of large pruning to little pruning, stronger constraints first)
         self.add_start_no_pad_constraints(sub_model)
+        self.add_goal_no_pad_no_belt_constraints(sub_model)
         self.add_cutter_no_belt_no_pad_constraints(sub_model, cutters)
         self.add_cutter_pad_direction_constraints(sub_model, cutters)
 
@@ -165,12 +166,18 @@ class SubProblem:
             sub_model.addConstr(quicksum(list_of_things_using_node) <= 1)
     
     def add_start_no_pad_constraints(self, sub_model):
-        # no jump edge at start
-        for i in range(self.num_nets):
-            for jump_edge in self.jump_edges:
-                u, v, direction = jump_edge
-                if u in self.net_sources[i]:
-                    sub_model.addConstr(self.is_edge_used[i][jump_edge] == 0)
+        # no starting pad 
+        for node in self.net_sources[0]:
+            for edge in self.node_related_starting_pad_edges[node]:
+                for i in range(self.num_nets):
+                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
+        
+    def add_goal_no_pad_no_belt_constraints(self, sub_model):
+        # no belt and starting pad
+        for node in self.net_sinks[1] + self.net_sinks[2]:
+            for edge in self.node_related_belt_edges[node] + self.node_related_starting_pad_edges[node]:
+                for i in range(self.num_nets):
+                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
 
     def add_pad_direction_constraints(self, sub_model):
         # for each edge, if the edge is used, then the end node must not have jump edge at different direction
