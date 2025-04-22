@@ -4,7 +4,10 @@ from typing import Dict, Tuple, List
 
 STEP_COST = 1
 JUMP_COST = 2
+STARTING_PAD = 0
+LANDING_PAD = 1
 
+PAD_TYPE = int
 Node = Tuple[int, int] # (x, y)
 Direction = Tuple[int, int] # (dx, dy)
 Edge = Tuple[Node, Node, Direction] # start, end, direciton
@@ -230,20 +233,30 @@ class SubProblem:
     def add_component_directional_constraints(self, i, sub_model):
         # source location: can only have starting jump pad in the same direction
         for node, direction in self.component_source_node_and_direction:
-            for jump_edge in self.node_related_jump_edges[node]:
-                u, v, jump_direction = jump_edge
-                if u == node and direction == jump_direction:
-                    # skip if jump pad is allowed
-                    continue
-                sub_model.addConstr(self.is_edge_used[i][jump_edge] == 0)
+            allowed_list = [(node, direction, STARTING_PAD)]
+            self.add_static_directional_constraints(i, sub_model, allowed_list)
 
         # input location: can only have landing jump pad in the same direction
         for node, direction in self.component_input_node_and_direction:
-            for jump_edge in self.node_related_jump_edges[node]:
-                u, v, jump_direction = jump_edge
-                if u != node and direction == jump_direction:
-                    # skip if jump pad is allowed
-                    continue
+            allowed_list = [(node, direction, LANDING_PAD)]
+            self.add_static_directional_constraints(i, sub_model, allowed_list)
+
+    def add_static_directional_constraints(self, i, sub_model, allowed_list: List[Tuple[Node, Direction, PAD_TYPE]]):
+        for node, allowed_direction, allowed_type in allowed_list:
+            # related
+            related_jump_edges = self.node_related_jump_edges[node]
+
+            # allowed
+            if allowed_type == STARTING_PAD:
+                allowed_jump_edges = [edge for edge in related_jump_edges if edge[0] == node and edge[2] == allowed_direction]
+            elif allowed_type == LANDING_PAD:
+                allowed_jump_edges = [edge for edge in related_jump_edges if edge[0] != node and edge[2] == allowed_direction]
+            else:
+                raise ValueError("Invalid jump pad type")
+
+            # invalid
+            invalid_jump_edges = [edge for edge in related_jump_edges if edge not in allowed_jump_edges]
+            for jump_edge in invalid_jump_edges:
                 sub_model.addConstr(self.is_edge_used[i][jump_edge] == 0)
 
     def add_things_overlap_constraints(self, sub_model):
