@@ -83,18 +83,12 @@ class SubProblem:
                 # edge flow value
                 self.edge_flow_value[i][edge] = sub_model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=self.flow_cap)
                 self.edge_flow_value[i][edge].setAttr("BranchPriority", self.flow_priority)
-
-                # constraint
-                sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[i][edge] >= 1)
-                sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], False, self.edge_flow_value[i][edge] == 0)
-        
         # in flow and out flow
         for i in range(self.num_nets):
             for node in self.all_nodes:
                 self.node_in_flow_expr[i][node] = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[1] == node)
                 self.node_out_flow_expr[i][node] = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[0] == node)        
-
-        # is node used by step edge
+        # is node used by belt edge
         for i in range(self.num_nets):
             for node in self.all_nodes:
                 node_belt_edges_bool_list = [self.is_edge_used[i][edge] for edge in self.node_related_belt_edges[node]]
@@ -102,32 +96,24 @@ class SubProblem:
 
                 sub_model.addGenConstrOr(self.is_node_used_by_belt[i][node], node_belt_edges_bool_list)
 
-        # component occupied nodes
-        component_occupied_nodes = set()
-        self.component_source_node_and_direction: List[Tuple[Node, Direction]] = []
-        self.component_input_node_and_direction: List[Tuple[Node, Direction]] = []
-        for component, value in is_component_used.items():
-            if value > 0.5:
-                component_node, direction, secondary_direction = component
-                secondary_component_node = (component_node[0] + secondary_direction[0], component_node[1] + secondary_direction[1])
-                component_primary_source_node = (component_node[0] + direction[0], component_node[1] + direction[1])
-                component_secondary_source_node = (secondary_component_node[0] + direction[0], secondary_component_node[1] + direction[1])
-                component_input_node = (component_node[0] - direction[0], component_node[1] - direction[1])
-                component_occupied_nodes.add(component_node)
-                component_occupied_nodes.add(secondary_component_node)
-                self.component_source_node_and_direction.append((component_primary_source_node, direction))
-                self.component_source_node_and_direction.append((component_secondary_source_node, direction))
-                self.component_input_node_and_direction.append((component_input_node, direction))
-        
+        # cutters
+        cutters = [compoenent for compoenent, value in is_component_used.items() if value > 0.5]
+
         # general
         self.add_objective(sub_model)
-        self.add_general_constraints(sub_model)
 
-        # cutter specific
-        cutters = [compoenent for compoenent, value in is_component_used.items() if value > 0.5]
-        self.add_net_for_cutter(sub_model, cutters)
-        self.add_constraints_for_cutter(sub_model, cutters)
+        # constraints (in order of large pruning to little pruning)
+        self.add_cutter_overlap_constraints(sub_model, cutters)
+        self.add_cutter_pad_direction_constraints(sub_model, cutters)
+        self.add_pad_not_at_start_constraints(sub_model)
 
+        self.add_flow_and_is_edge_used_constraints(sub_model)
+        self.add_flow_max_value_constraints(sub_model)
+        self.add_things_overlap_constraints(sub_model)
+        self.add_pad_direction_constraints(sub_model)
+        
+        self.add_cutter_net(sub_model, cutters)
+        
         # Solve
         self.solve(sub_model)
 
@@ -156,13 +142,15 @@ class SubProblem:
             
         sub_model.setObjective(quicksum(step_cost_list + jump_cost_list))
 
-    def add_general_constraints(self, sub_model):
-        self.add_max_flow_constraints(sub_model)
-        self.add_things_overlap_constraints(sub_model)
+    def add_flow_and_is_edge_used_constraints(self, sub_model):
+        # flow value constraints
         for i in range(self.num_nets):
-            self.add_dynamic_directional_constraints(i, sub_model)
+            for edge in self.all_edges:
+                # constraint
+                sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[i][edge] >= 1)
+                sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], False, self.edge_flow_value[i][edge] == 0)
             
-    def add_max_flow_constraints(self, sub_model):
+    def add_flow_max_value_constraints(self, sub_model):
         # max flow at each node
         for i in range(self.num_nets):
             for node in self.all_nodes:
@@ -181,30 +169,33 @@ class SubProblem:
             # constraint: at most one thing can use a node
             sub_model.addConstr(quicksum(list_of_things_using_node) <= 1)
     
-    def add_dynamic_directional_constraints(self, i, sub_model):
+    def add_pad_not_at_start_constraints(self, sub_model):
         # no jump edge at start
-        for jump_edge in self.jump_edges:
-            u, v, direction = jump_edge
-            if u in self.net_sources[i]:
-                sub_model.addConstr(self.is_edge_used[i][jump_edge] == 0)
-        
+        for i in range(self.num_nets):
+            for jump_edge in self.jump_edges:
+                u, v, direction = jump_edge
+                if u in self.net_sources[i]:
+                    sub_model.addConstr(self.is_edge_used[i][jump_edge] == 0)
+
+    def add_pad_direction_constraints(self, sub_model):
         # for each edge, if the edge is used, then the end node must not have jump edge at different direction
-        for edge in self.all_edges:
-            u, v, direction = edge
-            
-            # no landing pad if edge is used
-            for jump_edge in self.node_related_landing_pad_edges[v]:
-                sub_model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
+        for i in range(self.num_nets):
+            for edge in self.all_edges:
+                u, v, direction = edge
+                
+                # no landing pad if edge is used
+                for jump_edge in self.node_related_landing_pad_edges[v]:
+                    sub_model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
 
-            # no starting pad at wrong direction if edge is used
-            for jump_edge in self.node_related_starting_pad_edges[v]:
-                u2, v2, jump_direction = jump_edge
-                # skip if correct direction
-                if jump_direction == direction:
-                    continue
-                sub_model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
+                # no starting pad at wrong direction if edge is used
+                for jump_edge in self.node_related_starting_pad_edges[v]:
+                    u2, v2, jump_direction = jump_edge
+                    # skip if correct direction
+                    if jump_direction == direction:
+                        continue
+                    sub_model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
 
-    def add_net_for_cutter(self, sub_model, cutters):
+    def add_cutter_net(self, sub_model, cutters):
         # net 0: start -> componenent sink
         # net 1: component source -> goal
         # net 2: component secondary source -> goal
@@ -249,10 +240,6 @@ class SubProblem:
             else:
                 sub_model.addConstr(in_flow - out_flow == 0)
 
-    def add_constraints_for_cutter(self, sub_model, cutters):
-        self.add_cutter_overlap_constraints(sub_model, cutters)
-        self.add_directional_constraints_for_cutter(sub_model, cutters)
-
     def add_cutter_overlap_constraints(self, sub_model, cutters):
         cutter_occupied_nodes = set()
         for cutter in cutters:
@@ -267,7 +254,7 @@ class SubProblem:
                 for i in range(self.num_nets):
                     sub_model.addConstr(self.is_edge_used[i][edge] == 0)
 
-    def add_directional_constraints_for_cutter(self, sub_model, cutters):
+    def add_cutter_pad_direction_constraints(self, sub_model, cutters):
         for cutter in cutters:
             sink, direction, secondary_direction = cutter
             primary_source = (sink[0] + direction[0], sink[1] + direction[1])
