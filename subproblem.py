@@ -14,7 +14,7 @@ Edge = Tuple[Node, Node, Direction] # start, end, direciton
 
 class SubProblem:
     def __init__(self, net_sources, net_sinks, all_nodes, all_edges, step_edges, jump_edges, 
-                 node_related_step_edges, node_related_jump_edges, node_related_components,
+                 node_related_components,
                  node_related_secondary_components, node_related_component_sources,
                  node_related_component_secondary_sources, node_related_component_sinks, node_related_belt_edges,
                  node_related_starting_pad_edges, node_related_landing_pad_edges):
@@ -44,8 +44,6 @@ class SubProblem:
         self.all_edges = all_edges
         self.step_edges = step_edges
         self.jump_edges = jump_edges
-        self.node_related_step_edges = node_related_step_edges
-        self.node_related_jump_edges = node_related_jump_edges
 
         # edges that generate this belt / starting pad / landing pad
         self.node_related_belt_edges = node_related_belt_edges
@@ -177,7 +175,8 @@ class SubProblem:
             list_of_things_using_node = []
             for i in range(self.num_nets):
                 list_of_things_using_node += [self.is_node_used_by_belt[i][node]]
-                list_of_things_using_node += [self.is_edge_used[i][edge] for edge in self.node_related_starting_pad_edges[node] + self.node_related_landing_pad_edges[node]]
+                list_of_things_using_node += [self.is_edge_used[i][edge] for edge in self.node_related_starting_pad_edges[node]]
+                list_of_things_using_node += [self.is_edge_used[i][edge] for edge in self.node_related_landing_pad_edges[node]]
             
             # constraint: at most one thing can use a node
             sub_model.addConstr(quicksum(list_of_things_using_node) <= 1)
@@ -264,7 +263,7 @@ class SubProblem:
 
         # no belt and jump pad at cutter occupied nodes
         for node in cutter_occupied_nodes:
-            for edge in self.node_related_belt_edges[node] + self.node_related_jump_edges[node]:
+            for edge in self.node_related_belt_edges[node] + self.node_related_starting_pad_edges[node] + self.node_related_landing_pad_edges[node]:
                 for i in range(self.num_nets):
                     sub_model.addConstr(self.is_edge_used[i][edge] == 0)
 
@@ -284,20 +283,18 @@ class SubProblem:
     def add_static_directional_constraints(self, i, sub_model, constraint: Tuple[Node, Direction, PAD_TYPE]):
         node, allowed_direction, allowed_type = constraint
 
-        # related jump edges
-        related_jump_edges = self.node_related_jump_edges[node]
-
         # allowed
         if allowed_type == STARTING_PAD:
-            allowed_jump_edges = [edge for edge in related_jump_edges if edge[0] == node and edge[2] == allowed_direction]
+            allowed_pad_edges = [edge for edge in self.node_related_starting_pad_edges[node] if edge[2] == allowed_direction]
         elif allowed_type == LANDING_PAD:
-            allowed_jump_edges = [edge for edge in related_jump_edges if edge[0] != node and edge[2] == allowed_direction]
+            allowed_pad_edges = [edge for edge in self.node_related_landing_pad_edges[node] if edge[2] == allowed_direction]
         else:
             raise ValueError("Invalid jump pad type")
 
         # set invalid jump edges to 0
-        invalid_jump_edges = [edge for edge in related_jump_edges if edge not in allowed_jump_edges]
-        for jump_edge in invalid_jump_edges:
+        all_pad_edges = self.node_related_starting_pad_edges[node] + self.node_related_landing_pad_edges[node]
+        invalid_pad_edges = [edge for edge in all_pad_edges if edge not in allowed_pad_edges]
+        for jump_edge in invalid_pad_edges:
             sub_model.addConstr(self.is_edge_used[i][jump_edge] == 0)
 
     def solve(self, sub_model):
