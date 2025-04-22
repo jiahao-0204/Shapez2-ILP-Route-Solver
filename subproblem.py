@@ -150,8 +150,8 @@ class SubProblem:
         self.add_things_overlap_constraints(sub_model)
 
         for i in range(self.num_nets):
-            # self.add_no_step_jump_overlap_constraints(i)
-            self.add_directional_constraints_w_component(i, sub_model, is_component_used)
+            self.add_regular_directional_constraints(i, sub_model)
+            self.add_component_directional_constraints(i, sub_model, is_component_used)
 
     def add_net_from_cutter_components(self, sub_model, is_component_used):
         # net 0: start -> componenent sink
@@ -199,13 +199,27 @@ class SubProblem:
             else:
                 sub_model.addConstr(in_flow - out_flow == 0)
 
-    def add_directional_constraints_w_component(self, i, sub_model, is_component_used):
+    def add_regular_directional_constraints(self, i, sub_model):
         # no jump edge at start
         for jump_edge in self.jump_edges:
             u, v, direction = jump_edge
             if u in self.net_sources[i]:
                 sub_model.addConstr(self.is_edge_used[i][jump_edge] == 0)
         
+        # for each edge, if the edge is used, then the end node must not have jump edge at different direction
+        for edge in self.all_edges:
+            u, v, direction = edge
+
+            # if the edge is used, then the end node must not have starting jump edge at different direction, and must not have any landing jump edge
+            for jump_edge in self.node_related_jump_edges[v]:
+                u2, v2, jump_direction = jump_edge
+                if u2 == v and direction == jump_direction: # starting jump edge
+                    continue
+                else:
+                    # sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.is_edge_used[i][jump_edge] == 0)
+                    sub_model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
+
+    def add_component_directional_constraints(self, i, sub_model, is_component_used):
         # component direction constraint
         # for each node
         for node in self.all_nodes:
@@ -238,18 +252,6 @@ class SubProblem:
                         if is_component_used[component] > 0.5:
                             sub_model.addConstr(self.is_edge_used[i][jump_edge] == 0)
 
-        # for each edge, if the edge is used, then the end node must not have jump edge at different direction
-        for edge in self.all_edges:
-            u, v, direction = edge
-
-            # if the edge is used, then the end node must not have starting jump edge at different direction, and must not have any landing jump edge
-            for jump_edge in self.node_related_jump_edges[v]:
-                u2, v2, jump_direction = jump_edge
-                if u2 == v and direction == jump_direction: # starting jump edge
-                    continue
-                else:
-                    # sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.is_edge_used[i][jump_edge] == 0)
-                    sub_model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
 
     def add_things_overlap_constraints(self, sub_model):
         # between belts / pads in different nets
