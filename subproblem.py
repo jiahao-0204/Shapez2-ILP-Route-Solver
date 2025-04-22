@@ -126,7 +126,6 @@ class SubProblem:
         self.add_things_overlap_constraints(sub_model, is_component_used)
 
     def add_flow_constraints_source_to_components(self, i, sub_model, is_component_used):
-        self.edge_flow_value = {}
         self.edge_flow_value[i] = {edge: sub_model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=self.flow_cap) for edge in self.all_edges}
         # set priority
         for edge in self.all_edges:
@@ -164,7 +163,6 @@ class SubProblem:
                     sub_model.addConstr(in_flow - out_flow == 0)
     
     def add_flow_constraints_component_to_goal(self, i, sub_model, is_component_used):
-        self.edge_flow_value = {}
         self.edge_flow_value[i] = {edge: sub_model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=self.flow_cap) for edge in self.all_edges}
         # set priority
         for edge in self.all_edges:
@@ -202,7 +200,6 @@ class SubProblem:
                     sub_model.addConstr(out_flow - in_flow == 0)
 
     def add_flow_constraints_secondary_component_to_goal(self, i, sub_model, is_component_used):
-        self.edge_flow_value = {}
         self.edge_flow_value[i] = {edge: sub_model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=self.flow_cap) for edge in self.all_edges}
         # set priority
         for edge in self.all_edges:
