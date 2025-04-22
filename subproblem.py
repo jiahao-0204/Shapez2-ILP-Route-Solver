@@ -14,10 +14,15 @@ class SubProblem:
                  node_related_step_edges, node_related_jump_edges, node_related_components,
                  node_related_secondary_components, node_related_component_sources,
                  node_related_component_secondary_sources, node_related_component_sinks):
+        
+        # model parameters
         self.timelimit = -1
-        self.num_nets = 3
         self.edge_priority = 50
         self.flow_priority = 25
+        self.option = 1
+
+        # problem parameters
+        self.num_nets = 3
         self.start_amount = 4
         self.goal_amount = 4
         self.component_count = 16
@@ -27,7 +32,6 @@ class SubProblem:
         self.component_source_amount = 1
         self.component_sink_amount = 1
         self.flow_cap = 4
-        self.option = 1
 
 
         self.net_sources = net_sources
