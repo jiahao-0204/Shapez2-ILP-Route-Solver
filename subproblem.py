@@ -125,8 +125,15 @@ class SubProblem:
         # Objective function
         self.add_objective(sub_model)
 
-        # Constraints
-        self.add_constraints(sub_model, is_component_used)
+        # cutters
+        cutters = [compoenent for compoenent, value in is_component_used.items() if value > 0.5]
+
+        # nets
+        self.add_net_for_cutter(sub_model, cutters)
+
+        # constraints
+        self.add_general_constraints(sub_model)
+        self.add_cutter_constraints(sub_model, cutters)
 
         # Solve
         self.solve(sub_model)
@@ -156,20 +163,14 @@ class SubProblem:
             
         sub_model.setObjective(quicksum(step_cost_list + jump_cost_list))
 
-    def add_constraints(self, sub_model, is_component_used):
-        # extract used cutters
-        cutters = []
-        for compoenent, value in is_component_used.items():
-            if value > 0.5:
-                cutters.append(compoenent)
-
-        self.add_net_for_cutter(sub_model, cutters)
-        self.add_directional_constraints_for_cutter(sub_model, cutters)
-
+    def add_general_constraints(self, sub_model):
         self.add_things_overlap_constraints(sub_model)
         for i in range(self.num_nets):
             self.add_dynamic_directional_constraints(i, sub_model)
             
+    def add_cutter_constraints(self, sub_model, cutters):
+        self.add_directional_constraints_for_cutter(sub_model, cutters)
+
     def add_net_for_cutter(self, sub_model, cutters):
         # net 0: start -> componenent sink
         # net 1: component source -> goal
