@@ -279,8 +279,8 @@ class DirectionalJumpRouter:
             components_used = [component for component, value in is_component_used.items() if value > 0.5]
             print("Solving subproblem with", [component[0] for component in components_used])
 
-            # draw components
-            self.draw_components(is_component_used)
+            # # draw components
+            # self.draw_components(is_component_used)
 
             # solve subproblem
             subproblem = SubProblem(self.net_sources, self.net_sinks, self.all_nodes, self.all_edges, self.step_edges, self.jump_edges, 
@@ -302,7 +302,7 @@ class DirectionalJumpRouter:
                     self.sub_problem_is_edge_used = is_edge_used
                     model.cbLazy(self.sub_problem_cost >= cost)
 
-                    self.plot(is_edge_used, is_component_used)
+                    # self.plot(is_edge_used, is_component_used)
 
                     exit(0)
 
