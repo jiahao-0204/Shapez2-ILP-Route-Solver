@@ -132,9 +132,7 @@ class SubProblem:
         sub_model.setObjective(quicksum(step_cost_list + jump_cost_list))
 
     def add_constraints(self, sub_model, is_component_used):
-        self.add_flow_constraints_source_to_components(0, sub_model, is_component_used)
-        self.add_flow_constraints_component_to_goal(1, sub_model, is_component_used)
-        self.add_flow_constraints_secondary_component_to_goal(2, sub_model, is_component_used)
+        self.add_net_from_cutter_components(sub_model, is_component_used)
         self.add_things_overlap_constraints(sub_model, is_component_used)
 
         for i in range(self.num_nets):
@@ -156,47 +154,36 @@ class SubProblem:
             else:
                 sub_model.addConstr(in_flow - out_flow == 0)
 
-    def add_flow_constraints_source_to_components(self, i, sub_model, is_component_used):
-        sources = self.net_sources[i]
-        sinks = []
-        for component, value in is_component_used.items():
-            if value > 0.5:
-                sink, _, _ = component
-                sinks += [sink]
+    def add_net_from_cutter_components(self, sub_model, is_component_used):
+        # net 0: start -> componenent sink
+        # net 1: component source -> goal
+        # net 2: component secondary source -> goal
+        s0 = self.net_sources[0]
+        k0 = []
+        s1 = []
+        k1 = self.net_sinks[1]
+        s2 = []
+        k2 = self.net_sinks[2]
 
-        source_amounts = [self.start_amount] * len(sources)
-        sink_amounts = [self.component_sink_amount] * len(sinks)
-
-        self.add_net(sub_model, i, sources, source_amounts, sinks, sink_amounts)
-    
-    def add_flow_constraints_component_to_goal(self, i, sub_model, is_component_used):
-        sources = []
-        for component, value in is_component_used.items():
-            if value > 0.5:
-                sink, direction, _ = component
-                primary_source = (sink[0] + direction[0], sink[1] + direction[1])
-                sources += [primary_source]
-        sinks = self.net_sinks[i]
-
-        source_amounts = [self.component_source_amount] * len(sources)
-        sink_amounts = [self.goal_amount] * len(sinks)
-
-        self.add_net(sub_model, i, sources, source_amounts, sinks, sink_amounts)
-
-    def add_flow_constraints_secondary_component_to_goal(self, i, sub_model, is_component_used):
-        sources = []
         for component, value in is_component_used.items():
             if value > 0.5:
                 sink, direction, secondary_direction = component
                 primary_source = (sink[0] + direction[0], sink[1] + direction[1])
                 secondary_source = (primary_source[0] + secondary_direction[0], primary_source[1] + secondary_direction[1])
-                sources += [secondary_source]
-        sinks = self.net_sinks[i]
+                k0 += [sink]
+                s1 += [primary_source]
+                s2 += [secondary_source]
 
-        source_amounts = [self.component_source_amount] * len(sources)
-        sink_amounts = [self.goal_amount] * len(sinks)
+        s0_amount = [self.start_amount] * len(s0)
+        k0_amount = [self.component_sink_amount] * len(k0)
+        s1_amount = [self.component_source_amount] * len(s1)
+        k1_amount = [self.goal_amount] * len(k1)
+        s2_amount = [self.component_source_amount] * len(s2)
+        k2_amount = [self.goal_amount] * len(k2)
 
-        self.add_net(sub_model, i, sources, source_amounts, sinks, sink_amounts)
+        self.add_net(sub_model, 0, s0, s0_amount, k0, k0_amount)
+        self.add_net(sub_model, 1, s1, s1_amount, k1, k1_amount)
+        self.add_net(sub_model, 2, s2, s2_amount, k2, k2_amount)
 
     def add_directional_constraints_w_component(self, i, sub_model, is_component_used):
         # no jump edge at start
