@@ -161,7 +161,7 @@ class SubProblem:
         self.add_things_overlap_constraints(sub_model)
 
         for i in range(self.num_nets):
-            self.add_regular_directional_constraints(i, sub_model)
+            self.add_dynamic_directional_constraints(i, sub_model)
             self.add_component_directional_constraints(i, sub_model)
 
     def add_net_from_cutter_components(self, sub_model, is_component_used):
@@ -210,7 +210,7 @@ class SubProblem:
             else:
                 sub_model.addConstr(in_flow - out_flow == 0)
 
-    def add_regular_directional_constraints(self, i, sub_model):
+    def add_dynamic_directional_constraints(self, i, sub_model):
         # no jump edge at start
         for jump_edge in self.jump_edges:
             u, v, direction = jump_edge
