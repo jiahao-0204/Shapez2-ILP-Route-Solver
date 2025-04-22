@@ -1,4 +1,4 @@
-from gurobipy import Model, GRB, quicksum, Var
+from gurobipy import Model, GRB, quicksum, Var, LinExpr
 from collections import defaultdict
 from typing import Dict, Tuple, List
 
@@ -61,6 +61,8 @@ class SubProblem:
         self.is_edge_used: Dict[int, Dict[Edge, Var]] = defaultdict(lambda: defaultdict(Var))
         self.edge_flow_value: Dict[int, Dict[Edge, Var]] = defaultdict(lambda: defaultdict(Var))
         self.is_node_used_by_step_edge: Dict[int, Dict[Node, Var]] = defaultdict(lambda: defaultdict(Var))
+        self.node_in_flow_expr: Dict[int, Dict[Node, LinExpr]] = defaultdict(lambda: defaultdict(LinExpr))
+        self.node_out_flow_expr: Dict[int, Dict[Node, LinExpr]] = defaultdict(lambda: defaultdict(LinExpr))
 
         # is edge used & edge flow value
         for i in range(self.num_nets):
@@ -83,7 +85,17 @@ class SubProblem:
             for node in self.all_nodes:
                 node_step_edges_bool_list = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[node]]
                 self.is_node_used_by_step_edge[i][node] = sub_model.addVar(name=f"node_{i}_{node}", vtype=GRB.BINARY)
+
                 sub_model.addGenConstrOr(self.is_node_used_by_step_edge[i][node], node_step_edges_bool_list)
+
+        # node in flow and out flow value
+        for i in range(self.num_nets):
+            for node in self.all_nodes:
+                self.node_in_flow_expr[i][node] = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[1] == node)
+                self.node_out_flow_expr[i][node] = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[0] == node)
+
+                sub_model.addConstr(self.node_in_flow_expr[i][node] <= self.flow_cap)
+                sub_model.addConstr(self.node_out_flow_expr[i][node] <= self.flow_cap)
 
         # Objective function
         self.add_objective(sub_model)
@@ -129,87 +141,63 @@ class SubProblem:
             # self.add_no_step_jump_overlap_constraints(i)
             self.add_directional_constraints_w_component(i, sub_model, is_component_used)
 
-    def add_flow_constraints_source_to_components(self, i, sub_model, is_component_used):
-        sources = self.net_sources[i]
-
-        # Flow conservation constraints for each net
+    # within one net, flow can split and merge
+    def add_net(self, sub_model, i, sources, source_amounts, sinks, sink_amounts):
         for node in self.all_nodes:
-            node_components = self.node_related_components[node]
-            node_component_used_bool_list = [is_component_used[component] > 0.5 for component in node_components]
-            node_is_component_sink = any(node_component_used_bool_list)
-
-            in_flow = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[1] == node)
-            out_flow = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[0] == node)
-            
-            # no matter what
-            sub_model.addConstr(in_flow <= self.flow_cap)
-            sub_model.addConstr(out_flow <= self.flow_cap)
+            in_flow = self.node_in_flow_expr[i][node]
+            out_flow = self.node_out_flow_expr[i][node]
 
             if node in sources:
-                sub_model.addConstr(in_flow == 0)
-                start_amount = min(self.start_amount, self.total_start_amount)
-                self.total_start_amount -= start_amount
-                sub_model.addConstr(out_flow == start_amount)
+                source_count = sources.count(node)
+                sub_model.addConstr(out_flow - in_flow == source_amounts[sources.index(node)] * source_count)
+            elif node in sinks:
+                sink_count = sinks.count(node)
+                sub_model.addConstr(in_flow - out_flow == sink_amounts[sinks.index(node)] * sink_count)
             else:
-                if node_is_component_sink:
-                    sub_model.addConstr(in_flow - out_flow == self.component_sink_amount)
-                else:
-                    sub_model.addConstr(in_flow - out_flow == 0)
+                sub_model.addConstr(in_flow - out_flow == 0)
+
+    def add_flow_constraints_source_to_components(self, i, sub_model, is_component_used):
+        sources = self.net_sources[i]
+        sinks = []
+        for component, value in is_component_used.items():
+            if value > 0.5:
+                sink, _, _ = component
+                sinks += [sink]
+
+        source_amounts = [self.start_amount] * len(sources)
+        sink_amounts = [self.component_sink_amount] * len(sinks)
+
+        self.add_net(sub_model, i, sources, source_amounts, sinks, sink_amounts)
     
     def add_flow_constraints_component_to_goal(self, i, sub_model, is_component_used):
+        sources = []
+        for component, value in is_component_used.items():
+            if value > 0.5:
+                sink, direction, _ = component
+                primary_source = (sink[0] + direction[0], sink[1] + direction[1])
+                sources += [primary_source]
         sinks = self.net_sinks[i]
 
-        # Flow conservation constraints for each net
-        for node in self.all_nodes:
-            node_components = self.node_related_component_sources[node]
-            node_component_used_bool_list = [is_component_used[component] > 0.5 for component in node_components]
-            node_is_component_source = any(node_component_used_bool_list)
+        source_amounts = [self.component_source_amount] * len(sources)
+        sink_amounts = [self.goal_amount] * len(sinks)
 
-            in_flow = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[1] == node)
-            out_flow = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[0] == node)
-            
-            # no matter what
-            sub_model.addConstr(in_flow <= self.flow_cap)
-            sub_model.addConstr(out_flow <= self.flow_cap)
-
-            if node in sinks:
-                sub_model.addConstr(out_flow == 0)
-                goal_amount = min(self.goal_amount, self.total_goal_amount)
-                self.total_goal_amount -= goal_amount
-                sub_model.addConstr(in_flow == goal_amount)
-            else:
-                if node_is_component_source:
-                    sub_model.addConstr(out_flow - in_flow == self.component_source_amount * quicksum(node_component_used_bool_list))
-                else:
-                    sub_model.addConstr(out_flow - in_flow == 0)
+        self.add_net(sub_model, i, sources, source_amounts, sinks, sink_amounts)
 
     def add_flow_constraints_secondary_component_to_goal(self, i, sub_model, is_component_used):
+        sources = []
+        for component, value in is_component_used.items():
+            if value > 0.5:
+                sink, direction, secondary_direction = component
+                primary_source = (sink[0] + direction[0], sink[1] + direction[1])
+                secondary_source = (primary_source[0] + secondary_direction[0], primary_source[1] + secondary_direction[1])
+                sources += [secondary_source]
         sinks = self.net_sinks[i]
 
-        # Flow conservation constraints for each net
-        for node in self.all_nodes:
-            node_components = self.node_related_component_secondary_sources[node]
-            node_component_used_bool_list = [is_component_used[component] > 0.5 for component in node_components]
-            node_is_component_source = any(node_component_used_bool_list)
+        source_amounts = [self.component_source_amount] * len(sources)
+        sink_amounts = [self.goal_amount] * len(sinks)
 
-            in_flow = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[1] == node)
-            out_flow = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[0] == node)
-            
-            # no matter what
-            sub_model.addConstr(in_flow <= self.flow_cap)
-            sub_model.addConstr(out_flow <= self.flow_cap)
+        self.add_net(sub_model, i, sources, source_amounts, sinks, sink_amounts)
 
-            if node in sinks:
-                sub_model.addConstr(out_flow == 0)
-                goal_amount = min(self.goal_amount, self.total_secondary_goal_amount)
-                self.total_secondary_goal_amount -= goal_amount
-                sub_model.addConstr(in_flow == goal_amount)
-            else:
-                if node_is_component_source:
-                    sub_model.addConstr(out_flow - in_flow == self.component_source_amount * quicksum(node_component_used_bool_list))
-                else:
-                    sub_model.addConstr(out_flow - in_flow == 0)
-                  
     def add_directional_constraints_w_component(self, i, sub_model, is_component_used):
         # no jump edge at start
         for jump_edge in self.jump_edges:
