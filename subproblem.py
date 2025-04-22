@@ -80,6 +80,20 @@ class SubProblem:
                 sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[i][edge] >= 1)
                 sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], False, self.edge_flow_value[i][edge] == 0)
 
+        # component occupied nodes
+        component_occupied_nodes = set()
+        for component, value in is_component_used.items():
+            if value > 0.5:
+                component_node, direction, secondary_direction = component
+                secondary_component_node = (component_node[0] + secondary_direction[0], component_node[1] + secondary_direction[1])
+                component_occupied_nodes.add(component_node)
+                component_occupied_nodes.add(secondary_component_node)
+        # belts and jump pads at component occupied nodes
+        for node in component_occupied_nodes:
+            for edge in self.node_related_step_edges[node] + self.node_related_jump_edges[node]:
+                for i in range(self.num_nets):
+                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
+
         # is node used by step edge
         for i in range(self.num_nets):
             for node in self.all_nodes:
@@ -133,7 +147,7 @@ class SubProblem:
 
     def add_constraints(self, sub_model, is_component_used):
         self.add_net_from_cutter_components(sub_model, is_component_used)
-        self.add_things_overlap_constraints(sub_model, is_component_used)
+        self.add_things_overlap_constraints(sub_model)
 
         for i in range(self.num_nets):
             # self.add_no_step_jump_overlap_constraints(i)
@@ -237,30 +251,17 @@ class SubProblem:
                     # sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.is_edge_used[i][jump_edge] == 0)
                     sub_model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
 
-    def add_things_overlap_constraints(self, sub_model, is_component_used):
-        # between belts / pads / components
+    def add_things_overlap_constraints(self, sub_model):
+        # between belts / pads in different nets
         for node in self.all_nodes:
             list_of_things_using_node = []
-            occupied = False
-            # for i in range(self.num_nets):
-            #     list_of_things_using_node.append(self.is_node_used_by_net[i][node])
             for i in range(self.num_nets):
-                list_of_things_using_node.append(self.is_node_used_by_step_edge[i][node])
+                list_of_things_using_node += [self.is_node_used_by_step_edge[i][node]]
                 list_of_things_using_node += [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[node]]
-            for component in self.node_related_components[node]:
-                if is_component_used[component] > 0.5:
-                    occupied = True
-            for component in self.node_related_secondary_components[node]:
-                if is_component_used[component] > 0.5:
-                    occupied = True
             
-            if occupied:
-                # no things can occupy this
-                sub_model.addConstr(quicksum(list_of_things_using_node) == 0)
-            else:
-                # constraint: at most one thing can use a node
-                sub_model.addConstr(quicksum(list_of_things_using_node) <= 1)
-
+            # constraint: at most one thing can use a node
+            sub_model.addConstr(quicksum(list_of_things_using_node) <= 1)
+            
     def solve(self, sub_model):
         if self.timelimit != -1:
             sub_model.setParam('TimeLimit', self.timelimit)
