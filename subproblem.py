@@ -58,9 +58,11 @@ class SubProblem:
         sub_model.Params.Presolve = 2
         # sub_model.Params.OutputFlag = 0  # silent
 
-        # is edge used & edge flow value
         self.is_edge_used: Dict[int, Dict[Edge, Var]] = defaultdict(lambda: defaultdict(Var))
         self.edge_flow_value: Dict[int, Dict[Edge, Var]] = defaultdict(lambda: defaultdict(Var))
+        self.is_node_used_by_step_edge: Dict[int, Dict[Node, Var]] = defaultdict(lambda: defaultdict(Var))
+
+        # is edge used & edge flow value
         for i in range(self.num_nets):
             for edge in self.all_edges:
 
@@ -77,7 +79,6 @@ class SubProblem:
                 sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], False, self.edge_flow_value[i][edge] == 0)
 
         # is node used by step edge
-        self.is_node_used_by_step_edge: Dict[int, Dict[Node, Var]] = defaultdict(lambda: defaultdict(Var))
         for i in range(self.num_nets):
             for node in self.all_nodes:
                 node_step_edges_bool_list = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[node]]
@@ -122,12 +123,11 @@ class SubProblem:
         self.add_flow_constraints_source_to_components(0, sub_model, is_component_used)
         self.add_flow_constraints_component_to_goal(1, sub_model, is_component_used)
         self.add_flow_constraints_secondary_component_to_goal(2, sub_model, is_component_used)
+        self.add_things_overlap_constraints(sub_model, is_component_used)
 
         for i in range(self.num_nets):
             # self.add_no_step_jump_overlap_constraints(i)
             self.add_directional_constraints_w_component(i, sub_model, is_component_used)
-
-        self.add_things_overlap_constraints(sub_model, is_component_used)
 
     def add_flow_constraints_source_to_components(self, i, sub_model, is_component_used):
         sources = self.net_sources[i]
