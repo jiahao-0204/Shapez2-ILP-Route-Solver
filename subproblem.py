@@ -192,15 +192,18 @@ class SubProblem:
         # for each edge, if the edge is used, then the end node must not have jump edge at different direction
         for edge in self.all_edges:
             u, v, direction = edge
+            
+            # no landing pad if edge is used
+            for jump_edge in self.node_related_landing_pad_edges[v]:
+                sub_model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
 
-            # if the edge is used, then the end node must not have starting jump edge at different direction, and must not have any landing jump edge
-            for jump_edge in self.node_related_jump_edges[v]:
+            # no starting pad at wrong direction if edge is used
+            for jump_edge in self.node_related_starting_pad_edges[v]:
                 u2, v2, jump_direction = jump_edge
-                if u2 == v and direction == jump_direction: # starting jump edge
+                # skip if correct direction
+                if jump_direction == direction:
                     continue
-                else:
-                    # sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.is_edge_used[i][jump_edge] == 0)
-                    sub_model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
+                sub_model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
 
     def add_net_for_cutter(self, sub_model, cutters):
         # net 0: start -> componenent sink
