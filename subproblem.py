@@ -16,7 +16,8 @@ class SubProblem:
     def __init__(self, net_sources, net_sinks, all_nodes, all_edges, step_edges, jump_edges, 
                  node_related_step_edges, node_related_jump_edges, node_related_components,
                  node_related_secondary_components, node_related_component_sources,
-                 node_related_component_secondary_sources, node_related_component_sinks):
+                 node_related_component_secondary_sources, node_related_component_sinks, node_related_belt_edges,
+                 node_related_starting_pad_edges, node_related_landing_pad_edges):
         
         # model parameters
         self.timelimit = -1
@@ -45,6 +46,12 @@ class SubProblem:
         self.jump_edges = jump_edges
         self.node_related_step_edges = node_related_step_edges
         self.node_related_jump_edges = node_related_jump_edges
+
+        # edges that generate this belt / starting pad / landing pad
+        self.node_related_belt_edges = node_related_belt_edges
+        self.node_related_starting_pad_edges = node_related_starting_pad_edges
+        self.node_related_landing_pad_edges = node_related_landing_pad_edges
+
         self.node_related_components = node_related_components
         self.node_related_secondary_components = node_related_secondary_components
         self.node_related_component_sources = node_related_component_sources
@@ -65,7 +72,7 @@ class SubProblem:
         self.edge_flow_value: Dict[int, Dict[Edge, Var]] = defaultdict(lambda: defaultdict(Var))
         self.node_in_flow_expr: Dict[int, Dict[Node, LinExpr]] = defaultdict(lambda: defaultdict(LinExpr))
         self.node_out_flow_expr: Dict[int, Dict[Node, LinExpr]] = defaultdict(lambda: defaultdict(LinExpr))
-        self.is_node_used_by_step_edge: Dict[int, Dict[Node, Var]] = defaultdict(lambda: defaultdict(Var))
+        self.is_node_used_by_belt: Dict[int, Dict[Node, Var]] = defaultdict(lambda: defaultdict(Var))
 
         # is edge used & edge flow value
         for i in range(self.num_nets):
@@ -92,10 +99,10 @@ class SubProblem:
         # is node used by step edge
         for i in range(self.num_nets):
             for node in self.all_nodes:
-                node_step_edges_bool_list = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[node]]
-                self.is_node_used_by_step_edge[i][node] = sub_model.addVar(name=f"node_{i}_{node}", vtype=GRB.BINARY)
+                node_belt_edges_bool_list = [self.is_edge_used[i][edge] for edge in self.node_related_belt_edges[node]]
+                self.is_node_used_by_belt[i][node] = sub_model.addVar(name=f"node_{i}_{node}", vtype=GRB.BINARY)
 
-                sub_model.addGenConstrOr(self.is_node_used_by_step_edge[i][node], node_step_edges_bool_list)
+                sub_model.addGenConstrOr(self.is_node_used_by_belt[i][node], node_belt_edges_bool_list)
 
         # component occupied nodes
         component_occupied_nodes = set()
@@ -169,7 +176,7 @@ class SubProblem:
         for node in self.all_nodes:
             list_of_things_using_node = []
             for i in range(self.num_nets):
-                list_of_things_using_node += [self.is_node_used_by_step_edge[i][node]]
+                list_of_things_using_node += [self.is_node_used_by_belt[i][node]]
                 list_of_things_using_node += [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[node]]
             
             # constraint: at most one thing can use a node

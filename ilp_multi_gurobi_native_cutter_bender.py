@@ -203,6 +203,9 @@ class DirectionalJumpRouter:
         self.jump_edges: List[Edge] = []
         self.node_related_step_edges: Dict[Node, List[Edge]] = defaultdict(list)
         self.node_related_jump_edges: Dict[Node, List[Edge]] = defaultdict(list)
+        self.node_related_belt_edges: Dict[Node, List[Edge]] = defaultdict(list)
+        self.node_related_starting_pad_edges: Dict[Node, List[Edge]] = defaultdict(list)
+        self.node_related_landing_pad_edges: Dict[Node, List[Edge]] = defaultdict(list)
         for node in self.all_nodes:
             x, y = node
             for dx, dy in DIRECTIONS:
@@ -214,6 +217,7 @@ class DirectionalJumpRouter:
                     self.all_edges.append(edge)
                     self.step_edges.append(edge)
                     self.node_related_step_edges[node].append(edge)
+                    self.node_related_belt_edges[node].append(edge)
                 
                 for jump_distance in self.jump_distances:
                     nx, ny = x + dx * (jump_distance + 2), y + dy * (jump_distance + 2)
@@ -225,6 +229,8 @@ class DirectionalJumpRouter:
                         self.jump_edges.append(edge)
                         self.node_related_jump_edges[node].append(edge)
                         self.node_related_jump_edges[pad_node].append(edge)
+                        self.node_related_starting_pad_edges[node].append(edge)
+                        self.node_related_landing_pad_edges[pad_node].append(edge)
 
         # master problem cost
         # set objective to be number of nodes occupied by primary, secondary sources and input location
@@ -286,7 +292,8 @@ class DirectionalJumpRouter:
             subproblem = SubProblem(self.net_sources, self.net_sinks, self.all_nodes, self.all_edges, self.step_edges, self.jump_edges, 
                  self.node_related_step_edges, self.node_related_jump_edges, self.node_related_components,
                  self.node_related_secondary_components, self.node_related_component_sources,
-                 self.node_related_component_secondary_sources, self.node_related_component_sinks)
+                 self.node_related_component_secondary_sources, self.node_related_component_sinks, self.node_related_belt_edges,
+                 self.node_related_starting_pad_edges, self.node_related_landing_pad_edges)
             feasible, cost, is_edge_used = subproblem.solve_subproblem(is_component_used)
 
             # cut the component used if combination not feasible
