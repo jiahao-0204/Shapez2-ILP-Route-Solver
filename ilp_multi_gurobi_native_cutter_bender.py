@@ -253,9 +253,9 @@ class DirectionalJumpRouter:
         self.model.setParam('Presolve', 2)
         self.model.setParam('Heuristics', 0.5)
 
-        plt.figure(figsize=(12, 6))
-        self.ax = plt.gca()
-        plt.show(block=False)
+        # plt.figure(figsize=(12, 6))
+        # self.ax = plt.gca()
+        # plt.show(block=False)
         self.model.optimize(self.benders_callback)
 
         # self.model.optimize()
@@ -302,7 +302,7 @@ class DirectionalJumpRouter:
                     self.sub_problem_is_edge_used = is_edge_used
                     model.cbLazy(self.sub_problem_cost >= cost)
 
-                    # self.plot(is_edge_used, is_component_used)
+                    self.plot(is_edge_used, is_component_used)
 
                     exit(0)
 
