@@ -1,8 +1,13 @@
 from gurobipy import Model, GRB, quicksum, Var
 from collections import defaultdict
+from typing import Dict, Tuple, List
 
 STEP_COST = 1
 JUMP_COST = 2
+
+Node = Tuple[int, int] # (x, y)
+Direction = Tuple[int, int] # (dx, dy)
+Edge = Tuple[Node, Node, Direction] # start, end, direciton
 
 class SubProblem:
     def __init__(self, net_sources, net_sinks, all_nodes, all_edges, step_edges, jump_edges, 
@@ -49,9 +54,9 @@ class SubProblem:
         sub_model.Params.Presolve = 2
         # sub_model.Params.OutputFlag = 0  # silent
 
-        self.is_edge_used = {}
-        self.is_node_used_by_step_edge = {}
-        self.edge_flow_value = {}
+        self.is_edge_used: Dict[Edge, Var] = {}
+        self.is_node_used_by_step_edge: Dict[Node, Var] = {}
+        self.edge_flow_value: Dict[Edge, Var] = {}
         
         # is edge used
         for i in range(self.num_nets):
