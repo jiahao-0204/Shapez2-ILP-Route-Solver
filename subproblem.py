@@ -157,14 +157,15 @@ class SubProblem:
         sub_model.setObjective(quicksum(step_cost_list + jump_cost_list))
 
     def add_constraints(self, sub_model, is_component_used):
-        self.add_net_from_cutter_components(sub_model, is_component_used)
+        self.add_net_for_cutter(sub_model, is_component_used)
         self.add_things_overlap_constraints(sub_model)
 
         for i in range(self.num_nets):
             self.add_dynamic_directional_constraints(i, sub_model)
-            self.add_component_directional_constraints(i, sub_model)
+            self.add_directional_constraints_for_cutter(i, sub_model, is_component_used)
+        
 
-    def add_net_from_cutter_components(self, sub_model, is_component_used):
+    def add_net_for_cutter(self, sub_model, is_component_used):
         # net 0: start -> componenent sink
         # net 1: component source -> goal
         # net 2: component secondary source -> goal
@@ -230,34 +231,33 @@ class SubProblem:
                     # sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.is_edge_used[i][jump_edge] == 0)
                     sub_model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
 
-    def add_component_directional_constraints(self, i, sub_model):
+    def add_directional_constraints_for_cutter(self, i, sub_model, is_component_used):
         # source location: can only have starting jump pad in the same direction
         for node, direction in self.component_source_node_and_direction:
-            allowed_list = [(node, direction, STARTING_PAD)]
-            self.add_static_directional_constraints(i, sub_model, allowed_list)
+            self.add_static_directional_constraints(i, sub_model, (node, direction, STARTING_PAD))
 
         # input location: can only have landing jump pad in the same direction
         for node, direction in self.component_input_node_and_direction:
-            allowed_list = [(node, direction, LANDING_PAD)]
-            self.add_static_directional_constraints(i, sub_model, allowed_list)
+            self.add_static_directional_constraints(i, sub_model, (node, direction, LANDING_PAD))
 
-    def add_static_directional_constraints(self, i, sub_model, allowed_list: List[Tuple[Node, Direction, PAD_TYPE]]):
-        for node, allowed_direction, allowed_type in allowed_list:
-            # related
-            related_jump_edges = self.node_related_jump_edges[node]
+    def add_static_directional_constraints(self, i, sub_model, constraint: Tuple[Node, Direction, PAD_TYPE]):
+        node, allowed_direction, allowed_type = constraint
 
-            # allowed
-            if allowed_type == STARTING_PAD:
-                allowed_jump_edges = [edge for edge in related_jump_edges if edge[0] == node and edge[2] == allowed_direction]
-            elif allowed_type == LANDING_PAD:
-                allowed_jump_edges = [edge for edge in related_jump_edges if edge[0] != node and edge[2] == allowed_direction]
-            else:
-                raise ValueError("Invalid jump pad type")
+        # related jump edges
+        related_jump_edges = self.node_related_jump_edges[node]
 
-            # invalid
-            invalid_jump_edges = [edge for edge in related_jump_edges if edge not in allowed_jump_edges]
-            for jump_edge in invalid_jump_edges:
-                sub_model.addConstr(self.is_edge_used[i][jump_edge] == 0)
+        # allowed
+        if allowed_type == STARTING_PAD:
+            allowed_jump_edges = [edge for edge in related_jump_edges if edge[0] == node and edge[2] == allowed_direction]
+        elif allowed_type == LANDING_PAD:
+            allowed_jump_edges = [edge for edge in related_jump_edges if edge[0] != node and edge[2] == allowed_direction]
+        else:
+            raise ValueError("Invalid jump pad type")
+
+        # set invalid jump edges to 0
+        invalid_jump_edges = [edge for edge in related_jump_edges if edge not in allowed_jump_edges]
+        for jump_edge in invalid_jump_edges:
+            sub_model.addConstr(self.is_edge_used[i][jump_edge] == 0)
 
     def add_things_overlap_constraints(self, sub_model):
         # between belts / pads in different nets
