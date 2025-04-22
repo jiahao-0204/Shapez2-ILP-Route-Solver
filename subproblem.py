@@ -41,33 +41,32 @@ class SubProblem:
         
 
     def solve_subproblem(self, is_component_used):
+        # set up model parameters
         sub_model = Model("subproblem")
-        # sub_model.Params.OutputFlag = 0  # silent
         if self.timelimit != -1:
             sub_model.Params.TimeLimit = self.timelimit
         sub_model.Params.MIPFocus = 1
         sub_model.Params.Presolve = 2
+        # sub_model.Params.OutputFlag = 0  # silent
 
-        sub_problem_data = {
-            "is_edge_used": {},
-            "is_node_used_by_step_edge": {},
-            "edge_flow_value": {},
-        }
+        self.is_edge_used = {}
+        self.is_node_used_by_step_edge = {}
+        self.edge_flow_value = {}
         
         # is edge used
         for i in range(self.num_nets):
-            sub_problem_data["is_edge_used"][i] = {edge: sub_model.addVar(name=f"edge_{i}_{edge}", vtype=GRB.BINARY) for edge in self.all_edges}
+            self.is_edge_used[i] = {edge: sub_model.addVar(name=f"edge_{i}_{edge}", vtype=GRB.BINARY) for edge in self.all_edges}
             # set priority
             for edge in self.all_edges:
-                sub_problem_data["is_edge_used"][i][edge].setAttr("BranchPriority", self.edge_priority)
+                self.is_edge_used[i][edge].setAttr("BranchPriority", self.edge_priority)
         
-        self.add_variable_is_node_used_by_step_edges(sub_model, sub_problem_data)
+        self.add_variable_is_node_used_by_step_edges(sub_model)
 
         # Objective function
-        self.add_objective(sub_model, sub_problem_data)
+        self.add_objective(sub_model)
 
         # Constraints
-        self.add_constraints(sub_model, sub_problem_data, is_component_used)
+        self.add_constraints(sub_model, is_component_used)
 
         # Solve
         self.solve(sub_model)
@@ -79,55 +78,55 @@ class SubProblem:
             is_edge_used = {}
             for i in range(self.num_nets):
                 is_edge_used[i] = {edge: sub_model.getVarByName(f"edge_{i}_{edge}").X for edge in self.all_edges}
-                sub_problem_data["is_edge_used"][i] = is_edge_used[i]
+                self.is_edge_used[i] = is_edge_used[i]
             return True, sub_model.ObjVal, is_edge_used
 
         # # Plot
         # self.plot()
 
     
-    def add_variable_is_node_used_by_step_edges(self, sub_model, sub_problem_data):
-        sub_problem_data["is_node_used_by_step_edge"] = defaultdict(lambda: defaultdict(Var))
+    def add_variable_is_node_used_by_step_edges(self, sub_model):
+        self.is_node_used_by_step_edge = defaultdict(lambda: defaultdict(Var))
         for i in range(self.num_nets):
             for node in self.all_nodes:
-                node_step_edges_bool_list = [sub_problem_data["is_edge_used"][i][edge] for edge in self.node_related_step_edges[node]]
-                sub_problem_data["is_node_used_by_step_edge"][i][node] = sub_model.addVar(name=f"node_{i}_{node}", vtype=GRB.BINARY)
-                sub_model.addGenConstrOr(sub_problem_data["is_node_used_by_step_edge"][i][node], node_step_edges_bool_list)
+                node_step_edges_bool_list = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[node]]
+                self.is_node_used_by_step_edge[i][node] = sub_model.addVar(name=f"node_{i}_{node}", vtype=GRB.BINARY)
+                sub_model.addGenConstrOr(self.is_node_used_by_step_edge[i][node], node_step_edges_bool_list)
 
-    def add_objective(self, sub_model, sub_problem_data):
+    def add_objective(self, sub_model):
         step_cost_list = []
         jump_cost_list = []
 
         for i in range(self.num_nets):
-            step_cost_list_i = [sub_problem_data["is_edge_used"][i][edge] * STEP_COST for edge in self.step_edges]
-            jump_cost_list_i = [sub_problem_data["is_edge_used"][i][edge] * JUMP_COST for edge in self.jump_edges]
+            step_cost_list_i = [self.is_edge_used[i][edge] * STEP_COST for edge in self.step_edges]
+            jump_cost_list_i = [self.is_edge_used[i][edge] * JUMP_COST for edge in self.jump_edges]
             step_cost_list += step_cost_list_i
             jump_cost_list += jump_cost_list_i
             
         sub_model.setObjective(quicksum(step_cost_list + jump_cost_list))
 
-    def add_constraints(self, sub_model, sub_problem_data, is_component_used):
-        self.add_flow_constraints_source_to_components(0, sub_model, sub_problem_data, is_component_used)
-        self.add_flow_constraints_component_to_goal(1, sub_model, sub_problem_data, is_component_used)
-        self.add_flow_constraints_secondary_component_to_goal(2, sub_model, sub_problem_data, is_component_used)
+    def add_constraints(self, sub_model, is_component_used):
+        self.add_flow_constraints_source_to_components(0, sub_model, is_component_used)
+        self.add_flow_constraints_component_to_goal(1, sub_model, is_component_used)
+        self.add_flow_constraints_secondary_component_to_goal(2, sub_model, is_component_used)
 
         for i in range(self.num_nets):
             # self.add_no_step_jump_overlap_constraints(i)
-            self.add_directional_constraints_w_component(i, sub_model, sub_problem_data, is_component_used)
+            self.add_directional_constraints_w_component(i, sub_model, is_component_used)
 
-        self.add_things_overlap_constraints(sub_model, sub_problem_data, is_component_used)
+        self.add_things_overlap_constraints(sub_model, is_component_used)
 
-    def add_flow_constraints_source_to_components(self, i, sub_model, sub_problem_data, is_component_used):
-        sub_problem_data["edge_flow_value"] = {}
-        sub_problem_data["edge_flow_value"][i] = {edge: sub_model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=self.flow_cap) for edge in self.all_edges}
+    def add_flow_constraints_source_to_components(self, i, sub_model, is_component_used):
+        self.edge_flow_value = {}
+        self.edge_flow_value[i] = {edge: sub_model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=self.flow_cap) for edge in self.all_edges}
         # set priority
         for edge in self.all_edges:
-            sub_problem_data["edge_flow_value"][i][edge].setAttr("BranchPriority", self.flow_priority)
+            self.edge_flow_value[i][edge].setAttr("BranchPriority", self.flow_priority)
         
         # Flow is avaiable if the edge is selected
         for edge in self.all_edges:
-            sub_model.addGenConstrIndicator(sub_problem_data["is_edge_used"][i][edge], True, sub_problem_data["edge_flow_value"][i][edge] >= 1)
-            sub_model.addGenConstrIndicator(sub_problem_data["is_edge_used"][i][edge], False, sub_problem_data["edge_flow_value"][i][edge] == 0)
+            sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[i][edge] >= 1)
+            sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], False, self.edge_flow_value[i][edge] == 0)
 
         sources = self.net_sources[i]
 
@@ -137,8 +136,8 @@ class SubProblem:
             node_component_used_bool_list = [is_component_used[component] > 0.5 for component in node_components]
             node_is_component_sink = any(node_component_used_bool_list)
 
-            in_flow = quicksum(sub_problem_data["edge_flow_value"][i][edge] for edge in self.all_edges if edge[1] == node)
-            out_flow = quicksum(sub_problem_data["edge_flow_value"][i][edge] for edge in self.all_edges if edge[0] == node)
+            in_flow = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[1] == node)
+            out_flow = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[0] == node)
             
             # no matter what
             sub_model.addConstr(in_flow <= self.flow_cap)
@@ -155,17 +154,17 @@ class SubProblem:
                 else:
                     sub_model.addConstr(in_flow - out_flow == 0)
     
-    def add_flow_constraints_component_to_goal(self, i, sub_model, sub_problem_data, is_component_used):
-        sub_problem_data["edge_flow_value"] = {}
-        sub_problem_data["edge_flow_value"][i] = {edge: sub_model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=self.flow_cap) for edge in self.all_edges}
+    def add_flow_constraints_component_to_goal(self, i, sub_model, is_component_used):
+        self.edge_flow_value = {}
+        self.edge_flow_value[i] = {edge: sub_model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=self.flow_cap) for edge in self.all_edges}
         # set priority
         for edge in self.all_edges:
-            sub_problem_data["edge_flow_value"][i][edge].setAttr("BranchPriority", self.flow_priority)
+            self.edge_flow_value[i][edge].setAttr("BranchPriority", self.flow_priority)
 
         # Flow is avaiable if the edge is selected
         for edge in self.all_edges:
-            sub_model.addGenConstrIndicator(sub_problem_data["is_edge_used"][i][edge], True, sub_problem_data["edge_flow_value"][i][edge] >= 1)
-            sub_model.addGenConstrIndicator(sub_problem_data["is_edge_used"][i][edge], False, sub_problem_data["edge_flow_value"][i][edge] == 0)
+            sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[i][edge] >= 1)
+            sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], False, self.edge_flow_value[i][edge] == 0)
 
         sinks = self.net_sinks[i]
 
@@ -175,8 +174,8 @@ class SubProblem:
             node_component_used_bool_list = [is_component_used[component] > 0.5 for component in node_components]
             node_is_component_source = any(node_component_used_bool_list)
 
-            in_flow = quicksum(sub_problem_data["edge_flow_value"][i][edge] for edge in self.all_edges if edge[1] == node)
-            out_flow = quicksum(sub_problem_data["edge_flow_value"][i][edge] for edge in self.all_edges if edge[0] == node)
+            in_flow = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[1] == node)
+            out_flow = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[0] == node)
             
             # no matter what
             sub_model.addConstr(in_flow <= self.flow_cap)
@@ -193,17 +192,17 @@ class SubProblem:
                 else:
                     sub_model.addConstr(out_flow - in_flow == 0)
 
-    def add_flow_constraints_secondary_component_to_goal(self, i, sub_model, sub_problem_data, is_component_used):
-        sub_problem_data["edge_flow_value"] = {}
-        sub_problem_data["edge_flow_value"][i] = {edge: sub_model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=self.flow_cap) for edge in self.all_edges}
+    def add_flow_constraints_secondary_component_to_goal(self, i, sub_model, is_component_used):
+        self.edge_flow_value = {}
+        self.edge_flow_value[i] = {edge: sub_model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=self.flow_cap) for edge in self.all_edges}
         # set priority
         for edge in self.all_edges:
-            sub_problem_data["edge_flow_value"][i][edge].setAttr("BranchPriority", self.flow_priority)
+            self.edge_flow_value[i][edge].setAttr("BranchPriority", self.flow_priority)
 
         # Flow is avaiable if the edge is selected
         for edge in self.all_edges:
-            sub_model.addGenConstrIndicator(sub_problem_data["is_edge_used"][i][edge], True, sub_problem_data["edge_flow_value"][i][edge] >= 1)
-            sub_model.addGenConstrIndicator(sub_problem_data["is_edge_used"][i][edge], False, sub_problem_data["edge_flow_value"][i][edge] == 0)
+            sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[i][edge] >= 1)
+            sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], False, self.edge_flow_value[i][edge] == 0)
 
         sinks = self.net_sinks[i]
 
@@ -213,8 +212,8 @@ class SubProblem:
             node_component_used_bool_list = [is_component_used[component] > 0.5 for component in node_components]
             node_is_component_source = any(node_component_used_bool_list)
 
-            in_flow = quicksum(sub_problem_data["edge_flow_value"][i][edge] for edge in self.all_edges if edge[1] == node)
-            out_flow = quicksum(sub_problem_data["edge_flow_value"][i][edge] for edge in self.all_edges if edge[0] == node)
+            in_flow = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[1] == node)
+            out_flow = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[0] == node)
             
             # no matter what
             sub_model.addConstr(in_flow <= self.flow_cap)
@@ -231,12 +230,12 @@ class SubProblem:
                 else:
                     sub_model.addConstr(out_flow - in_flow == 0)
                   
-    def add_directional_constraints_w_component(self, i, sub_model, sub_problem_data, is_component_used):
+    def add_directional_constraints_w_component(self, i, sub_model, is_component_used):
         # no jump edge at start
         for jump_edge in self.jump_edges:
             u, v, direction = jump_edge
             if u in self.net_sources[i]:
-                sub_model.addConstr(sub_problem_data["is_edge_used"][i][jump_edge] == 0)
+                sub_model.addConstr(self.is_edge_used[i][jump_edge] == 0)
         
         # component direction constraint
         # for each node
@@ -251,9 +250,9 @@ class SubProblem:
                     if u == node and direction == component_direction:
                         continue
                     else:
-                        # sub_model.addGenConstrIndicator(is_component_used[component], True, sub_problem_data["is_edge_used"][i][jump_edge] == 0)
+                        # sub_model.addGenConstrIndicator(is_component_used[component], True, self.is_edge_used[i][jump_edge] == 0)
                         if is_component_used[component] > 0.5:
-                            sub_model.addConstr(sub_problem_data["is_edge_used"][i][jump_edge] == 0)
+                            sub_model.addConstr(self.is_edge_used[i][jump_edge] == 0)
             
             # for each possible component sink that can be placed at this node
             for component in self.node_related_component_sinks[node]:
@@ -266,9 +265,9 @@ class SubProblem:
                     if v == node and direction == component_direction:
                         continue
                     else:
-                        # sub_model.addGenConstrIndicator(is_component_used[component], True, sub_problem_data["is_edge_used"][i][jump_edge] == 0)
+                        # sub_model.addGenConstrIndicator(is_component_used[component], True, self.is_edge_used[i][jump_edge] == 0)
                         if is_component_used[component] > 0.5:
-                            sub_model.addConstr(sub_problem_data["is_edge_used"][i][jump_edge] == 0)
+                            sub_model.addConstr(self.is_edge_used[i][jump_edge] == 0)
 
         # for each edge, if the edge is used, then the end node must not have jump edge at different direction
         for edge in self.all_edges:
@@ -280,10 +279,10 @@ class SubProblem:
                 if u2 == v and direction == jump_direction: # starting jump edge
                     continue
                 else:
-                    # sub_model.addGenConstrIndicator(sub_problem_data["is_edge_used"][i][edge], True, sub_problem_data["is_edge_used"][i][jump_edge] == 0)
-                    sub_model.addConstr(sub_problem_data["is_edge_used"][i][edge] + sub_problem_data["is_edge_used"][i][jump_edge] <= 1) # only one can be true
+                    # sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.is_edge_used[i][jump_edge] == 0)
+                    sub_model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
 
-    def add_things_overlap_constraints(self, sub_model, sub_problem_data, is_component_used):
+    def add_things_overlap_constraints(self, sub_model, is_component_used):
         # between belts / pads / components
         for node in self.all_nodes:
             list_of_things_using_node = []
@@ -291,8 +290,8 @@ class SubProblem:
             # for i in range(self.num_nets):
             #     list_of_things_using_node.append(self.is_node_used_by_net[i][node])
             for i in range(self.num_nets):
-                list_of_things_using_node.append(sub_problem_data["is_node_used_by_step_edge"][i][node])
-                list_of_things_using_node += [sub_problem_data["is_edge_used"][i][edge] for edge in self.node_related_jump_edges[node]]
+                list_of_things_using_node.append(self.is_node_used_by_step_edge[i][node])
+                list_of_things_using_node += [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[node]]
             for component in self.node_related_components[node]:
                 if is_component_used[component] > 0.5:
                     occupied = True
