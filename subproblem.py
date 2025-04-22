@@ -58,18 +58,31 @@ class SubProblem:
         sub_model.Params.Presolve = 2
         # sub_model.Params.OutputFlag = 0  # silent
 
-        self.is_edge_used: Dict[Edge, Var] = {}
-        self.is_node_used_by_step_edge: Dict[Node, Var] = {}
-        self.edge_flow_value: Dict[Edge, Var] = {}
-        
-        # is edge used
+        # is edge used & edge flow value
+        self.is_edge_used: Dict[int, Dict[Edge, Var]] = defaultdict(lambda: defaultdict(Var))
+        self.edge_flow_value: Dict[int, Dict[Edge, Var]] = defaultdict(lambda: defaultdict(Var))
         for i in range(self.num_nets):
-            self.is_edge_used[i] = {edge: sub_model.addVar(name=f"edge_{i}_{edge}", vtype=GRB.BINARY) for edge in self.all_edges}
-            # set priority
             for edge in self.all_edges:
+
+                # is edge used
+                self.is_edge_used[i][edge] = sub_model.addVar(name=f"edge_{i}_{edge}", vtype=GRB.BINARY)
                 self.is_edge_used[i][edge].setAttr("BranchPriority", self.edge_priority)
-        
-        self.add_variable_is_node_used_by_step_edges(sub_model)
+
+                # edge flow value
+                self.edge_flow_value[i][edge] = sub_model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=self.flow_cap)
+                self.edge_flow_value[i][edge].setAttr("BranchPriority", self.flow_priority)
+
+                # constraint
+                sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[i][edge] >= 1)
+                sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], False, self.edge_flow_value[i][edge] == 0)
+
+        # is node used by step edge
+        self.is_node_used_by_step_edge: Dict[int, Dict[Node, Var]] = defaultdict(lambda: defaultdict(Var))
+        for i in range(self.num_nets):
+            for node in self.all_nodes:
+                node_step_edges_bool_list = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[node]]
+                self.is_node_used_by_step_edge[i][node] = sub_model.addVar(name=f"node_{i}_{node}", vtype=GRB.BINARY)
+                sub_model.addGenConstrOr(self.is_node_used_by_step_edge[i][node], node_step_edges_bool_list)
 
         # Objective function
         self.add_objective(sub_model)
@@ -92,15 +105,6 @@ class SubProblem:
 
         # # Plot
         # self.plot()
-
-    
-    def add_variable_is_node_used_by_step_edges(self, sub_model):
-        self.is_node_used_by_step_edge = defaultdict(lambda: defaultdict(Var))
-        for i in range(self.num_nets):
-            for node in self.all_nodes:
-                node_step_edges_bool_list = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[node]]
-                self.is_node_used_by_step_edge[i][node] = sub_model.addVar(name=f"node_{i}_{node}", vtype=GRB.BINARY)
-                sub_model.addGenConstrOr(self.is_node_used_by_step_edge[i][node], node_step_edges_bool_list)
 
     def add_objective(self, sub_model):
         step_cost_list = []
@@ -126,16 +130,6 @@ class SubProblem:
         self.add_things_overlap_constraints(sub_model, is_component_used)
 
     def add_flow_constraints_source_to_components(self, i, sub_model, is_component_used):
-        self.edge_flow_value[i] = {edge: sub_model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=self.flow_cap) for edge in self.all_edges}
-        # set priority
-        for edge in self.all_edges:
-            self.edge_flow_value[i][edge].setAttr("BranchPriority", self.flow_priority)
-        
-        # Flow is avaiable if the edge is selected
-        for edge in self.all_edges:
-            sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[i][edge] >= 1)
-            sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], False, self.edge_flow_value[i][edge] == 0)
-
         sources = self.net_sources[i]
 
         # Flow conservation constraints for each net
@@ -163,16 +157,6 @@ class SubProblem:
                     sub_model.addConstr(in_flow - out_flow == 0)
     
     def add_flow_constraints_component_to_goal(self, i, sub_model, is_component_used):
-        self.edge_flow_value[i] = {edge: sub_model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=self.flow_cap) for edge in self.all_edges}
-        # set priority
-        for edge in self.all_edges:
-            self.edge_flow_value[i][edge].setAttr("BranchPriority", self.flow_priority)
-
-        # Flow is avaiable if the edge is selected
-        for edge in self.all_edges:
-            sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[i][edge] >= 1)
-            sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], False, self.edge_flow_value[i][edge] == 0)
-
         sinks = self.net_sinks[i]
 
         # Flow conservation constraints for each net
@@ -200,16 +184,6 @@ class SubProblem:
                     sub_model.addConstr(out_flow - in_flow == 0)
 
     def add_flow_constraints_secondary_component_to_goal(self, i, sub_model, is_component_used):
-        self.edge_flow_value[i] = {edge: sub_model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=self.flow_cap) for edge in self.all_edges}
-        # set priority
-        for edge in self.all_edges:
-            self.edge_flow_value[i][edge].setAttr("BranchPriority", self.flow_priority)
-
-        # Flow is avaiable if the edge is selected
-        for edge in self.all_edges:
-            sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[i][edge] >= 1)
-            sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], False, self.edge_flow_value[i][edge] == 0)
-
         sinks = self.net_sinks[i]
 
         # Flow conservation constraints for each net
