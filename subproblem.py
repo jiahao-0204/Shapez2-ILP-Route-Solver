@@ -82,12 +82,20 @@ class SubProblem:
 
         # component occupied nodes
         component_occupied_nodes = set()
+        self.component_source_node_and_direction: List[Tuple[Node, Direction]] = []
+        self.component_input_node_and_direction: List[Tuple[Node, Direction]] = []
         for component, value in is_component_used.items():
             if value > 0.5:
                 component_node, direction, secondary_direction = component
                 secondary_component_node = (component_node[0] + secondary_direction[0], component_node[1] + secondary_direction[1])
+                component_primary_source_node = (component_node[0] + direction[0], component_node[1] + direction[1])
+                component_secondary_source_node = (secondary_component_node[0] + direction[0], secondary_component_node[1] + direction[1])
+                component_input_node = (component_node[0] - direction[0], component_node[1] - direction[1])
                 component_occupied_nodes.add(component_node)
                 component_occupied_nodes.add(secondary_component_node)
+                self.component_source_node_and_direction.append((component_primary_source_node, direction))
+                self.component_source_node_and_direction.append((component_secondary_source_node, direction))
+                self.component_input_node_and_direction.append((component_input_node, direction))
         # belts and jump pads at component occupied nodes
         for node in component_occupied_nodes:
             for edge in self.node_related_step_edges[node] + self.node_related_jump_edges[node]:
@@ -151,7 +159,7 @@ class SubProblem:
 
         for i in range(self.num_nets):
             self.add_regular_directional_constraints(i, sub_model)
-            self.add_component_directional_constraints(i, sub_model, is_component_used)
+            self.add_component_directional_constraints(i, sub_model)
 
     def add_net_from_cutter_components(self, sub_model, is_component_used):
         # net 0: start -> componenent sink
@@ -219,39 +227,24 @@ class SubProblem:
                     # sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.is_edge_used[i][jump_edge] == 0)
                     sub_model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
 
-    def add_component_directional_constraints(self, i, sub_model, is_component_used):
-        # component direction constraint
-        # for each node
-        for node in self.all_nodes:
-            # for each possible component source that can be placed at this node
-            for component in self.node_related_component_sources[node] + self.node_related_component_secondary_sources[node]:
-                _, component_direction, _ = component
+    def add_component_directional_constraints(self, i, sub_model):
+        # source location: can only have starting jump pad in the same direction
+        for node, direction in self.component_source_node_and_direction:
+            for jump_edge in self.node_related_jump_edges[node]:
+                u, v, jump_direction = jump_edge
+                if u == node and direction == jump_direction:
+                    # skip if jump pad is allowed
+                    continue
+                sub_model.addConstr(self.is_edge_used[i][jump_edge] == 0)
 
-                # if this component is active, jumps in different direction are not allowed
-                for jump_edge in self.node_related_jump_edges[node]:
-                    u, v, direction = jump_edge
-                    if u == node and direction == component_direction:
-                        continue
-                    else:
-                        # sub_model.addGenConstrIndicator(is_component_used[component], True, self.is_edge_used[i][jump_edge] == 0)
-                        if is_component_used[component] > 0.5:
-                            sub_model.addConstr(self.is_edge_used[i][jump_edge] == 0)
-            
-            # for each possible component sink that can be placed at this node
-            for component in self.node_related_component_sinks[node]:
-                _, component_direction, _ = component
-                related_jump_edge = [edge for edge in self.all_edges if edge[1] == node]
-
-                # if this component is active, jumps in different direction are not allowed
-                for jump_edge in related_jump_edge:
-                    u, v, direction = jump_edge
-                    if v == node and direction == component_direction:
-                        continue
-                    else:
-                        # sub_model.addGenConstrIndicator(is_component_used[component], True, self.is_edge_used[i][jump_edge] == 0)
-                        if is_component_used[component] > 0.5:
-                            sub_model.addConstr(self.is_edge_used[i][jump_edge] == 0)
-
+        # input location: can only have landing jump pad in the same direction
+        for node, direction in self.component_input_node_and_direction:
+            for jump_edge in self.node_related_jump_edges[node]:
+                u, v, jump_direction = jump_edge
+                if u != node and direction == jump_direction:
+                    # skip if jump pad is allowed
+                    continue
+                sub_model.addConstr(self.is_edge_used[i][jump_edge] == 0)
 
     def add_things_overlap_constraints(self, sub_model):
         # between belts / pads in different nets
