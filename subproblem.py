@@ -261,7 +261,7 @@ class SubProblem:
 
         # no belt and jump pad at cutter occupied nodes
         for node in cutter_occupied_nodes:
-            for edge in self.node_related_step_edges[node] + self.node_related_jump_edges[node]:
+            for edge in self.node_related_belt_edges[node] + self.node_related_jump_edges[node]:
                 for i in range(self.num_nets):
                     sub_model.addConstr(self.is_edge_used[i][edge] == 0)
 
