@@ -139,21 +139,6 @@ class SubProblem:
             # self.add_no_step_jump_overlap_constraints(i)
             self.add_directional_constraints_w_component(i, sub_model, is_component_used)
 
-    # within one net, flow can split and merge
-    def add_net(self, sub_model, i, sources, source_amounts, sinks, sink_amounts):
-        for node in self.all_nodes:
-            in_flow = self.node_in_flow_expr[i][node]
-            out_flow = self.node_out_flow_expr[i][node]
-
-            if node in sources:
-                source_count = sources.count(node)
-                sub_model.addConstr(out_flow - in_flow == source_amounts[sources.index(node)] * source_count)
-            elif node in sinks:
-                sink_count = sinks.count(node)
-                sub_model.addConstr(in_flow - out_flow == sink_amounts[sinks.index(node)] * sink_count)
-            else:
-                sub_model.addConstr(in_flow - out_flow == 0)
-
     def add_net_from_cutter_components(self, sub_model, is_component_used):
         # net 0: start -> componenent sink
         # net 1: component source -> goal
@@ -184,6 +169,21 @@ class SubProblem:
         self.add_net(sub_model, 0, s0, s0_amount, k0, k0_amount)
         self.add_net(sub_model, 1, s1, s1_amount, k1, k1_amount)
         self.add_net(sub_model, 2, s2, s2_amount, k2, k2_amount)
+
+    # within one net, flow can split and merge
+    def add_net(self, sub_model, i, sources, source_amounts, sinks, sink_amounts):
+        for node in self.all_nodes:
+            in_flow = self.node_in_flow_expr[i][node]
+            out_flow = self.node_out_flow_expr[i][node]
+
+            if node in sources:
+                source_count = sources.count(node)
+                sub_model.addConstr(out_flow - in_flow == source_amounts[sources.index(node)] * source_count)
+            elif node in sinks:
+                sink_count = sinks.count(node)
+                sub_model.addConstr(in_flow - out_flow == sink_amounts[sinks.index(node)] * sink_count)
+            else:
+                sub_model.addConstr(in_flow - out_flow == 0)
 
     def add_directional_constraints_w_component(self, i, sub_model, is_component_used):
         # no jump edge at start
