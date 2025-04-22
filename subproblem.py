@@ -157,15 +157,20 @@ class SubProblem:
         sub_model.setObjective(quicksum(step_cost_list + jump_cost_list))
 
     def add_constraints(self, sub_model, is_component_used):
-        self.add_net_for_cutter(sub_model, is_component_used)
-        self.add_things_overlap_constraints(sub_model)
+        # extract used cutters
+        cutters = []
+        for compoenent, value in is_component_used.items():
+            if value > 0.5:
+                cutters.append(compoenent)
 
+        self.add_net_for_cutter(sub_model, cutters)
+        self.add_directional_constraints_for_cutter(sub_model, cutters)
+
+        self.add_things_overlap_constraints(sub_model)
         for i in range(self.num_nets):
             self.add_dynamic_directional_constraints(i, sub_model)
-            self.add_directional_constraints_for_cutter(i, sub_model, is_component_used)
-        
-
-    def add_net_for_cutter(self, sub_model, is_component_used):
+            
+    def add_net_for_cutter(self, sub_model, cutters):
         # net 0: start -> componenent sink
         # net 1: component source -> goal
         # net 2: component secondary source -> goal
@@ -176,14 +181,13 @@ class SubProblem:
         s2 = []
         k2 = self.net_sinks[2]
 
-        for component, value in is_component_used.items():
-            if value > 0.5:
-                sink, direction, secondary_direction = component
-                primary_source = (sink[0] + direction[0], sink[1] + direction[1])
-                secondary_source = (primary_source[0] + secondary_direction[0], primary_source[1] + secondary_direction[1])
-                k0 += [sink]
-                s1 += [primary_source]
-                s2 += [secondary_source]
+        for cutter in cutters:
+            sink, direction, secondary_direction = cutter
+            primary_source = (sink[0] + direction[0], sink[1] + direction[1])
+            secondary_source = (primary_source[0] + secondary_direction[0], primary_source[1] + secondary_direction[1])
+            k0 += [sink]
+            s1 += [primary_source]
+            s2 += [secondary_source]
 
         s0_amount = [self.start_amount] * len(s0)
         k0_amount = [self.component_sink_amount] * len(k0)
@@ -231,14 +235,18 @@ class SubProblem:
                     # sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.is_edge_used[i][jump_edge] == 0)
                     sub_model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
 
-    def add_directional_constraints_for_cutter(self, i, sub_model, is_component_used):
-        # source location: can only have starting jump pad in the same direction
-        for node, direction in self.component_source_node_and_direction:
-            self.add_static_directional_constraints(i, sub_model, (node, direction, STARTING_PAD))
+    def add_directional_constraints_for_cutter(self, sub_model, cutters):
+        for cutter in cutters:
+            sink, direction, secondary_direction = cutter
+            primary_source = (sink[0] + direction[0], sink[1] + direction[1])
+            secondary_component = (sink[0] + secondary_direction[0], sink[1] + secondary_direction[1])
+            secondary_source = (secondary_component[0] + direction[0], secondary_component[1] + direction[1])
+            input_location = (sink[0] - direction[0], sink[1] - direction[1])
 
-        # input location: can only have landing jump pad in the same direction
-        for node, direction in self.component_input_node_and_direction:
-            self.add_static_directional_constraints(i, sub_model, (node, direction, LANDING_PAD))
+            for i in range(self.num_nets):    
+                self.add_static_directional_constraints(i, sub_model, (primary_source, direction, STARTING_PAD))
+                self.add_static_directional_constraints(i, sub_model, (secondary_source, direction, STARTING_PAD))
+                self.add_static_directional_constraints(i, sub_model, (input_location, direction, LANDING_PAD))
 
     def add_static_directional_constraints(self, i, sub_model, constraint: Tuple[Node, Direction, PAD_TYPE]):
         node, allowed_direction, allowed_type = constraint
