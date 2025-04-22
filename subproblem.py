@@ -21,8 +21,8 @@ class SubProblem:
         
         # model parameters
         self.timelimit = -1
-        self.edge_priority = 50
-        self.flow_priority = 25
+        self.flow_priority = 50
+        self.edge_priority = 0
         self.option = 1
 
         # problem parameters
@@ -75,43 +75,46 @@ class SubProblem:
         # is edge used & edge flow value
         for i in range(self.num_nets):
             for edge in self.all_edges:
+                # edge flow value
+                self.edge_flow_value[i][edge] = sub_model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=self.flow_cap)
+                self.edge_flow_value[i][edge].setAttr("BranchPriority", self.flow_priority)
 
                 # is edge used
                 self.is_edge_used[i][edge] = sub_model.addVar(name=f"edge_{i}_{edge}", vtype=GRB.BINARY)
                 self.is_edge_used[i][edge].setAttr("BranchPriority", self.edge_priority)
-
-                # edge flow value
-                self.edge_flow_value[i][edge] = sub_model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=self.flow_cap)
-                self.edge_flow_value[i][edge].setAttr("BranchPriority", self.flow_priority)
         # in flow and out flow
         for i in range(self.num_nets):
             for node in self.all_nodes:
                 self.node_in_flow_expr[i][node] = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[1] == node)
                 self.node_out_flow_expr[i][node] = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[0] == node)        
-        # is node used by belt edge
+        # compute is node used by belt edge
         for i in range(self.num_nets):
             for node in self.all_nodes:
                 node_belt_edges_bool_list = [self.is_edge_used[i][edge] for edge in self.node_related_belt_edges[node]]
                 self.is_node_used_by_belt[i][node] = sub_model.addVar(name=f"node_{i}_{node}", vtype=GRB.BINARY)
 
                 sub_model.addGenConstrOr(self.is_node_used_by_belt[i][node], node_belt_edges_bool_list)
-
+        # compute is edge used
+        for i in range(self.num_nets):
+            for edge in self.all_edges:
+                # constraint
+                sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[i][edge] >= 1)
+                sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], False, self.edge_flow_value[i][edge] == 0)
         # cutters
         cutters = [compoenent for compoenent, value in is_component_used.items() if value > 0.5]
 
         # general
         self.add_objective(sub_model)
 
-        # constraints (in order of large pruning to little pruning)
-        self.add_cutter_overlap_constraints(sub_model, cutters)
+        # constraints (in order of large pruning to little pruning, stronger constraints first)
+        self.add_start_no_pad_constraints(sub_model)
+        self.add_cutter_no_belt_no_pad_constraints(sub_model, cutters)
         self.add_cutter_pad_direction_constraints(sub_model, cutters)
-        self.add_pad_not_at_start_constraints(sub_model)
 
-        self.add_flow_and_is_edge_used_constraints(sub_model)
+        self.add_belt_pad_net_overlap_constraints(sub_model)
         self.add_flow_max_value_constraints(sub_model)
-        self.add_things_overlap_constraints(sub_model)
         self.add_pad_direction_constraints(sub_model)
-        
+
         self.add_cutter_net(sub_model, cutters)
         
         # Solve
@@ -141,15 +144,7 @@ class SubProblem:
             jump_cost_list += jump_cost_list_i
             
         sub_model.setObjective(quicksum(step_cost_list + jump_cost_list))
-
-    def add_flow_and_is_edge_used_constraints(self, sub_model):
-        # flow value constraints
-        for i in range(self.num_nets):
-            for edge in self.all_edges:
-                # constraint
-                sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[i][edge] >= 1)
-                sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], False, self.edge_flow_value[i][edge] == 0)
-            
+        
     def add_flow_max_value_constraints(self, sub_model):
         # max flow at each node
         for i in range(self.num_nets):
@@ -157,7 +152,7 @@ class SubProblem:
                 sub_model.addConstr(self.node_in_flow_expr[i][node] <= self.flow_cap)
                 sub_model.addConstr(self.node_out_flow_expr[i][node] <= self.flow_cap)
 
-    def add_things_overlap_constraints(self, sub_model):
+    def add_belt_pad_net_overlap_constraints(self, sub_model):
         # between belts / pads in different nets
         for node in self.all_nodes:
             list_of_things_using_node = []
@@ -169,7 +164,7 @@ class SubProblem:
             # constraint: at most one thing can use a node
             sub_model.addConstr(quicksum(list_of_things_using_node) <= 1)
     
-    def add_pad_not_at_start_constraints(self, sub_model):
+    def add_start_no_pad_constraints(self, sub_model):
         # no jump edge at start
         for i in range(self.num_nets):
             for jump_edge in self.jump_edges:
@@ -240,7 +235,7 @@ class SubProblem:
             else:
                 sub_model.addConstr(in_flow - out_flow == 0)
 
-    def add_cutter_overlap_constraints(self, sub_model, cutters):
+    def add_cutter_no_belt_no_pad_constraints(self, sub_model, cutters):
         cutter_occupied_nodes = set()
         for cutter in cutters:
             sink, _, secondary_direction = cutter
