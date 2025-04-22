@@ -177,7 +177,7 @@ class SubProblem:
             list_of_things_using_node = []
             for i in range(self.num_nets):
                 list_of_things_using_node += [self.is_node_used_by_belt[i][node]]
-                list_of_things_using_node += [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[node]]
+                list_of_things_using_node += [self.is_edge_used[i][edge] for edge in self.node_related_starting_pad_edges[node] + self.node_related_landing_pad_edges[node]]
             
             # constraint: at most one thing can use a node
             sub_model.addConstr(quicksum(list_of_things_using_node) <= 1)
