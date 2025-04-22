@@ -63,9 +63,9 @@ class SubProblem:
 
         self.is_edge_used: Dict[int, Dict[Edge, Var]] = defaultdict(lambda: defaultdict(Var))
         self.edge_flow_value: Dict[int, Dict[Edge, Var]] = defaultdict(lambda: defaultdict(Var))
-        self.is_node_used_by_step_edge: Dict[int, Dict[Node, Var]] = defaultdict(lambda: defaultdict(Var))
         self.node_in_flow_expr: Dict[int, Dict[Node, LinExpr]] = defaultdict(lambda: defaultdict(LinExpr))
         self.node_out_flow_expr: Dict[int, Dict[Node, LinExpr]] = defaultdict(lambda: defaultdict(LinExpr))
+        self.is_node_used_by_step_edge: Dict[int, Dict[Node, Var]] = defaultdict(lambda: defaultdict(Var))
 
         # is edge used & edge flow value
         for i in range(self.num_nets):
@@ -82,6 +82,20 @@ class SubProblem:
                 # constraint
                 sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[i][edge] >= 1)
                 sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], False, self.edge_flow_value[i][edge] == 0)
+        
+        # in flow and out flow
+        for i in range(self.num_nets):
+            for node in self.all_nodes:
+                self.node_in_flow_expr[i][node] = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[1] == node)
+                self.node_out_flow_expr[i][node] = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[0] == node)        
+
+        # is node used by step edge
+        for i in range(self.num_nets):
+            for node in self.all_nodes:
+                node_step_edges_bool_list = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[node]]
+                self.is_node_used_by_step_edge[i][node] = sub_model.addVar(name=f"node_{i}_{node}", vtype=GRB.BINARY)
+
+                sub_model.addGenConstrOr(self.is_node_used_by_step_edge[i][node], node_step_edges_bool_list)
 
         # component occupied nodes
         component_occupied_nodes = set()
@@ -99,41 +113,15 @@ class SubProblem:
                 self.component_source_node_and_direction.append((component_primary_source_node, direction))
                 self.component_source_node_and_direction.append((component_secondary_source_node, direction))
                 self.component_input_node_and_direction.append((component_input_node, direction))
-        # belts and jump pads at component occupied nodes
-        for node in component_occupied_nodes:
-            for edge in self.node_related_step_edges[node] + self.node_related_jump_edges[node]:
-                for i in range(self.num_nets):
-                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
-
-        # is node used by step edge
-        for i in range(self.num_nets):
-            for node in self.all_nodes:
-                node_step_edges_bool_list = [self.is_edge_used[i][edge] for edge in self.node_related_step_edges[node]]
-                self.is_node_used_by_step_edge[i][node] = sub_model.addVar(name=f"node_{i}_{node}", vtype=GRB.BINARY)
-
-                sub_model.addGenConstrOr(self.is_node_used_by_step_edge[i][node], node_step_edges_bool_list)
-
-        # node in flow and out flow value
-        for i in range(self.num_nets):
-            for node in self.all_nodes:
-                self.node_in_flow_expr[i][node] = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[1] == node)
-                self.node_out_flow_expr[i][node] = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[0] == node)
-
-                sub_model.addConstr(self.node_in_flow_expr[i][node] <= self.flow_cap)
-                sub_model.addConstr(self.node_out_flow_expr[i][node] <= self.flow_cap)
-
-        # Objective function
+        
+        # general
         self.add_objective(sub_model)
-
-        # cutters
-        cutters = [compoenent for compoenent, value in is_component_used.items() if value > 0.5]
-
-        # nets
-        self.add_net_for_cutter(sub_model, cutters)
-
-        # constraints
         self.add_general_constraints(sub_model)
-        self.add_cutter_constraints(sub_model, cutters)
+
+        # cutter specific
+        cutters = [compoenent for compoenent, value in is_component_used.items() if value > 0.5]
+        self.add_net_for_cutter(sub_model, cutters)
+        self.add_constraints_for_cutter(sub_model, cutters)
 
         # Solve
         self.solve(sub_model)
@@ -164,12 +152,48 @@ class SubProblem:
         sub_model.setObjective(quicksum(step_cost_list + jump_cost_list))
 
     def add_general_constraints(self, sub_model):
+        self.add_max_flow_constraints(sub_model)
         self.add_things_overlap_constraints(sub_model)
         for i in range(self.num_nets):
             self.add_dynamic_directional_constraints(i, sub_model)
             
-    def add_cutter_constraints(self, sub_model, cutters):
-        self.add_directional_constraints_for_cutter(sub_model, cutters)
+    def add_max_flow_constraints(self, sub_model):
+        # max flow at each node
+        for i in range(self.num_nets):
+            for node in self.all_nodes:
+                sub_model.addConstr(self.node_in_flow_expr[i][node] <= self.flow_cap)
+                sub_model.addConstr(self.node_out_flow_expr[i][node] <= self.flow_cap)
+
+    def add_things_overlap_constraints(self, sub_model):
+        # between belts / pads in different nets
+        for node in self.all_nodes:
+            list_of_things_using_node = []
+            for i in range(self.num_nets):
+                list_of_things_using_node += [self.is_node_used_by_step_edge[i][node]]
+                list_of_things_using_node += [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[node]]
+            
+            # constraint: at most one thing can use a node
+            sub_model.addConstr(quicksum(list_of_things_using_node) <= 1)
+    
+    def add_dynamic_directional_constraints(self, i, sub_model):
+        # no jump edge at start
+        for jump_edge in self.jump_edges:
+            u, v, direction = jump_edge
+            if u in self.net_sources[i]:
+                sub_model.addConstr(self.is_edge_used[i][jump_edge] == 0)
+        
+        # for each edge, if the edge is used, then the end node must not have jump edge at different direction
+        for edge in self.all_edges:
+            u, v, direction = edge
+
+            # if the edge is used, then the end node must not have starting jump edge at different direction, and must not have any landing jump edge
+            for jump_edge in self.node_related_jump_edges[v]:
+                u2, v2, jump_direction = jump_edge
+                if u2 == v and direction == jump_direction: # starting jump edge
+                    continue
+                else:
+                    # sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.is_edge_used[i][jump_edge] == 0)
+                    sub_model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
 
     def add_net_for_cutter(self, sub_model, cutters):
         # net 0: start -> componenent sink
@@ -216,25 +240,23 @@ class SubProblem:
             else:
                 sub_model.addConstr(in_flow - out_flow == 0)
 
-    def add_dynamic_directional_constraints(self, i, sub_model):
-        # no jump edge at start
-        for jump_edge in self.jump_edges:
-            u, v, direction = jump_edge
-            if u in self.net_sources[i]:
-                sub_model.addConstr(self.is_edge_used[i][jump_edge] == 0)
-        
-        # for each edge, if the edge is used, then the end node must not have jump edge at different direction
-        for edge in self.all_edges:
-            u, v, direction = edge
+    def add_constraints_for_cutter(self, sub_model, cutters):
+        self.add_cutter_overlap_constraints(sub_model, cutters)
+        self.add_directional_constraints_for_cutter(sub_model, cutters)
 
-            # if the edge is used, then the end node must not have starting jump edge at different direction, and must not have any landing jump edge
-            for jump_edge in self.node_related_jump_edges[v]:
-                u2, v2, jump_direction = jump_edge
-                if u2 == v and direction == jump_direction: # starting jump edge
-                    continue
-                else:
-                    # sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.is_edge_used[i][jump_edge] == 0)
-                    sub_model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
+    def add_cutter_overlap_constraints(self, sub_model, cutters):
+        cutter_occupied_nodes = set()
+        for cutter in cutters:
+            sink, _, secondary_direction = cutter
+            secondary_component = (sink[0] + secondary_direction[0], sink[1] + secondary_direction[1])
+            cutter_occupied_nodes.add(sink)
+            cutter_occupied_nodes.add(secondary_component)
+
+        # no belt and jump pad at cutter occupied nodes
+        for node in cutter_occupied_nodes:
+            for edge in self.node_related_step_edges[node] + self.node_related_jump_edges[node]:
+                for i in range(self.num_nets):
+                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
 
     def add_directional_constraints_for_cutter(self, sub_model, cutters):
         for cutter in cutters:
@@ -268,17 +290,6 @@ class SubProblem:
         for jump_edge in invalid_jump_edges:
             sub_model.addConstr(self.is_edge_used[i][jump_edge] == 0)
 
-    def add_things_overlap_constraints(self, sub_model):
-        # between belts / pads in different nets
-        for node in self.all_nodes:
-            list_of_things_using_node = []
-            for i in range(self.num_nets):
-                list_of_things_using_node += [self.is_node_used_by_step_edge[i][node]]
-                list_of_things_using_node += [self.is_edge_used[i][edge] for edge in self.node_related_jump_edges[node]]
-            
-            # constraint: at most one thing can use a node
-            sub_model.addConstr(quicksum(list_of_things_using_node) <= 1)
-            
     def solve(self, sub_model):
         if self.timelimit != -1:
             sub_model.setParam('TimeLimit', self.timelimit)
