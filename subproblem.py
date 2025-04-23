@@ -105,8 +105,7 @@ class SubProblem:
 
         # add cutter
         cutters = [compoenent for compoenent, value in is_component_used.items() if value > 0.5]
-        self.add_cutter_no_belt_no_pad_constraints(sub_model, cutters)
-        self.add_cutter_pad_direction_constraints(sub_model, cutters)
+        self.add_cutter_edge_constraints(sub_model, cutters)
         self.add_cutter_net(sub_model, cutters)
 
         
@@ -251,7 +250,7 @@ class SubProblem:
             else:
                 sub_model.addConstr(in_flow - out_flow == 0)
 
-    def add_cutter_no_belt_no_pad_constraints(self, sub_model, cutters):
+    def add_cutter_edge_constraints(self, sub_model, cutters):
         cutter_occupied_nodes = set()
         for cutter in cutters:
             sink, _, secondary_direction = cutter
@@ -265,7 +264,7 @@ class SubProblem:
                 for i in range(self.num_nets):
                     sub_model.addConstr(self.is_edge_used[i][edge] == 0)
 
-    def add_cutter_pad_direction_constraints(self, sub_model, cutters):
+        # pad direction
         for cutter in cutters:
             sink, direction, secondary_direction = cutter
             primary_source = (sink[0] + direction[0], sink[1] + direction[1])
@@ -277,7 +276,7 @@ class SubProblem:
                 self.add_static_directional_constraints(i, sub_model, (primary_source, direction, STARTING_PAD))
                 self.add_static_directional_constraints(i, sub_model, (secondary_source, direction, STARTING_PAD))
                 self.add_static_directional_constraints(i, sub_model, (input_location, direction, LANDING_PAD))
-
+        
     def add_static_directional_constraints(self, i, sub_model, constraint: Tuple[Node, Direction, PAD_TYPE]):
         node, allowed_direction, allowed_type = constraint
 
