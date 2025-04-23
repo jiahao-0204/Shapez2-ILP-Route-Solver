@@ -1,6 +1,6 @@
 from gurobipy import Model, GRB, quicksum, Var, LinExpr
 from collections import defaultdict
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Set
 
 STEP_COST = 1
 JUMP_COST = 2
@@ -251,30 +251,71 @@ class SubProblem:
                 sub_model.addConstr(in_flow - out_flow == 0)
 
     def add_cutter_edge_constraints(self, sub_model, cutters):
-        cutter_occupied_nodes = set()
+        # split into lists
+        primary_components: List[Tuple[Node, Direction]] = []
+        secondary_components: List[Tuple[Node, Direction]] = []
+        primary_sources: List[Tuple[Node, Direction]] = []
+        secondary_sources: List[Tuple[Node, Direction]] = []
+        input_locations: List[Tuple[Node, Direction]] = []
         for cutter in cutters:
-            sink, _, secondary_direction = cutter
-            secondary_component = (sink[0] + secondary_direction[0], sink[1] + secondary_direction[1])
-            cutter_occupied_nodes.add(sink)
-            cutter_occupied_nodes.add(secondary_component)
-
-        # no belt and jump pad at cutter occupied nodes
-        for node in cutter_occupied_nodes:
-            for edge in self.node_related_belt_edges[node] + self.node_related_starting_pad_edges[node] + self.node_related_landing_pad_edges[node]:
-                for i in range(self.num_nets):
-                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
-
-        # pad direction
-        for cutter in cutters:
-            sink, direction, secondary_direction = cutter
-            primary_source = (sink[0] + direction[0], sink[1] + direction[1])
-            secondary_component = (sink[0] + secondary_direction[0], sink[1] + secondary_direction[1])
+            primary_component, direction, secondary_direction = cutter
+            secondary_component = (primary_component[0] + secondary_direction[0], primary_component[1] + secondary_direction[1])
+            primary_source = (primary_component[0] + direction[0], primary_component[1] + direction[1])
             secondary_source = (secondary_component[0] + direction[0], secondary_component[1] + direction[1])
-            input_location = (sink[0] - direction[0], sink[1] - direction[1])
+            input_location = (primary_component[0] - direction[0], primary_component[1] - direction[1])
+            
+            primary_components.append((primary_component, direction))
+            secondary_components.append((secondary_component, secondary_direction))
+            primary_sources.append((primary_source, direction))
+            secondary_sources.append((secondary_source, direction))
+            input_locations.append((input_location, direction))
 
-            for i in range(self.num_nets):    
+        # primary component nodes
+        for node, direction in primary_components:
+            for i in range(self.num_nets):
+                # flow in at same direction
+                in_flow_edges = [edge for edge in self.all_edges if edge[1] == node]
+                for edge in in_flow_edges:
+                    if edge[2] != direction:
+                        sub_model.addConstr(self.is_edge_used[i][edge] == 0) 
+
+                # no flow out
+                sub_model.addConstr(self.node_out_flow_expr[i][node] == 0)
+
+                # no belt and pads
+                for edge in self.node_related_belt_edges[node] + self.node_related_starting_pad_edges[node] + self.node_related_landing_pad_edges[node]:
+                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
+                
+        # secondary component nodes
+        for node, direction in secondary_components:
+            for i in range(self.num_nets):
+                
+                # no flow in
+                sub_model.addConstr(self.node_in_flow_expr[i][node] == 0) # no flow into secondary component
+
+                # no flow out
+                sub_model.addConstr(self.node_out_flow_expr[i][node] == 0) # no flow out of secondary component
+
+                # no pad and belt
+                for edge in self.node_related_belt_edges[node] + self.node_related_starting_pad_edges[node] + self.node_related_landing_pad_edges[node]:
+                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
+                
+        # primary source nodes
+        for node, direction in primary_sources:
+            # only starting pad at direction
+            for i in range(self.num_nets):
                 self.add_static_directional_constraints(i, sub_model, (primary_source, direction, STARTING_PAD))
+        
+        # secondary source nodes
+        for node, direction in secondary_sources:
+            # only starting pad at direction
+            for i in range(self.num_nets):
                 self.add_static_directional_constraints(i, sub_model, (secondary_source, direction, STARTING_PAD))
+
+        # input location nodes
+        for node, direction in input_locations:
+            # only landing pad at direction
+            for i in range(self.num_nets):
                 self.add_static_directional_constraints(i, sub_model, (input_location, direction, LANDING_PAD))
         
     def add_static_directional_constraints(self, i, sub_model, constraint: Tuple[Node, Direction, PAD_TYPE]):
