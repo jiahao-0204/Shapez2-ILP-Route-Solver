@@ -92,24 +92,33 @@ class SubProblem:
         self.add_belt_pad_net_overlap_constraints(sub_model)
         self.add_pad_direction_constraints(sub_model)
         
+        # start and goals
+        starts: List[Tuple[Node, Direction]] = []
+        goals1: List[Tuple[Node, Direction]] = []
+        goals2: List[Tuple[Node, Direction]] = []
+        for node in self.net_sources[0]:
+            starts.append((node, (0, 1)))
+        for node in self.net_sinks[1]:
+            goals1.append((node, (-1, 0)))
+        for node in self.net_sinks[2]:
+            goals2.append((node, (0, 1)))
+
+        # cutters
+        cutters = [compoenent for compoenent, value in is_component_used.items() if value > 0.5]
+
         # general
         self.add_objective(sub_model)
-
-        # add start
-        self.add_start_no_pad_constraints(sub_model)
-        # self.add_start_direction_constraints(sub_model)
-
-        # add goal
-        self.add_goal_no_pad_no_belt_constraints(sub_model)
-        # self.add_goal_direction_constraints(sub_model)
+        
+        # add start and goal
+        self.add_start_edge_constraints(sub_model, starts)
+        self.add_goal_edge_constraints(sub_model, goals1)
+        self.add_goal_edge_constraints(sub_model, goals2)
 
         # add cutter
-        cutters = [compoenent for compoenent, value in is_component_used.items() if value > 0.5]
         self.add_cutter_edge_constraints(sub_model, cutters)
         self.add_cutter_net(sub_model, cutters)
 
-        
-        # Solve
+        # solve
         self.solve(sub_model)
 
         # get solution
@@ -173,18 +182,36 @@ class SubProblem:
             # constraint: at most one thing can use a node
             sub_model.addConstr(quicksum(list_of_things_using_node) <= 1)
     
-    def add_start_no_pad_constraints(self, sub_model):
-        # no starting pad and landing pad
-        for node in self.net_sources[0]:
-            for edge in self.node_related_starting_pad_edges[node] + self.node_related_landing_pad_edges[node]:
-                for i in range(self.num_nets):
+    def add_start_edge_constraints(self, sub_model, starts: List[Tuple[Node, Direction]]):
+        for node, direction in starts:
+            for i in range(self.num_nets):
+                # no in flow
+                sub_model.addConstr(self.node_in_flow_expr[i][node] == 0) # no in flow into starting pad
+
+                # out flow only by step and only in given direction
+                out_flow_edges = self.node_related_belt_edges[node]
+                for edge in out_flow_edges:
+                    if edge[2] != direction:
+                        sub_model.addConstr(self.is_edge_used[i][edge] == 0) 
+
+                # no starting pad and landing pad
+                for edge in self.node_related_starting_pad_edges[node] + self.node_related_landing_pad_edges[node]:
                     sub_model.addConstr(self.is_edge_used[i][edge] == 0)
-        
-    def add_goal_no_pad_no_belt_constraints(self, sub_model):
-        # no belt and starting pad
-        for node in self.net_sinks[1] + self.net_sinks[2]:
-            for edge in self.node_related_belt_edges[node] + self.node_related_starting_pad_edges[node] + self.node_related_landing_pad_edges[node]:
-                for i in range(self.num_nets):
+    
+    def add_goal_edge_constraints(self, sub_model, goals: List[Tuple[Node, Direction]]):
+        for node, direction in goals:
+            for i in range(self.num_nets):
+                # no out flow
+                sub_model.addConstr(self.node_out_flow_expr[i][node] == 0) # no in flow into starting pad
+
+                # in flow only in given direction
+                in_flow_edges = [edge for edge in self.all_edges if edge[1] == node]
+                for edge in in_flow_edges:
+                    if edge[2] != direction:
+                        sub_model.addConstr(self.is_edge_used[i][edge] == 0) 
+
+                # no belt, starting and landing pad
+                for edge in self.node_related_belt_edges[node] + self.node_related_starting_pad_edges[node] + self.node_related_landing_pad_edges[node]:
                     sub_model.addConstr(self.is_edge_used[i][edge] == 0)
 
     def add_pad_direction_constraints(self, sub_model):
