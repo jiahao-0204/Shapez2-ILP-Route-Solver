@@ -72,8 +72,7 @@ class SubProblem:
         self.node_out_flow_expr: Dict[int, Dict[Node, LinExpr]] = defaultdict(lambda: defaultdict(LinExpr))
         self.is_node_used_by_belt: Dict[int, Dict[Node, Var]] = defaultdict(lambda: defaultdict(Var))
 
-        # add belts and pads
-        # is edge used & edge flow value
+        # edge and flow
         for i in range(self.num_nets):
             for edge in self.all_edges:
                 # edge flow value
@@ -83,26 +82,14 @@ class SubProblem:
                 # is edge used
                 self.is_edge_used[i][edge] = sub_model.addVar(name=f"edge_{i}_{edge}", vtype=GRB.BINARY)
                 self.is_edge_used[i][edge].setAttr("BranchPriority", self.edge_priority)
-        # in flow and out flow
-        for i in range(self.num_nets):
-            for node in self.all_nodes:
-                self.node_in_flow_expr[i][node] = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[1] == node)
-                self.node_out_flow_expr[i][node] = quicksum(self.edge_flow_value[i][edge] for edge in self.all_edges if edge[0] == node)        
-        # compute is node used by belt edge
-        for i in range(self.num_nets):
-            for node in self.all_nodes:
-                node_belt_edges_bool_list = [self.is_edge_used[i][edge] for edge in self.node_related_belt_edges[node]]
-                self.is_node_used_by_belt[i][node] = sub_model.addVar(name=f"node_{i}_{node}", vtype=GRB.BINARY)
 
-                sub_model.addGenConstrOr(self.is_node_used_by_belt[i][node], node_belt_edges_bool_list)
-        # compute is edge used
-        for i in range(self.num_nets):
-            for edge in self.all_edges:
-                # constraint
-                sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[i][edge] >= 1)
-                sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], False, self.edge_flow_value[i][edge] == 0)
-        self.add_belt_pad_net_overlap_constraints(sub_model)
+                # in flow and out flow
+                self.node_out_flow_expr[i][edge[0]].addTerms(1, self.edge_flow_value[i][edge])
+                self.node_in_flow_expr[i][edge[1]].addTerms(1, self.edge_flow_value[i][edge])
+        self.compute_is_edge_used(sub_model)
+        self.compute_is_node_used_by_belt(sub_model)
         self.add_flow_max_value_constraints(sub_model)
+        self.add_belt_pad_net_overlap_constraints(sub_model)
         self.add_pad_direction_constraints(sub_model)
         
         # general
@@ -150,7 +137,24 @@ class SubProblem:
             jump_cost_list += jump_cost_list_i
             
         sub_model.setObjective(quicksum(step_cost_list + jump_cost_list))
-        
+
+    def compute_is_node_used_by_belt(self, sub_model):
+        # compute is node used by belt edge
+        for i in range(self.num_nets):
+            for node in self.all_nodes:
+                node_belt_edges_bool_list = [self.is_edge_used[i][edge] for edge in self.node_related_belt_edges[node]]
+                self.is_node_used_by_belt[i][node] = sub_model.addVar(name=f"node_{i}_{node}", vtype=GRB.BINARY)
+
+                sub_model.addGenConstrOr(self.is_node_used_by_belt[i][node], node_belt_edges_bool_list)
+
+    def compute_is_edge_used(self, sub_model):
+        # compute is edge used
+        for i in range(self.num_nets):
+            for edge in self.all_edges:
+                # constraint
+                sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[i][edge] >= 1)
+                sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], False, self.edge_flow_value[i][edge] == 0)
+
     def add_flow_max_value_constraints(self, sub_model):
         # max flow at each node
         for i in range(self.num_nets):
