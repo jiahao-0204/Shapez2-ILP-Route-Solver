@@ -72,6 +72,7 @@ class SubProblem:
         self.node_out_flow_expr: Dict[int, Dict[Node, LinExpr]] = defaultdict(lambda: defaultdict(LinExpr))
         self.is_node_used_by_belt: Dict[int, Dict[Node, Var]] = defaultdict(lambda: defaultdict(Var))
 
+        # add belts and pads
         # is edge used & edge flow value
         for i in range(self.num_nets):
             for edge in self.all_edges:
@@ -100,23 +101,27 @@ class SubProblem:
                 # constraint
                 sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[i][edge] >= 1)
                 sub_model.addGenConstrIndicator(self.is_edge_used[i][edge], False, self.edge_flow_value[i][edge] == 0)
-        # cutters
-        cutters = [compoenent for compoenent, value in is_component_used.items() if value > 0.5]
-
-        # general
-        self.add_objective(sub_model)
-
-        # constraints (in order of large pruning to little pruning, stronger constraints first)
-        self.add_start_no_pad_constraints(sub_model)
-        self.add_goal_no_pad_no_belt_constraints(sub_model)
-        self.add_cutter_no_belt_no_pad_constraints(sub_model, cutters)
-        self.add_cutter_pad_direction_constraints(sub_model, cutters)
-
         self.add_belt_pad_net_overlap_constraints(sub_model)
         self.add_flow_max_value_constraints(sub_model)
         self.add_pad_direction_constraints(sub_model)
+        
+        # general
+        self.add_objective(sub_model)
 
+        # add start
+        self.add_start_no_pad_constraints(sub_model)
+        # self.add_start_direction_constraints(sub_model)
+
+        # add goal
+        self.add_goal_no_pad_no_belt_constraints(sub_model)
+        # self.add_goal_direction_constraints(sub_model)
+
+        # add cutter
+        cutters = [compoenent for compoenent, value in is_component_used.items() if value > 0.5]
+        self.add_cutter_no_belt_no_pad_constraints(sub_model, cutters)
+        self.add_cutter_pad_direction_constraints(sub_model, cutters)
         self.add_cutter_net(sub_model, cutters)
+
         
         # Solve
         self.solve(sub_model)
@@ -166,16 +171,16 @@ class SubProblem:
             sub_model.addConstr(quicksum(list_of_things_using_node) <= 1)
     
     def add_start_no_pad_constraints(self, sub_model):
-        # no starting pad 
+        # no starting pad and landing pad
         for node in self.net_sources[0]:
-            for edge in self.node_related_starting_pad_edges[node]:
+            for edge in self.node_related_starting_pad_edges[node] + self.node_related_landing_pad_edges[node]:
                 for i in range(self.num_nets):
                     sub_model.addConstr(self.is_edge_used[i][edge] == 0)
         
     def add_goal_no_pad_no_belt_constraints(self, sub_model):
         # no belt and starting pad
         for node in self.net_sinks[1] + self.net_sinks[2]:
-            for edge in self.node_related_belt_edges[node] + self.node_related_starting_pad_edges[node]:
+            for edge in self.node_related_belt_edges[node] + self.node_related_starting_pad_edges[node] + self.node_related_landing_pad_edges[node]:
                 for i in range(self.num_nets):
                     sub_model.addConstr(self.is_edge_used[i][edge] == 0)
 
