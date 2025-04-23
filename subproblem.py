@@ -186,7 +186,9 @@ class SubProblem:
         for node, direction in starts:
             for i in range(self.num_nets):
                 # no in flow
-                sub_model.addConstr(self.node_in_flow_expr[i][node] == 0) # no in flow into starting pad
+                in_flow_edges = [edge for edge in self.all_edges if edge[1] == node]
+                for edge in in_flow_edges:
+                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
 
                 # out flow only by step and only in given direction
                 out_flow_edges = self.node_related_belt_edges[node]
@@ -202,7 +204,9 @@ class SubProblem:
         for node, direction in goals:
             for i in range(self.num_nets):
                 # no out flow
-                sub_model.addConstr(self.node_out_flow_expr[i][node] == 0) # no in flow into starting pad
+                out_flow_edges = [edge for edge in self.all_edges if edge[0] == node]
+                for edge in out_flow_edges:
+                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
 
                 # in flow only in given direction
                 in_flow_edges = [edge for edge in self.all_edges if edge[1] == node]
@@ -307,7 +311,9 @@ class SubProblem:
                         sub_model.addConstr(self.is_edge_used[i][edge] == 0) 
 
                 # no flow out
-                sub_model.addConstr(self.node_out_flow_expr[i][node] == 0)
+                out_flow_edges = [edge for edge in self.all_edges if edge[0] == node]
+                for edge in out_flow_edges:
+                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
 
                 # no belt and pads
                 for edge in self.node_related_belt_edges[node] + self.node_related_starting_pad_edges[node] + self.node_related_landing_pad_edges[node]:
@@ -318,10 +324,14 @@ class SubProblem:
             for i in range(self.num_nets):
                 
                 # no flow in
-                sub_model.addConstr(self.node_in_flow_expr[i][node] == 0) # no flow into secondary component
+                in_flow_edges = [edge for edge in self.all_edges if edge[1] == node]
+                for edge in in_flow_edges:
+                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
 
                 # no flow out
-                sub_model.addConstr(self.node_out_flow_expr[i][node] == 0) # no flow out of secondary component
+                out_flow_edges = [edge for edge in self.all_edges if edge[0] == node]
+                for edge in out_flow_edges:
+                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
 
                 # no pad and belt
                 for edge in self.node_related_belt_edges[node] + self.node_related_starting_pad_edges[node] + self.node_related_landing_pad_edges[node]:
@@ -329,39 +339,37 @@ class SubProblem:
                 
         # primary source nodes
         for node, direction in primary_sources:
-            # only starting pad at direction
             for i in range(self.num_nets):
-                self.add_static_directional_constraints(i, sub_model, (primary_source, direction, STARTING_PAD))
+                # only starting pad at direction
+                for edge in self.node_related_starting_pad_edges[node]:
+                    if edge[2] != direction:
+                        sub_model.addConstr(self.is_edge_used[i][edge] == 0)
+                # no landing pad
+                for edge in self.node_related_landing_pad_edges[node]:
+                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
         
         # secondary source nodes
         for node, direction in secondary_sources:
-            # only starting pad at direction
             for i in range(self.num_nets):
-                self.add_static_directional_constraints(i, sub_model, (secondary_source, direction, STARTING_PAD))
+                # only starting pad at direction
+                for edge in self.node_related_starting_pad_edges[node]:
+                    if edge[2] != direction:
+                        sub_model.addConstr(self.is_edge_used[i][edge] == 0)
+                # no landing pad
+                for edge in self.node_related_landing_pad_edges[node]:
+                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
 
         # input location nodes
         for node, direction in input_locations:
-            # only landing pad at direction
             for i in range(self.num_nets):
-                self.add_static_directional_constraints(i, sub_model, (input_location, direction, LANDING_PAD))
-        
-    def add_static_directional_constraints(self, i, sub_model, constraint: Tuple[Node, Direction, PAD_TYPE]):
-        node, allowed_direction, allowed_type = constraint
-
-        # allowed
-        if allowed_type == STARTING_PAD:
-            allowed_pad_edges = [edge for edge in self.node_related_starting_pad_edges[node] if edge[2] == allowed_direction]
-        elif allowed_type == LANDING_PAD:
-            allowed_pad_edges = [edge for edge in self.node_related_landing_pad_edges[node] if edge[2] == allowed_direction]
-        else:
-            raise ValueError("Invalid jump pad type")
-
-        # set invalid jump edges to 0
-        all_pad_edges = self.node_related_starting_pad_edges[node] + self.node_related_landing_pad_edges[node]
-        invalid_pad_edges = [edge for edge in all_pad_edges if edge not in allowed_pad_edges]
-        for jump_edge in invalid_pad_edges:
-            sub_model.addConstr(self.is_edge_used[i][jump_edge] == 0)
-
+                # no start pad
+                for edge in self.node_related_starting_pad_edges[node]:
+                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
+                # only landing pad at direction
+                for edge in self.node_related_landing_pad_edges[node]:
+                    if edge[2] != direction:
+                        sub_model.addConstr(self.is_edge_used[i][edge] == 0)
+    
     def solve(self, sub_model):
         if self.timelimit != -1:
             sub_model.setParam('TimeLimit', self.timelimit)
