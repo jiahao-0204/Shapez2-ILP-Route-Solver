@@ -116,7 +116,7 @@ class SubProblem:
 
         # add cutter
         self.add_cutter_edge_constraints(sub_model, cutters)
-        self.add_cutter_net(sub_model, cutters)
+        self.add_cutter_net(sub_model, cutters, starts, goals1, goals2)
 
         # solve
         self.solve(sub_model)
@@ -213,19 +213,16 @@ class SubProblem:
                         continue
                     sub_model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
 
-    def add_cutter_net(self, sub_model, cutters):
+    def add_cutter_net(self, sub_model, cutters, starts, goals1, goals2):
         # net 0: start -> componenent sink
         # net 1: component source -> goal
         # net 2: component secondary source -> goal
-        s0 = []
-        source_direction = (0, 1)
-        for node in self.net_sources[0]:
-            s0 += [(node[0] + source_direction[0], node[1] + source_direction[1])]
+        s0 = [(node[0] + direction[0], node[1] + direction[1]) for node, direction in starts]
         k0 = []
         s1 = []
-        k1 = self.net_sinks[1]
+        k1 = [node for node, _ in goals1]
         s2 = []
-        k2 = self.net_sinks[2]
+        k2 = [node for node, _ in goals2]
 
         for cutter in cutters:
             sink, direction, secondary_direction = cutter
