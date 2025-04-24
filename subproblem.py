@@ -184,27 +184,12 @@ class SubProblem:
     
     def add_start_edge_constraints(self, sub_model, starts: List[Tuple[Node, Direction]]):
         for node, direction in starts:
-            # null_node = node
-            # source_node = (node[0] + direction[0], node[1] + direction[1])
-            # self.add_null_node_constraints(sub_model, null_node)
-            # self.add_source_node_constraints(sub_model, source_node, direction)
-
-            # pass
-            for i in range(self.num_nets):
-                # no in flow
-                in_flow_edges = [edge for edge in self.all_edges if edge[1] == node]
-                for edge in in_flow_edges:
-                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
-
-                # out flow only by step and only in given direction
-                out_flow_edges = self.node_related_belt_edges[node]
-                for edge in out_flow_edges:
-                    if edge[2] != direction:
-                        sub_model.addConstr(self.is_edge_used[i][edge] == 0) 
-
-                # no starting pad and landing pad
-                for edge in self.node_related_starting_pad_edges[node] + self.node_related_landing_pad_edges[node]:
-                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
+            # null node
+            null_node = node
+            self.add_null_node_constraints(sub_model, null_node)
+            # source node
+            source_node = (node[0] + direction[0], node[1] + direction[1])
+            self.add_source_node_constraints(sub_model, source_node, direction)
     
     def add_goal_edge_constraints(self, sub_model, goals: List[Tuple[Node, Direction]]):
         for node, direction in goals:
@@ -232,7 +217,10 @@ class SubProblem:
         # net 0: start -> componenent sink
         # net 1: component source -> goal
         # net 2: component secondary source -> goal
-        s0 = self.net_sources[0]
+        s0 = []
+        source_direction = (0, 1)
+        for node in self.net_sources[0]:
+            s0 += [(node[0] + source_direction[0], node[1] + source_direction[1])]
         k0 = []
         s1 = []
         k1 = self.net_sinks[1]
