@@ -184,6 +184,12 @@ class SubProblem:
     
     def add_start_edge_constraints(self, sub_model, starts: List[Tuple[Node, Direction]]):
         for node, direction in starts:
+            # null_node = node
+            # source_node = (node[0] + direction[0], node[1] + direction[1])
+            # self.add_null_node_constraints(sub_model, null_node)
+            # self.add_source_node_constraints(sub_model, source_node, direction)
+
+            # pass
             for i in range(self.num_nets):
                 # no in flow
                 in_flow_edges = [edge for edge in self.all_edges if edge[1] == node]
@@ -202,21 +208,7 @@ class SubProblem:
     
     def add_goal_edge_constraints(self, sub_model, goals: List[Tuple[Node, Direction]]):
         for node, direction in goals:
-            for i in range(self.num_nets):
-                # no out flow
-                out_flow_edges = [edge for edge in self.all_edges if edge[0] == node]
-                for edge in out_flow_edges:
-                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
-
-                # in flow only in given direction
-                in_flow_edges = [edge for edge in self.all_edges if edge[1] == node]
-                for edge in in_flow_edges:
-                    if edge[2] != direction:
-                        sub_model.addConstr(self.is_edge_used[i][edge] == 0) 
-
-                # no belt, starting and landing pad
-                for edge in self.node_related_belt_edges[node] + self.node_related_starting_pad_edges[node] + self.node_related_landing_pad_edges[node]:
-                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
+            self.add_sink_node_constraints(sub_model, node, direction)
 
     def add_pad_direction_constraints(self, sub_model):
         # for each edge, if the edge is used, then the end node must not have jump edge at different direction
@@ -287,7 +279,6 @@ class SubProblem:
         secondary_components: List[Tuple[Node, Direction]] = []
         primary_sources: List[Tuple[Node, Direction]] = []
         secondary_sources: List[Tuple[Node, Direction]] = []
-        input_locations: List[Tuple[Node, Direction]] = []
         for cutter in cutters:
             primary_component, direction, secondary_direction = cutter
             secondary_component = (primary_component[0] + secondary_direction[0], primary_component[1] + secondary_direction[1])
@@ -299,77 +290,105 @@ class SubProblem:
             secondary_components.append((secondary_component, secondary_direction))
             primary_sources.append((primary_source, direction))
             secondary_sources.append((secondary_source, direction))
-            input_locations.append((input_location, direction))
 
         # primary component nodes
         for node, direction in primary_components:
-            for i in range(self.num_nets):
-                # flow in at same direction
-                in_flow_edges = [edge for edge in self.all_edges if edge[1] == node]
-                for edge in in_flow_edges:
-                    if edge[2] != direction:
-                        sub_model.addConstr(self.is_edge_used[i][edge] == 0) 
-
-                # no flow out
-                out_flow_edges = [edge for edge in self.all_edges if edge[0] == node]
-                for edge in out_flow_edges:
-                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
-
-                # no belt and pads
-                for edge in self.node_related_belt_edges[node] + self.node_related_starting_pad_edges[node] + self.node_related_landing_pad_edges[node]:
-                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
+            self.add_sink_node_constraints(sub_model, node, direction)
                 
         # secondary component nodes
         for node, direction in secondary_components:
-            for i in range(self.num_nets):
-                
-                # no flow in
-                in_flow_edges = [edge for edge in self.all_edges if edge[1] == node]
-                for edge in in_flow_edges:
-                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
-
-                # no flow out
-                out_flow_edges = [edge for edge in self.all_edges if edge[0] == node]
-                for edge in out_flow_edges:
-                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
-
-                # no pad and belt
-                for edge in self.node_related_belt_edges[node] + self.node_related_starting_pad_edges[node] + self.node_related_landing_pad_edges[node]:
-                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
+            self.add_null_node_constraints(sub_model, node)
                 
         # primary source nodes
         for node, direction in primary_sources:
-            for i in range(self.num_nets):
-                # only starting pad at direction
-                for edge in self.node_related_starting_pad_edges[node]:
-                    if edge[2] != direction:
-                        sub_model.addConstr(self.is_edge_used[i][edge] == 0)
-                # no landing pad
-                for edge in self.node_related_landing_pad_edges[node]:
-                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
+            self.add_source_node_constraints(sub_model, node, direction)
         
         # secondary source nodes
         for node, direction in secondary_sources:
-            for i in range(self.num_nets):
-                # only starting pad at direction
-                for edge in self.node_related_starting_pad_edges[node]:
-                    if edge[2] != direction:
-                        sub_model.addConstr(self.is_edge_used[i][edge] == 0)
-                # no landing pad
-                for edge in self.node_related_landing_pad_edges[node]:
+            self.add_source_node_constraints(sub_model, node, direction)
+    
+    def add_source_node_constraints(self, sub_model, node:Node, direction:Direction):
+        for i in range(self.num_nets):
+            # inflow: except in opposite direction
+            in_flow_edges = [edge for edge in self.all_edges if edge[1] == node]
+            for edge in in_flow_edges:
+                if edge[2] == (-direction[0], -direction[1]):
                     sub_model.addConstr(self.is_edge_used[i][edge] == 0)
 
-        # input location nodes
-        for node, direction in input_locations:
-            for i in range(self.num_nets):
-                # no start pad
-                for edge in self.node_related_starting_pad_edges[node]:
+            # outflow: except in opposite direction
+            out_flow_edges = [edge for edge in self.all_edges if edge[0] == node]
+            for edge in out_flow_edges:
+                if edge[2] == (-direction[0], -direction[1]):
                     sub_model.addConstr(self.is_edge_used[i][edge] == 0)
-                # only landing pad at direction
-                for edge in self.node_related_landing_pad_edges[node]:
-                    if edge[2] != direction:
-                        sub_model.addConstr(self.is_edge_used[i][edge] == 0)
-    
+
+            # start pad: only in direction
+            for edge in self.node_related_starting_pad_edges[node]:
+                if edge[2] != direction:
+                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
+
+            # landing pad: no
+            for edge in self.node_related_landing_pad_edges[node]:
+                sub_model.addConstr(self.is_edge_used[i][edge] == 0)
+
+    def add_sink_node_constraints(self, sub_model, node:Node, direction:Direction):
+        for i in range(self.num_nets):
+            # in flow: only in direction
+            in_flow_edges = [edge for edge in self.all_edges if edge[1] == node]
+            for edge in in_flow_edges:
+                if edge[2] != direction:
+                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
+
+            # out flow: no
+            out_flow_edges = [edge for edge in self.all_edges if edge[0] == node]
+            for edge in out_flow_edges:
+                sub_model.addConstr(self.is_edge_used[i][edge] == 0)
+
+            # start pad: no
+            for edge in self.node_related_starting_pad_edges[node]:
+                sub_model.addConstr(self.is_edge_used[i][edge] == 0)
+
+            # land pad: no
+            for edge in self.node_related_landing_pad_edges[node]:
+                sub_model.addConstr(self.is_edge_used[i][edge] == 0)
+            
+            # ------ for input location ------
+            input_node = (node[0] - direction[0], node[1] - direction[1])
+            
+            # in flow: except from node direction (but is covered in the above)
+            pass
+
+            # outflow: all
+            pass
+
+            # start pad: no
+            for edge in self.node_related_starting_pad_edges[input_node]:
+                sub_model.addConstr(self.is_edge_used[i][edge] == 0)
+            
+            # land pad: only in direction
+            for edge in self.node_related_landing_pad_edges[input_node]:
+                if edge[2] != direction:
+                    sub_model.addConstr(self.is_edge_used[i][edge] == 0)
+
+    def add_null_node_constraints(self, sub_model, node:Node):
+        for i in range(self.num_nets):
+            # in flow: no
+            in_flow_edges = [edge for edge in self.all_edges if edge[1] == node]
+            for edge in in_flow_edges:
+                sub_model.addConstr(self.is_edge_used[i][edge] == 0)
+
+            # out flow: no
+            out_flow_edges = [edge for edge in self.all_edges if edge[0] == node]
+            for edge in out_flow_edges:
+                sub_model.addConstr(self.is_edge_used[i][edge] == 0)
+
+            # start pad: no
+            for edge in self.node_related_starting_pad_edges[node]:
+                sub_model.addConstr(self.is_edge_used[i][edge] == 0)
+
+            # land pad: no
+            for edge in self.node_related_landing_pad_edges[node]:
+                sub_model.addConstr(self.is_edge_used[i][edge] == 0)
+
     def solve(self, sub_model):
         if self.timelimit != -1:
             sub_model.setParam('TimeLimit', self.timelimit)
