@@ -20,64 +20,21 @@ Edge = Tuple[Node, Node, Direction] # start, end, direciton
 class SubProblem:
     def __init__(self):
         
-        
-        self.WIDTH = 16
-        self.HEIGHT = 16
         self.jump_distances = [1, 2, 3, 4]
         self.timelimit = -1
         self.option = 1
 
-        # problem parameters
-        self.component_source_amount = 1
-        self.component_sink_amount = 1
-
         self.num_nets = 3 # start to component, component to goal
 
-        self.preplacement_list = []
-        self.preplacement_list.append(((4, 3), (1, 0), (0, 1)))
-        self.preplacement_list.append(((4, 7), (1, 0), (0, -1)))
-        self.preplacement_list.append(((4, 9), (1, 0), (0, 1)))
-        # self.preplacement_list.append(((4, 13), (1, 0), (0, -1)))
-
-        self.preplacement_list.append(((6, 3), (-1, 0), (0, 1)))
-        self.preplacement_list.append(((6, 7), (-1, 0), (0, -1)))
-        self.preplacement_list.append(((6, 9), (-1, 0), (0, 1)))
-        # self.preplacement_list.append(((6, 13), (-1, 0), (0, -1)))
-
-        self.preplacement_list.append(((9, 3), (1, 0), (0, 1)))
-        self.preplacement_list.append(((9, 7), (1, 0), (0, -1)))
-        self.preplacement_list.append(((9, 9), (1, 0), (0, 1)))
-        # self.preplacement_list.append(((9, 13), (1, 0), (0, -1)))
-
-        self.preplacement_list.append(((11, 3), (-1, 0), (0, 1)))
-        self.preplacement_list.append(((11, 7), (-1, 0), (0, -1)))
-        self.preplacement_list.append(((11, 9), (-1, 0), (0, 1)))
-        # self.preplacement_list.append(((11, 13), (-1, 0), (0, -1)))
-
-
         self.flow_cap = 4
-        self.start_amount = 4
-        self.goal_amount = 4
+        
         self.edge_priority = 50
         self.flow_priority = 25
 
         # blocked tile is the border of the map
-        self.border = [(x, 0) for x in range(self.WIDTH)] + [(x, self.HEIGHT-1) for x in range(self.WIDTH)] + [(0, y) for y in range(self.HEIGHT)] + [(self.WIDTH-1, y) for y in range(self.HEIGHT)]
-        self.corner = [(1, 1), (self.WIDTH-2, 1), (1, self.HEIGHT-2), (self.WIDTH-2, self.HEIGHT-2)]
-
-        self.port_location = []
-        self.port_location += [(6, 1), (7, 1), (8, 1), (9, 1)]
-        self.port_location += [(6, self.HEIGHT-2), (7, self.HEIGHT-2), (8, self.HEIGHT-2), (9, self.HEIGHT-2)]
-        self.port_location += [(1, 6), (1, 7), (1, 8), (1, 9)]
-        self.port_location += [(self.WIDTH-2, 6), (self.WIDTH-2, 7), (self.WIDTH-2, 8), (self.WIDTH-2, 9)]
-
-        self.port_center_location = []
-        self.port_center_location += [(7, 1), (8, 1)]
-        self.port_center_location += [(7, self.HEIGHT-2), (8, self.HEIGHT-2)]
-        self.port_center_location += [(1, 7), (1, 8)]
-        self.port_center_location += [(self.WIDTH-2, 7), (self.WIDTH-2, 8)]
-
-        self.blocked_tiles = self.border.copy()
+        self.WIDTH = 16
+        self.HEIGHT = 16
+        self.blocked_tiles = [(x, 0) for x in range(self.WIDTH)] + [(x, self.HEIGHT-1) for x in range(self.WIDTH)] + [(0, y) for y in range(self.HEIGHT)] + [(self.WIDTH-1, y) for y in range(self.HEIGHT)]
         
         remove_from_blocked_tiles = [] 
         remove_from_blocked_tiles += [(6, 0), (7, 0), (8, 0), (9, 0)]
@@ -127,30 +84,50 @@ class SubProblem:
                         self.node_related_landing_pad_edges[pad_node].append(edge)
 
         # start and goals
+        self.start_amount = 4
         self.starts: List[Tuple[Node, Direction]] = []
         self.starts.append(((7, 0), (0, 1)))
         self.starts.append(((8, 0), (0, 1)))
         self.starts.append(((9, 0), (0, 1)))
 
+        self.goal1_amount = 4
         self.goals1: List[Tuple[Node, Direction]] = []
         self.goals1.append(((0, 7), (-1, 0)))
         self.goals1.append(((0, 8), (-1, 0)))
         self.goals1.append(((0, 9), (-1, 0)))
 
+        self.goal2_amount = 4
         self.goals2: List[Tuple[Node, Direction]] = []
         self.goals2.append(((7, 15), (0, 1)))
         self.goals2.append(((8, 15), (0, 1)))
         self.goals2.append(((9, 15), (0, 1)))
 
-        self.net_sources: Dict[int, List[Node]] = defaultdict(list)
-        self.net_sinks: Dict[int, List[Node]] = defaultdict(list)
-        self.net_sources[0] = [node for node, _ in self.starts]
-        self.net_sinks[1] = [node for node, _ in self.goals1]
-        self.net_sinks[2] = [node for node, _ in self.goals2]
+        self.cutter_sink_amount = 1
+        self.cutter_source_amount = 1
+        self.cutter_used = []
+        self.cutter_used.append(((4, 3), (1, 0), (0, 1)))
+        self.cutter_used.append(((4, 7), (1, 0), (0, -1)))
+        self.cutter_used.append(((4, 9), (1, 0), (0, 1)))
+        # self.cutter_used.append(((4, 13), (1, 0), (0, -1)))
 
-        feasible, cost, is_edge_used = self.solve_subproblem(self.preplacement_list, self.starts, self.goals1, self.goals2)
+        self.cutter_used.append(((6, 3), (-1, 0), (0, 1)))
+        self.cutter_used.append(((6, 7), (-1, 0), (0, -1)))
+        self.cutter_used.append(((6, 9), (-1, 0), (0, 1)))
+        # self.cutter_used.append(((6, 13), (-1, 0), (0, -1)))
 
-        self.plot(is_edge_used, self.preplacement_list)
+        self.cutter_used.append(((9, 3), (1, 0), (0, 1)))
+        self.cutter_used.append(((9, 7), (1, 0), (0, -1)))
+        self.cutter_used.append(((9, 9), (1, 0), (0, 1)))
+        # self.cutter_used.append(((9, 13), (1, 0), (0, -1)))
+
+        self.cutter_used.append(((11, 3), (-1, 0), (0, 1)))
+        self.cutter_used.append(((11, 7), (-1, 0), (0, -1)))
+        self.cutter_used.append(((11, 9), (-1, 0), (0, 1)))
+        # self.cutter_used.append(((11, 13), (-1, 0), (0, -1)))
+
+        feasible, cost, is_edge_used = self.solve_subproblem(self.cutter_used, self.starts, self.goals1, self.goals2)
+
+        self.plot(is_edge_used, self.cutter_used)
 
     def solve_subproblem(self, cutters, starts, goals1, goals2):
         # set up model parameters
@@ -320,11 +297,17 @@ class SubProblem:
             s2 += [secondary_source]
 
         s0_amount = [self.start_amount] * len(s0)
-        k0_amount = [self.component_sink_amount] * len(k0)
-        s1_amount = [self.component_source_amount] * len(s1)
-        k1_amount = [self.goal_amount] * len(k1)
-        s2_amount = [self.component_source_amount] * len(s2)
-        k2_amount = [self.goal_amount] * len(k2)
+        k0_amount = [self.cutter_sink_amount] * len(k0)
+        s1_amount = [self.cutter_source_amount] * len(s1)
+        k1_amount = [self.goal1_amount] * len(k1)
+        s2_amount = [self.cutter_source_amount] * len(s2)
+        k2_amount = [self.goal2_amount] * len(k2)
+
+        self.net_sources: Dict[int, List[Node]] = defaultdict(list)
+        self.net_sinks: Dict[int, List[Node]] = defaultdict(list)
+        self.net_sources[0] = [node for node, _ in self.starts]
+        self.net_sinks[1] = [node for node, _ in self.goals1]
+        self.net_sinks[2] = [node for node, _ in self.goals2]
 
         self.add_net(sub_model, 0, s0, s0_amount, k0, k0_amount)
         self.add_net(sub_model, 1, s1, s1_amount, k1, k1_amount)
@@ -486,7 +469,6 @@ class SubProblem:
             # ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='none', hatch='////'))
             # ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='lightgrey', edgecolor='black', linewidth=2))
             ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='lightgrey', linewidth=2))
-
 
         colors = ['red', 'green', 'blue', 'orange', 'purple', 'cyan', 'magenta', 'brown', 'gray', 'olive']    
         for i in range(self.num_nets):
