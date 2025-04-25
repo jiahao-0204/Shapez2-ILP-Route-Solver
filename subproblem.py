@@ -19,11 +19,7 @@ Edge = Tuple[Node, Node, Direction] # start, end, direciton
 
 class SubProblem:
     def __init__(self):
-        nets = [
-            ([(7, 0), (8, 0), (9, 0)], 
-            [(0, 7), (0, 8), (0, 9)],
-            [(7, 15), (8, 15), (9, 15)]),
-        ]
+        
         
         self.WIDTH = 16
         self.HEIGHT = 16
@@ -36,19 +32,6 @@ class SubProblem:
         self.component_sink_amount = 1
 
         self.num_nets = 3 # start to component, component to goal
-        self.net_sources: Dict[int, List[Node]] = {}
-        self.net_sinks: Dict[int, List[Node]] = {}
-
-        sources, sinks1, sinks2 = nets[0]
-        
-        self.net_sources[0] = sources
-        self.net_sinks[0] = []
-
-        self.net_sources[1] = []
-        self.net_sinks[1] = sinks1
-
-        self.net_sources[2] = []
-        self.net_sinks[2] = sinks2
 
         self.preplacement_list = []
         self.preplacement_list.append(((4, 3), (1, 0), (0, 1)))
@@ -143,11 +126,33 @@ class SubProblem:
                         self.node_related_starting_pad_edges[node].append(edge)
                         self.node_related_landing_pad_edges[pad_node].append(edge)
 
-        feasible, cost, is_edge_used = self.solve_subproblem()
+        # start and goals
+        self.starts: List[Tuple[Node, Direction]] = []
+        self.starts.append(((7, 0), (0, 1)))
+        self.starts.append(((8, 0), (0, 1)))
+        self.starts.append(((9, 0), (0, 1)))
+
+        self.goals1: List[Tuple[Node, Direction]] = []
+        self.goals1.append(((0, 7), (-1, 0)))
+        self.goals1.append(((0, 8), (-1, 0)))
+        self.goals1.append(((0, 9), (-1, 0)))
+
+        self.goals2: List[Tuple[Node, Direction]] = []
+        self.goals2.append(((7, 15), (0, 1)))
+        self.goals2.append(((8, 15), (0, 1)))
+        self.goals2.append(((9, 15), (0, 1)))
+
+        self.net_sources: Dict[int, List[Node]] = defaultdict(list)
+        self.net_sinks: Dict[int, List[Node]] = defaultdict(list)
+        self.net_sources[0] = [node for node, _ in self.starts]
+        self.net_sinks[1] = [node for node, _ in self.goals1]
+        self.net_sinks[2] = [node for node, _ in self.goals2]
+
+        feasible, cost, is_edge_used = self.solve_subproblem(self.preplacement_list, self.starts, self.goals1, self.goals2)
 
         self.plot(is_edge_used, self.preplacement_list)
 
-    def solve_subproblem(self):
+    def solve_subproblem(self, cutters, starts, goals1, goals2):
         # set up model parameters
         sub_model = Model("subproblem")
         if self.timelimit != -1:
@@ -188,20 +193,6 @@ class SubProblem:
         self.add_belt_pad_net_overlap_constraints(sub_model)
         self.add_pad_direction_constraints(sub_model)
         
-        # start and goals
-        starts: List[Tuple[Node, Direction]] = []
-        goals1: List[Tuple[Node, Direction]] = []
-        goals2: List[Tuple[Node, Direction]] = []
-        for node in self.net_sources[0]:
-            starts.append((node, (0, 1)))
-        for node in self.net_sinks[1]:
-            goals1.append((node, (-1, 0)))
-        for node in self.net_sinks[2]:
-            goals2.append((node, (0, 1)))
-
-        # cutters
-        cutters = self.preplacement_list
-
         # general
         self.add_objective(sub_model)
         
