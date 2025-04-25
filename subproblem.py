@@ -129,10 +129,10 @@ class SubProblem:
                         self.node_related_landing_pad_edges[pad_node].append(edge)
 
         
+        self.draw_components(self.cutter_list)
+        # feasible, cost, is_edge_used = self.solve_subproblem(self.cutter_list, self.starts, self.goals1, self.goals2)
 
-        feasible, cost, is_edge_used = self.solve_subproblem(self.cutter_list, self.starts, self.goals1, self.goals2)
-
-        self.plot(is_edge_used, self.cutter_list)
+        # self.plot(is_edge_used, self.cutter_list)
 
     def solve_subproblem(self, cutters, starts, goals1, goals2):
         # set up model parameters
@@ -571,8 +571,10 @@ class SubProblem:
         # show
         plt.show()
 
-    def draw_components(self, is_component_used):
-        ax = self.ax
+    def draw_components(self, cutter_list):
+        # ax = self.ax
+        plt.figure(figsize=(12, 6))
+        ax = plt.gca()
         ax.clear()
         ax.set_xlim(0, self.WIDTH)
         ax.set_ylim(0, self.HEIGHT)
@@ -590,7 +592,7 @@ class SubProblem:
             ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='lightgrey', linewidth=2))
 
         # draw components
-        used_components = [c for c in self.all_components if is_component_used[c] > 0.5]
+        used_components = cutter_list
         for component in used_components:
             (x, y), (dx, dy), (dx2, dy2) = component        # two‑cell component
             nx, ny = x + dx, y + dy
@@ -624,8 +626,8 @@ class SubProblem:
 
         plt.title("Shapez2: Routing using Integer Linear Programming (ILP) -- Jiahao")
 
-        plt.draw()
-        plt.pause(0.1)
-        
+        # plt.draw()
+        plt.show()
+
 if __name__ == "__main__":
     router = SubProblem()
