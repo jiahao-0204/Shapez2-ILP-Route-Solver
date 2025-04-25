@@ -20,18 +20,63 @@ Edge = Tuple[Node, Node, Direction] # start, end, direciton
 class SubProblem:
     def __init__(self):
         
-        self.jump_distances = [1, 2, 3, 4]
-        self.timelimit = -1
-        self.option = 1
-
-        self.num_nets = 3 # start to component, component to goal
-
+        # some const settings
         self.flow_cap = 4
-        
         self.edge_priority = 50
         self.flow_priority = 25
 
+        # solver settings
+        self.timelimit = -1
+        self.option = 1
+
+        # problem definition
+        self.jump_distances = [1, 2, 3, 4]
+        self.num_nets = 3 # start to component, component to goal
+
+        # start and goals
+        self.start_amount = 4
+        self.starts: List[Tuple[Node, Direction]] = []
+        self.starts.append(((7, 0), (0, 1)))
+        self.starts.append(((8, 0), (0, 1)))
+        self.starts.append(((9, 0), (0, 1)))
+
+        self.goal1_amount = 4
+        self.goals1: List[Tuple[Node, Direction]] = []
+        self.goals1.append(((0, 7), (-1, 0)))
+        self.goals1.append(((0, 8), (-1, 0)))
+        self.goals1.append(((0, 9), (-1, 0)))
+
+        self.goal2_amount = 4
+        self.goals2: List[Tuple[Node, Direction]] = []
+        self.goals2.append(((7, 15), (0, 1)))
+        self.goals2.append(((8, 15), (0, 1)))
+        self.goals2.append(((9, 15), (0, 1)))
+
+        self.cutter_sink_amount = 1
+        self.cutter_source_amount = 1
+        self.cutter_list = []
+        self.cutter_list.append(((4, 3), (1, 0), (0, 1)))
+        self.cutter_list.append(((4, 7), (1, 0), (0, -1)))
+        self.cutter_list.append(((4, 9), (1, 0), (0, 1)))
+        # self.cutter_used.append(((4, 13), (1, 0), (0, -1)))
+
+        self.cutter_list.append(((6, 3), (-1, 0), (0, 1)))
+        self.cutter_list.append(((6, 7), (-1, 0), (0, -1)))
+        self.cutter_list.append(((6, 9), (-1, 0), (0, 1)))
+        # self.cutter_used.append(((6, 13), (-1, 0), (0, -1)))
+
+        self.cutter_list.append(((9, 3), (1, 0), (0, 1)))
+        self.cutter_list.append(((9, 7), (1, 0), (0, -1)))
+        self.cutter_list.append(((9, 9), (1, 0), (0, 1)))
+        # self.cutter_used.append(((9, 13), (1, 0), (0, -1)))
+
+        self.cutter_list.append(((11, 3), (-1, 0), (0, 1)))
+        self.cutter_list.append(((11, 7), (-1, 0), (0, -1)))
+        self.cutter_list.append(((11, 9), (-1, 0), (0, 1)))
+        # self.cutter_used.append(((11, 13), (-1, 0), (0, -1)))
+
         # blocked tile is the border of the map
+        # compute board
         self.WIDTH = 16
         self.HEIGHT = 16
         self.blocked_tiles = [(x, 0) for x in range(self.WIDTH)] + [(x, self.HEIGHT-1) for x in range(self.WIDTH)] + [(0, y) for y in range(self.HEIGHT)] + [(self.WIDTH-1, y) for y in range(self.HEIGHT)]
@@ -83,51 +128,11 @@ class SubProblem:
                         self.node_related_starting_pad_edges[node].append(edge)
                         self.node_related_landing_pad_edges[pad_node].append(edge)
 
-        # start and goals
-        self.start_amount = 4
-        self.starts: List[Tuple[Node, Direction]] = []
-        self.starts.append(((7, 0), (0, 1)))
-        self.starts.append(((8, 0), (0, 1)))
-        self.starts.append(((9, 0), (0, 1)))
+        
 
-        self.goal1_amount = 4
-        self.goals1: List[Tuple[Node, Direction]] = []
-        self.goals1.append(((0, 7), (-1, 0)))
-        self.goals1.append(((0, 8), (-1, 0)))
-        self.goals1.append(((0, 9), (-1, 0)))
+        feasible, cost, is_edge_used = self.solve_subproblem(self.cutter_list, self.starts, self.goals1, self.goals2)
 
-        self.goal2_amount = 4
-        self.goals2: List[Tuple[Node, Direction]] = []
-        self.goals2.append(((7, 15), (0, 1)))
-        self.goals2.append(((8, 15), (0, 1)))
-        self.goals2.append(((9, 15), (0, 1)))
-
-        self.cutter_sink_amount = 1
-        self.cutter_source_amount = 1
-        self.cutter_used = []
-        self.cutter_used.append(((4, 3), (1, 0), (0, 1)))
-        self.cutter_used.append(((4, 7), (1, 0), (0, -1)))
-        self.cutter_used.append(((4, 9), (1, 0), (0, 1)))
-        # self.cutter_used.append(((4, 13), (1, 0), (0, -1)))
-
-        self.cutter_used.append(((6, 3), (-1, 0), (0, 1)))
-        self.cutter_used.append(((6, 7), (-1, 0), (0, -1)))
-        self.cutter_used.append(((6, 9), (-1, 0), (0, 1)))
-        # self.cutter_used.append(((6, 13), (-1, 0), (0, -1)))
-
-        self.cutter_used.append(((9, 3), (1, 0), (0, 1)))
-        self.cutter_used.append(((9, 7), (1, 0), (0, -1)))
-        self.cutter_used.append(((9, 9), (1, 0), (0, 1)))
-        # self.cutter_used.append(((9, 13), (1, 0), (0, -1)))
-
-        self.cutter_used.append(((11, 3), (-1, 0), (0, 1)))
-        self.cutter_used.append(((11, 7), (-1, 0), (0, -1)))
-        self.cutter_used.append(((11, 9), (-1, 0), (0, 1)))
-        # self.cutter_used.append(((11, 13), (-1, 0), (0, -1)))
-
-        feasible, cost, is_edge_used = self.solve_subproblem(self.cutter_used, self.starts, self.goals1, self.goals2)
-
-        self.plot(is_edge_used, self.cutter_used)
+        self.plot(is_edge_used, self.cutter_list)
 
     def solve_subproblem(self, cutters, starts, goals1, goals2):
         # set up model parameters
@@ -566,5 +571,61 @@ class SubProblem:
         # show
         plt.show()
 
+    def draw_components(self, is_component_used):
+        ax = self.ax
+        ax.clear()
+        ax.set_xlim(0, self.WIDTH)
+        ax.set_ylim(0, self.HEIGHT)
+        ax.set_xticks(range(self.WIDTH))
+        ax.set_yticks(range(self.HEIGHT))
+        ax.set_aspect('equal')
+        ax.grid(True)
+
+        offset = 0.5
+
+        # draw blocked tiles
+        for (x, y) in self.blocked_tiles:
+            # ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='none', hatch='////'))
+            # ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='lightgrey', edgecolor='black', linewidth=2))
+            ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='lightgrey', linewidth=2))
+
+        # draw components
+        used_components = [c for c in self.all_components if is_component_used[c] > 0.5]
+        for component in used_components:
+            (x, y), (dx, dy), (dx2, dy2) = component        # two‑cell component
+            nx, ny = x + dx, y + dy
+            x2, y2 = x + dx2, y + dy2                       # second node
+            nx2, ny2 = x2 + dx, y2 + dy
+
+            ix, iy = x - dx, y - dy
+
+            margin = 0.2
+            ll_x = min(x, x2) + margin
+            ll_y = min(y, y2) + margin
+            width  = abs(x2 - x) + 1 - 2 * margin       # +1 because each node is 1×1
+            height = abs(y2 - y) + 1 - 2 * margin
+
+            rect = plt.Rectangle((ll_x, ll_y), width, height, facecolor='grey', edgecolor='black', linewidth=1.2, zorder=1)
+            ax.add_patch(rect)
+            d = (dx, dy)
+            if d == (0, 1):
+                marker = '^'
+            elif d == (0, -1):
+                marker = 'v'
+            elif d == (1, 0):
+                marker = '>'
+            elif d == (-1, 0):
+                marker = '<'
+            ax.scatter(x + offset, y + offset, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
+            ax.scatter(x2 + offset, y2 + offset, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
+            ax.plot([ix + offset, x + offset], [iy + offset, y + offset], c='black', zorder=0)
+            ax.plot([x + offset, nx + offset], [y + offset, ny + offset], c='black', zorder=0)
+            ax.plot([x2 + offset, nx2 + offset], [y2 + offset, ny2 + offset], c='black', zorder=0)
+
+        plt.title("Shapez2: Routing using Integer Linear Programming (ILP) -- Jiahao")
+
+        plt.draw()
+        plt.pause(0.1)
+        
 if __name__ == "__main__":
     router = SubProblem()
