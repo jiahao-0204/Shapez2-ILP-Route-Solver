@@ -30,7 +30,6 @@ class SubProblem:
         self.option = 1
 
         # problem definition
-        self.jump_distances = [1, 2, 3, 4]
         self.num_nets = 3 # start to component, component to goal
 
         # start and goals
@@ -74,19 +73,63 @@ class SubProblem:
         self.cutter_list.append(((11, 7), (-1, 0), (0, -1)))
         self.cutter_list.append(((11, 9), (-1, 0), (0, 1)))
         # self.cutter_used.append(((11, 13), (-1, 0), (0, -1)))
+        
+        io_tiles = [] 
+        io_tiles += [node for node, _ in self.starts]
+        io_tiles += [node for node, _ in self.goals1]
+        io_tiles += [node for node, _ in self.goals2]
+        self.general_initialization(16, 16, io_tiles, [1, 2, 3, 4])
+
+        # self.draw_components(self.cutter_list)
+        feasible, cost, is_edge_used = self.solve_subproblem(self.cutter_list, self.starts, self.goals1, self.goals2)
+
+        self.plot(is_edge_used, self.cutter_list)
+
+    def solve_subproblem(self, cutters, starts, goals1, goals2):        
+        # add start and goal
+        self.add_start_edge_constraints(starts)
+        self.add_goal_edge_constraints(goals1)
+        self.add_goal_edge_constraints(goals2)
+
+        # add cutter
+        self.add_cutter_edge_constraints(cutters)
+        self.add_cutter_net(cutters, starts, goals1, goals2)
+
+        # solve
+        self.solve()
+
+        # get solution
+        if self.model.Status == GRB.INFEASIBLE:
+            return False, None, None
+        else:
+            is_edge_used = {}
+            for i in range(self.num_nets):
+                is_edge_used[i] = {edge: self.model.getVarByName(f"edge_{i}_{edge}").X for edge in self.all_edges}
+                self.is_edge_used[i] = is_edge_used[i]
+            return True, self.model.ObjVal, is_edge_used
+
+        # # Plot
+        # self.plot()
+
+    def general_initialization(self, width, height, io_tiles, jump_distances):
+        # add model
+        self.model = Model("subproblem")
+
+        # model parameters
+        if self.timelimit != -1:
+            self.model.Params.TimeLimit = self.timelimit
+        self.model.Params.MIPFocus = 1
+        self.model.Params.Presolve = 2
+        # self.model.Params.OutputFlag = 0  # silent
 
         # blocked tile is the border of the map
-        # compute board
-        self.WIDTH = 16
-        self.HEIGHT = 16
+        self.WIDTH = width
+        self.HEIGHT = height
         self.blocked_tiles = [(x, 0) for x in range(self.WIDTH)] + [(x, self.HEIGHT-1) for x in range(self.WIDTH)] + [(0, y) for y in range(self.HEIGHT)] + [(self.WIDTH-1, y) for y in range(self.HEIGHT)]
-        
-        remove_from_blocked_tiles = [] 
-        remove_from_blocked_tiles += [node for node, _ in self.starts]
-        remove_from_blocked_tiles += [node for node, _ in self.goals1]
-        remove_from_blocked_tiles += [node for node, _ in self.goals2]
-        for tile in remove_from_blocked_tiles:
+        for tile in io_tiles:
             self.blocked_tiles.remove(tile)
+
+        self.jump_distances = jump_distances
 
         # all nodes
         self.all_nodes: List[Node] = []
@@ -124,49 +167,7 @@ class SubProblem:
                         self.node_related_starting_pad_edges[node].append(edge)
                         self.node_related_landing_pad_edges[pad_node].append(edge)
 
-        
-        # self.draw_components(self.cutter_list)
-        feasible, cost, is_edge_used = self.solve_subproblem(self.cutter_list, self.starts, self.goals1, self.goals2)
-
-        self.plot(is_edge_used, self.cutter_list)
-
-    def solve_subproblem(self, cutters, starts, goals1, goals2):
-        self.general_initialization()
-        
-        # add start and goal
-        self.add_start_edge_constraints(starts)
-        self.add_goal_edge_constraints(goals1)
-        self.add_goal_edge_constraints(goals2)
-
-        # add cutter
-        self.add_cutter_edge_constraints(cutters)
-        self.add_cutter_net(cutters, starts, goals1, goals2)
-
-        # solve
-        self.solve()
-
-        # get solution
-        if self.model.Status == GRB.INFEASIBLE:
-            return False, None, None
-        else:
-            is_edge_used = {}
-            for i in range(self.num_nets):
-                is_edge_used[i] = {edge: self.model.getVarByName(f"edge_{i}_{edge}").X for edge in self.all_edges}
-                self.is_edge_used[i] = is_edge_used[i]
-            return True, self.model.ObjVal, is_edge_used
-
-        # # Plot
-        # self.plot()
-
-    def general_initialization(self):
-        # set up model parameters
-        self.model = Model("subproblem")
-        if self.timelimit != -1:
-            self.model.Params.TimeLimit = self.timelimit
-        self.model.Params.MIPFocus = 1
-        self.model.Params.Presolve = 2
-        # self.model.Params.OutputFlag = 0  # silent
-
+        # model variables
         self.is_edge_used: Dict[int, Dict[Edge, Var]] = defaultdict(lambda: defaultdict(Var))
         self.edge_flow_value: Dict[int, Dict[Edge, Var]] = defaultdict(lambda: defaultdict(Var))
         self.node_in_flow_edges: Dict[int, Dict[Node, List[Edge]]] = defaultdict(lambda: defaultdict(list))
@@ -199,7 +200,7 @@ class SubProblem:
         self.add_belt_pad_net_overlap_constraints()
         self.add_pad_direction_constraints()
         
-        # general
+        # objective
         self.add_objective()
 
 
