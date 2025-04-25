@@ -82,15 +82,11 @@ class SubProblem:
         self.blocked_tiles = [(x, 0) for x in range(self.WIDTH)] + [(x, self.HEIGHT-1) for x in range(self.WIDTH)] + [(0, y) for y in range(self.HEIGHT)] + [(self.WIDTH-1, y) for y in range(self.HEIGHT)]
         
         remove_from_blocked_tiles = [] 
-        remove_from_blocked_tiles += [(6, 0), (7, 0), (8, 0), (9, 0)]
-        remove_from_blocked_tiles += [(6, self.HEIGHT-1), (7, self.HEIGHT-1), (8, self.HEIGHT-1), (9, self.HEIGHT-1)]
-        # remove_from_blocked_tiles += [(26, self.HEIGHT-1), (27, self.HEIGHT-1), (28, self.HEIGHT-1), (29, self.HEIGHT-1)]
-        remove_from_blocked_tiles += [(0, 6), (0, 7), (0, 8), (0, 9)]
-        remove_from_blocked_tiles += [(self.WIDTH-1, 6), (self.WIDTH-1, 7), (self.WIDTH-1, 8), (self.WIDTH-1, 9)]
-
+        remove_from_blocked_tiles += [node for node, _ in self.starts]
+        remove_from_blocked_tiles += [node for node, _ in self.goals1]
+        remove_from_blocked_tiles += [node for node, _ in self.goals2]
         for tile in remove_from_blocked_tiles:
             self.blocked_tiles.remove(tile)
-        # self.blocked_tiles += [(1, 1), (2, 1), (3, 1), (4, 1), (5, 1)]
 
         # all nodes
         self.all_nodes: List[Node] = []
@@ -129,10 +125,10 @@ class SubProblem:
                         self.node_related_landing_pad_edges[pad_node].append(edge)
 
         
-        self.draw_components(self.cutter_list)
-        # feasible, cost, is_edge_used = self.solve_subproblem(self.cutter_list, self.starts, self.goals1, self.goals2)
+        # self.draw_components(self.cutter_list)
+        feasible, cost, is_edge_used = self.solve_subproblem(self.cutter_list, self.starts, self.goals1, self.goals2)
 
-        # self.plot(is_edge_used, self.cutter_list)
+        self.plot(is_edge_used, self.cutter_list)
 
     def solve_subproblem(self, cutters, starts, goals1, goals2):
         # set up model parameters
