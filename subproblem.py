@@ -1,11 +1,16 @@
 from gurobipy import Model, GRB, quicksum, Var, LinExpr
 from collections import defaultdict
 from typing import Dict, Tuple, List, Set
+import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+from matplotlib.legend_handler import HandlerTuple
+
 
 STEP_COST = 1
 JUMP_COST = 2
 STARTING_PAD = 0
 LANDING_PAD = 1
+DIRECTIONS = [(1, 0), (0, 1), (-1, 0), (0, -1)] # right, up, left, down
 
 PAD_TYPE = int
 Node = Tuple[int, int] # (x, y)
@@ -13,51 +18,131 @@ Direction = Tuple[int, int] # (dx, dy)
 Edge = Tuple[Node, Node, Direction] # start, end, direciton
 
 class SubProblem:
-    def __init__(self, net_sources, net_sinks, all_nodes, all_edges, step_edges, jump_edges, 
-                 node_related_components,
-                 node_related_secondary_components, node_related_component_sources,
-                 node_related_component_secondary_sources, node_related_component_sinks, node_related_belt_edges,
-                 node_related_starting_pad_edges, node_related_landing_pad_edges):
-        
-        # model parameters
-        self.timelimit = -1
-        self.flow_priority = 50
-        self.edge_priority = 0
-        self.option = 1
+    def __init__(self, width, height, nets, jump_distances: List[int] = [4], timelimit: int = 60, symmetry: bool = False, option: int = 0):
+        self.WIDTH = width
+        self.HEIGHT = height
+        self.jump_distances = jump_distances
+        self.timelimit = timelimit
+        self.symmetry = symmetry
+        self.option = option
 
         # problem parameters
-        self.num_nets = 3
-        self.start_amount = 4
-        self.goal_amount = 4
-        self.component_count = 16
-        self.total_start_amount = self.component_count * self.start_amount 
-        self.total_goal_amount = self.component_count * self.goal_amount
-        self.total_secondary_goal_amount = self.component_count * self.goal_amount
         self.component_source_amount = 1
         self.component_sink_amount = 1
-        self.flow_cap = 4
 
+        self.num_nets = 3 # start to component, component to goal
+        self.net_sources: Dict[int, List[Node]] = {}
+        self.net_sinks: Dict[int, List[Node]] = {}
 
-        self.net_sources = net_sources
-        self.net_sinks = net_sinks
-        self.all_nodes = all_nodes
-        self.all_edges = all_edges
-        self.step_edges = step_edges
-        self.jump_edges = jump_edges
-
-        # edges that generate this belt / starting pad / landing pad
-        self.node_related_belt_edges = node_related_belt_edges
-        self.node_related_starting_pad_edges = node_related_starting_pad_edges
-        self.node_related_landing_pad_edges = node_related_landing_pad_edges
-
-        self.node_related_components = node_related_components
-        self.node_related_secondary_components = node_related_secondary_components
-        self.node_related_component_sources = node_related_component_sources
-        self.node_related_component_secondary_sources = node_related_component_secondary_sources
-        self.node_related_component_sinks = node_related_component_sinks
+        sources, sinks1, sinks2 = nets[0]
         
+        self.net_sources[0] = sources
+        self.net_sinks[0] = []
 
-    def solve_subproblem(self, is_component_used):
+        self.net_sources[1] = []
+        self.net_sinks[1] = sinks1
+
+        self.net_sources[2] = []
+        self.net_sinks[2] = sinks2
+
+        self.preplacement_list = []
+        self.preplacement_list.append(((4, 3), (1, 0), (0, 1)))
+        self.preplacement_list.append(((4, 7), (1, 0), (0, -1)))
+        self.preplacement_list.append(((4, 9), (1, 0), (0, 1)))
+        # self.preplacement_list.append(((4, 13), (1, 0), (0, -1)))
+
+        self.preplacement_list.append(((6, 3), (-1, 0), (0, 1)))
+        self.preplacement_list.append(((6, 7), (-1, 0), (0, -1)))
+        self.preplacement_list.append(((6, 9), (-1, 0), (0, 1)))
+        # self.preplacement_list.append(((6, 13), (-1, 0), (0, -1)))
+
+        self.preplacement_list.append(((9, 3), (1, 0), (0, 1)))
+        self.preplacement_list.append(((9, 7), (1, 0), (0, -1)))
+        self.preplacement_list.append(((9, 9), (1, 0), (0, 1)))
+        # self.preplacement_list.append(((9, 13), (1, 0), (0, -1)))
+
+        self.preplacement_list.append(((11, 3), (-1, 0), (0, 1)))
+        self.preplacement_list.append(((11, 7), (-1, 0), (0, -1)))
+        self.preplacement_list.append(((11, 9), (-1, 0), (0, 1)))
+        # self.preplacement_list.append(((11, 13), (-1, 0), (0, -1)))
+
+
+        self.flow_cap = 4
+        self.start_amount = 4
+        self.goal_amount = 4
+        self.edge_priority = 50
+        self.flow_priority = 25
+
+        # blocked tile is the border of the map
+        self.border = [(x, 0) for x in range(self.WIDTH)] + [(x, self.HEIGHT-1) for x in range(self.WIDTH)] + [(0, y) for y in range(self.HEIGHT)] + [(self.WIDTH-1, y) for y in range(self.HEIGHT)]
+        self.corner = [(1, 1), (self.WIDTH-2, 1), (1, self.HEIGHT-2), (self.WIDTH-2, self.HEIGHT-2)]
+
+        self.port_location = []
+        self.port_location += [(6, 1), (7, 1), (8, 1), (9, 1)]
+        self.port_location += [(6, self.HEIGHT-2), (7, self.HEIGHT-2), (8, self.HEIGHT-2), (9, self.HEIGHT-2)]
+        self.port_location += [(1, 6), (1, 7), (1, 8), (1, 9)]
+        self.port_location += [(self.WIDTH-2, 6), (self.WIDTH-2, 7), (self.WIDTH-2, 8), (self.WIDTH-2, 9)]
+
+        self.port_center_location = []
+        self.port_center_location += [(7, 1), (8, 1)]
+        self.port_center_location += [(7, self.HEIGHT-2), (8, self.HEIGHT-2)]
+        self.port_center_location += [(1, 7), (1, 8)]
+        self.port_center_location += [(self.WIDTH-2, 7), (self.WIDTH-2, 8)]
+
+        self.blocked_tiles = self.border.copy()
+        
+        remove_from_blocked_tiles = [] 
+        remove_from_blocked_tiles += [(6, 0), (7, 0), (8, 0), (9, 0)]
+        remove_from_blocked_tiles += [(6, self.HEIGHT-1), (7, self.HEIGHT-1), (8, self.HEIGHT-1), (9, self.HEIGHT-1)]
+        # remove_from_blocked_tiles += [(26, self.HEIGHT-1), (27, self.HEIGHT-1), (28, self.HEIGHT-1), (29, self.HEIGHT-1)]
+        remove_from_blocked_tiles += [(0, 6), (0, 7), (0, 8), (0, 9)]
+        remove_from_blocked_tiles += [(self.WIDTH-1, 6), (self.WIDTH-1, 7), (self.WIDTH-1, 8), (self.WIDTH-1, 9)]
+
+        for tile in remove_from_blocked_tiles:
+            self.blocked_tiles.remove(tile)
+        # self.blocked_tiles += [(1, 1), (2, 1), (3, 1), (4, 1), (5, 1)]
+
+        # all nodes
+        self.all_nodes: List[Node] = []
+        for x in range(self.WIDTH):
+            for y in range(self.HEIGHT):
+                if (x, y) not in self.blocked_tiles:
+                    self.all_nodes.append((x, y))
+
+        self.all_edges: List[Edge] = []
+        self.step_edges: List[Edge] = []
+        self.jump_edges: List[Edge] = []
+        self.node_related_belt_edges: Dict[Node, List[Edge]] = defaultdict(list)
+        self.node_related_starting_pad_edges: Dict[Node, List[Edge]] = defaultdict(list)
+        self.node_related_landing_pad_edges: Dict[Node, List[Edge]] = defaultdict(list)
+        for node in self.all_nodes:
+            x, y = node
+            for dx, dy in DIRECTIONS:
+
+                # Step edge
+                nx, ny = x + dx, y + dy
+                if (nx, ny) in self.all_nodes:
+                    edge = ((x, y), (nx, ny), (dx, dy))
+                    self.all_edges.append(edge)
+                    self.step_edges.append(edge)
+                    self.node_related_belt_edges[node].append(edge)
+                
+                for jump_distance in self.jump_distances:
+                    nx, ny = x + dx * (jump_distance + 2), y + dy * (jump_distance + 2)
+                    jx, jy = x + dx * (jump_distance + 1), y + dy * (jump_distance + 1)
+                    pad_node = (jx, jy)
+                    if (nx, ny) in self.all_nodes:
+                        edge = ((x, y), (nx, ny), (dx, dy))
+                        self.all_edges.append(edge)
+                        self.jump_edges.append(edge)
+                        self.node_related_starting_pad_edges[node].append(edge)
+                        self.node_related_landing_pad_edges[pad_node].append(edge)
+
+        feasible, cost, is_edge_used = self.solve_subproblem()
+
+        self.plot(is_edge_used, self.preplacement_list)
+
+    def solve_subproblem(self):
         # set up model parameters
         sub_model = Model("subproblem")
         if self.timelimit != -1:
@@ -110,7 +195,7 @@ class SubProblem:
             goals2.append((node, (0, 1)))
 
         # cutters
-        cutters = [compoenent for compoenent, value in is_component_used.items() if value > 0.5]
+        cutters = self.preplacement_list
 
         # general
         self.add_objective(sub_model)
@@ -387,3 +472,127 @@ class SubProblem:
         # relaxed_model = sub_model.copy()
         # relaxed_model.feasRelaxS(0, False, False, True)
         # relaxed_model.optimize()
+
+    def plot(self, sub_problem_is_edge_used, used_components):
+        plt.figure(figsize=(12, 6))
+        ax = plt.gca()
+        ax.set_xlim(0, self.WIDTH)
+        ax.set_ylim(0, self.HEIGHT)
+        ax.set_xticks(range(self.WIDTH))
+        ax.set_yticks(range(self.HEIGHT))
+        ax.set_aspect('equal')
+        ax.grid(True)
+
+        offset = 0.5
+
+        # draw blocked tiles
+        for (x, y) in self.blocked_tiles:
+            # ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='none', hatch='////'))
+            # ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='lightgrey', edgecolor='black', linewidth=2))
+            ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='lightgrey', linewidth=2))
+
+
+        colors = ['red', 'green', 'blue', 'orange', 'purple', 'cyan', 'magenta', 'brown', 'gray', 'olive']    
+        for i in range(self.num_nets):
+            color = colors[i % len(colors)]
+
+            used_step_edges = [e for e in self.step_edges if sub_problem_is_edge_used[i][e] == 1]
+            used_jump_edges = [e for e in self.jump_edges if sub_problem_is_edge_used[i][e] == 1]
+
+            # Plot start and goal
+            for start in self.net_sources[i]:
+                sx, sy = start
+                plt.scatter(sx + offset, sy + offset, c=color, marker='s', s=120, edgecolors='black', label='Start', zorder = 0)
+            for goal in self.net_sinks[i]:
+                gx, gy = goal
+                plt.scatter(gx + offset, gy + offset, c=color, marker='s', s=120, edgecolors='black', zorder = 0)
+                plt.scatter(gx + offset, gy + offset, c=color, marker='o', s=50, edgecolors='black', zorder = 2)
+
+            # plot step circule and line
+            for (u, v, d) in used_step_edges:
+                ux, uy = u
+                ax.plot([ux + offset, v[0] + offset], [uy + offset, v[1] + offset], c='black', zorder = 1)
+                ax.scatter(ux + offset, uy + offset, c=color, marker='o', s=50, edgecolors='black', zorder = 2)
+
+            for (u, v, d) in used_jump_edges:
+                ux, uy = u
+                u2x, u2y = u
+                jump_distance = max(abs(v[0] - u[0]), abs(v[1] - u[1])) - 2
+                u2x += d[0] * (jump_distance + 1)
+                u2y += d[1] * (jump_distance + 1)
+
+                # if d == (0, 1):
+                #     marker = '2'
+                # elif d == (0, -1):
+                #     marker = '1'
+                # elif d == (1, 0):
+                #     marker = '4'
+                # elif d == (-1, 0):
+                #     marker = '3'
+
+                if d == (0, 1):
+                    marker = '^'
+                elif d == (0, -1):
+                    marker = 'v'
+                elif d == (1, 0):
+                    marker = '>'
+                elif d == (-1, 0):
+                    marker = '<'
+
+                ax.plot([u2x + offset, v[0] + offset], [u2y + offset, v[1] + offset], c='black', zorder = 1)
+                ax.scatter(ux + offset, uy + offset, c=color, marker=marker, s=80, edgecolors='black', zorder = 2)
+                ax.scatter(u2x + offset, u2y + offset, c=color, marker=marker, s=80, edgecolors='black', zorder = 2)
+        
+        # draw components
+        for component in used_components:
+            (x, y), (dx, dy), (dx2, dy2) = component        # two‑cell component
+            nx, ny = x + dx, y + dy
+            x2, y2 = x + dx2, y + dy2                       # second node
+            nx2, ny2 = x2 + dx, y2 + dy
+
+            margin = 0.2
+            ll_x = min(x, x2) + margin
+            ll_y = min(y, y2) + margin
+            width  = abs(x2 - x) + 1 - 2 * margin       # +1 because each node is 1×1
+            height = abs(y2 - y) + 1 - 2 * margin
+
+            rect = plt.Rectangle((ll_x, ll_y), width, height, facecolor='grey', edgecolor='black', linewidth=1.2, zorder=1)
+            ax.add_patch(rect)
+            d = (dx, dy)
+            if d == (0, 1):
+                marker = '^'
+            elif d == (0, -1):
+                marker = 'v'
+            elif d == (1, 0):
+                marker = '>'
+            elif d == (-1, 0):
+                marker = '<'
+            ax.scatter(x + offset, y + offset, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
+            ax.scatter(x2 + offset, y2 + offset, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
+            ax.plot([x + offset, nx + offset], [y + offset, ny + offset], c='black', zorder=0)
+            ax.plot([x2 + offset, nx2 + offset], [y2 + offset, ny2 + offset], c='black', zorder=0)
+
+        plt.title("Shapez2: Routing using Integer Linear Programming (ILP) -- Jiahao")
+
+        # custom legend
+        handle_start = Line2D([], [], marker='s', color='grey', markersize=9, markeredgecolor='black', linestyle='None', label='Start/Goal')
+        handle_jump_pad = Line2D([], [], marker='^', color='grey', markersize=8, markeredgecolor='black', linestyle='None', label='Jump Pad')
+        handle_belt = Line2D([], [], marker='o', color='grey', markersize=7, markeredgecolor='black', linestyle='None', label='Belt')
+        # handle_component_square = Line2D([], [], marker='s', color='grey', markersize=14, markeredgecolor='black', linestyle='None')
+        # handle_component_circle = Line2D([], [], marker='o', color='grey', markersize=13, markeredgecolor='black', linestyle='None')
+        # handle_component = (handle_component_square, handle_component_circle)
+        legend_handles = [handle_start, handle_jump_pad, handle_belt]
+        legend_labels  = ['Start/Goal', 'Jump Pad', 'Belt']
+        ax.legend(legend_handles, legend_labels, handler_map={tuple: HandlerTuple(ndivide=1)}, loc='upper right')
+
+        # show
+        plt.show()
+
+if __name__ == "__main__":
+    nets = [
+        ([(7, 0), (8, 0), (9, 0)], 
+         [(0, 7), (0, 8), (0, 9)],
+         [(7, 15), (8, 15), (9, 15)]),
+    ]
+
+    router = SubProblem(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = -1, symmetry = False, option = 1)
