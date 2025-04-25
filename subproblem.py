@@ -18,13 +18,18 @@ Direction = Tuple[int, int] # (dx, dy)
 Edge = Tuple[Node, Node, Direction] # start, end, direciton
 
 class SubProblem:
-    def __init__(self, width, height, nets, jump_distances: List[int] = [4], timelimit: int = 60, symmetry: bool = False, option: int = 0):
-        self.WIDTH = width
-        self.HEIGHT = height
-        self.jump_distances = jump_distances
-        self.timelimit = timelimit
-        self.symmetry = symmetry
-        self.option = option
+    def __init__(self):
+        nets = [
+            ([(7, 0), (8, 0), (9, 0)], 
+            [(0, 7), (0, 8), (0, 9)],
+            [(7, 15), (8, 15), (9, 15)]),
+        ]
+        
+        self.WIDTH = 16
+        self.HEIGHT = 16
+        self.jump_distances = [1, 2, 3, 4]
+        self.timelimit = -1
+        self.option = 1
 
         # problem parameters
         self.component_source_amount = 1
@@ -589,10 +594,4 @@ class SubProblem:
         plt.show()
 
 if __name__ == "__main__":
-    nets = [
-        ([(7, 0), (8, 0), (9, 0)], 
-         [(0, 7), (0, 8), (0, 9)],
-         [(7, 15), (8, 15), (9, 15)]),
-    ]
-
-    router = SubProblem(width=16, height=16, nets=nets, jump_distances= [1, 2, 3, 4], timelimit = -1, symmetry = False, option = 1)
+    router = SubProblem()
