@@ -312,7 +312,7 @@ class DirectionalJumpRouter:
                  self.node_related_secondary_components, self.node_related_component_sources,
                  self.node_related_component_secondary_sources, self.node_related_component_sinks, self.node_related_belt_edges,
                  self.node_related_starting_pad_edges, self.node_related_landing_pad_edges)
-            feasible, cost, is_edge_used = subproblem.solve_subproblem(is_component_used)
+            feasible, cost, is_edge_used = subproblem.route_cutters(is_component_used)
 
             # cut the component used if combination not feasible
             if not feasible:

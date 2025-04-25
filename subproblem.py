@@ -18,74 +18,36 @@ Direction = Tuple[int, int] # (dx, dy)
 Edge = Tuple[Node, Node, Direction] # start, end, direciton
 
 class SubProblem:
-    def __init__(self):
-        
+    def __init__(self, timelimit = -1, option = 1):
         # some const settings
         self.flow_cap = 4
         self.edge_priority = 50
         self.flow_priority = 25
 
         # solver settings
-        self.timelimit = -1
-        self.option = 1
+        self.timelimit = timelimit
+        self.option = option
 
-        # problem definition
-        self.num_nets = 3 # start to component, component to goal
+    def route_cutters(self, cutters, starts, goals1, goals2, width, height, jump_distances):        
+        self.cutter_list = cutters
+        self.starts = starts
+        self.goals1 = goals1
+        self.goals2 = goals2
 
-        # start and goals
         self.start_amount = 4
-        self.starts: List[Tuple[Node, Direction]] = []
-        self.starts.append(((7, 0), (0, 1)))
-        self.starts.append(((8, 0), (0, 1)))
-        self.starts.append(((9, 0), (0, 1)))
-
         self.goal1_amount = 4
-        self.goals1: List[Tuple[Node, Direction]] = []
-        self.goals1.append(((0, 7), (-1, 0)))
-        self.goals1.append(((0, 8), (-1, 0)))
-        self.goals1.append(((0, 9), (-1, 0)))
-
         self.goal2_amount = 4
-        self.goals2: List[Tuple[Node, Direction]] = []
-        self.goals2.append(((7, 15), (0, 1)))
-        self.goals2.append(((8, 15), (0, 1)))
-        self.goals2.append(((9, 15), (0, 1)))
-
         self.cutter_sink_amount = 1
         self.cutter_source_amount = 1
-        self.cutter_list = []
-        self.cutter_list.append(((4, 3), (1, 0), (0, 1)))
-        self.cutter_list.append(((4, 7), (1, 0), (0, -1)))
-        self.cutter_list.append(((4, 9), (1, 0), (0, 1)))
-        # self.cutter_used.append(((4, 13), (1, 0), (0, -1)))
 
-        self.cutter_list.append(((6, 3), (-1, 0), (0, 1)))
-        self.cutter_list.append(((6, 7), (-1, 0), (0, -1)))
-        self.cutter_list.append(((6, 9), (-1, 0), (0, 1)))
-        # self.cutter_used.append(((6, 13), (-1, 0), (0, -1)))
+        self.num_nets = 3 # start to component, component to goal
 
-        self.cutter_list.append(((9, 3), (1, 0), (0, 1)))
-        self.cutter_list.append(((9, 7), (1, 0), (0, -1)))
-        self.cutter_list.append(((9, 9), (1, 0), (0, 1)))
-        # self.cutter_used.append(((9, 13), (1, 0), (0, -1)))
-
-        self.cutter_list.append(((11, 3), (-1, 0), (0, 1)))
-        self.cutter_list.append(((11, 7), (-1, 0), (0, -1)))
-        self.cutter_list.append(((11, 9), (-1, 0), (0, 1)))
-        # self.cutter_used.append(((11, 13), (-1, 0), (0, -1)))
-        
         io_tiles = [] 
         io_tiles += [node for node, _ in self.starts]
         io_tiles += [node for node, _ in self.goals1]
         io_tiles += [node for node, _ in self.goals2]
-        self.general_initialization(16, 16, io_tiles, [1, 2, 3, 4])
+        self.general_initialization(width, height, io_tiles, jump_distances)
 
-        # self.draw_components(self.cutter_list)
-        feasible, cost, is_edge_used = self.solve_subproblem(self.cutter_list, self.starts, self.goals1, self.goals2)
-
-        self.plot(is_edge_used, self.cutter_list)
-
-    def solve_subproblem(self, cutters, starts, goals1, goals2):        
         # add start and goal
         self.add_start_edge_constraints(starts)
         self.add_goal_edge_constraints(goals1)
@@ -106,10 +68,9 @@ class SubProblem:
             for i in range(self.num_nets):
                 is_edge_used[i] = {edge: self.model.getVarByName(f"edge_{i}_{edge}").X for edge in self.all_edges}
                 self.is_edge_used[i] = is_edge_used[i]
+            
+            self.plot(is_edge_used, self.cutter_list)
             return True, self.model.ObjVal, is_edge_used
-
-        # # Plot
-        # self.plot()
 
     def general_initialization(self, width, height, io_tiles, jump_distances):
         # add model
@@ -631,4 +592,45 @@ class SubProblem:
         plt.show()
 
 if __name__ == "__main__":
+    # problem definition
+    width = 16
+    height = 16
+    jump_distances = [1, 2, 3, 4]
+    starts: List[Tuple[Node, Direction]] = []
+    starts.append(((7, 0), (0, 1)))
+    starts.append(((8, 0), (0, 1)))
+    starts.append(((9, 0), (0, 1)))
+
+    goals1: List[Tuple[Node, Direction]] = []
+    goals1.append(((0, 7), (-1, 0)))
+    goals1.append(((0, 8), (-1, 0)))
+    goals1.append(((0, 9), (-1, 0)))
+
+    goals2: List[Tuple[Node, Direction]] = []
+    goals2.append(((7, 15), (0, 1)))
+    goals2.append(((8, 15), (0, 1)))
+    goals2.append(((9, 15), (0, 1)))
+
+    cutter_list: List[Tuple[Node, Direction, Direction]] = []
+    cutter_list.append(((4, 3), (1, 0), (0, 1)))
+    cutter_list.append(((4, 7), (1, 0), (0, -1)))
+    cutter_list.append(((4, 9), (1, 0), (0, 1)))
+    # cutter_used.append(((4, 13), (1, 0), (0, -1)))
+
+    cutter_list.append(((6, 3), (-1, 0), (0, 1)))
+    cutter_list.append(((6, 7), (-1, 0), (0, -1)))
+    cutter_list.append(((6, 9), (-1, 0), (0, 1)))
+    # cutter_used.append(((6, 13), (-1, 0), (0, -1)))
+
+    cutter_list.append(((9, 3), (1, 0), (0, 1)))
+    cutter_list.append(((9, 7), (1, 0), (0, -1)))
+    cutter_list.append(((9, 9), (1, 0), (0, 1)))
+    # cutter_used.append(((9, 13), (1, 0), (0, -1)))
+    
+    cutter_list.append(((11, 3), (-1, 0), (0, 1)))
+    cutter_list.append(((11, 7), (-1, 0), (0, -1)))
+    cutter_list.append(((11, 9), (-1, 0), (0, 1)))
+    # cutter_used.append(((11, 13), (-1, 0), (0, -1)))
+    
     router = SubProblem()
+    router.route_cutters(cutter_list, starts, goals1, goals2, width, height, jump_distances)
