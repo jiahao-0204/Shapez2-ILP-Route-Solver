@@ -68,6 +68,28 @@ class DirectionalJumpRouter:
         self.preplacement_list.append(((11, 9), (-1, 0), (0, 1)))
         # self.preplacement_list.append(((11, 13), (-1, 0), (0, -1)))
 
+
+        # self.preplacement_list.append(((2, 6), (0, 1), (1, 0)))
+        # self.preplacement_list.append(((4, 6), (0, 1), (1, 0)))
+        # self.preplacement_list.append(((6, 6), (0, 1), (1, 0)))
+        # self.preplacement_list.append(((8, 6), (0, 1), (1, 0)))
+
+        # self.preplacement_list.append(((10, 6), (0, 1), (1, 0)))
+        # self.preplacement_list.append(((12, 6), (0, 1), (1, 0)))
+        # self.preplacement_list.append(((14, 6), (0, 1), (1, 0)))
+        # self.preplacement_list.append(((16, 6), (0, 1), (1, 0)))
+
+        # self.preplacement_list.append(((18, 6), (0, 1), (1, 0)))
+        # self.preplacement_list.append(((20, 6), (0, 1), (1, 0)))
+        # self.preplacement_list.append(((22, 6), (0, 1), (1, 0)))
+        # self.preplacement_list.append(((24, 6), (0, 1), (1, 0)))
+
+        # self.preplacement_list.append(((26, 6), (0, 1), (1, 0)))
+        # self.preplacement_list.append(((28, 6), (0, 1), (1, 0)))
+        # self.preplacement_list.append(((30, 6), (0, 1), (1, 0)))
+        # self.preplacement_list.append(((32, 6), (0, 1), (1, 0)))
+        
+
         self.flow_cap = 4
         self.start_amount = 4
         self.goal_amount = 4
@@ -106,6 +128,7 @@ class DirectionalJumpRouter:
         remove_from_blocked_tiles = [] 
         remove_from_blocked_tiles += [(6, 0), (7, 0), (8, 0), (9, 0)]
         remove_from_blocked_tiles += [(6, self.HEIGHT-1), (7, self.HEIGHT-1), (8, self.HEIGHT-1), (9, self.HEIGHT-1)]
+        # remove_from_blocked_tiles += [(26, self.HEIGHT-1), (27, self.HEIGHT-1), (28, self.HEIGHT-1), (29, self.HEIGHT-1)]
         remove_from_blocked_tiles += [(0, 6), (0, 7), (0, 8), (0, 9)]
         remove_from_blocked_tiles += [(self.WIDTH-1, 6), (self.WIDTH-1, 7), (self.WIDTH-1, 8), (self.WIDTH-1, 9)]
 
@@ -604,6 +627,10 @@ if __name__ == "__main__":
         ([(7, 0), (8, 0), (9, 0)], 
          [(0, 7), (0, 8), (0, 9)],
          [(7, 15), (8, 15), (9, 15)]),
+
+        # ([(6, 0), (7, 0), (8, 0), (9, 0)], 
+        #  [(6, 15), (7, 15), (8, 15), (9, 15)],
+        #  [(26, 15), (27, 15), (28, 15), (29, 15)]),
 
         # ([(6, 0), (7, 0), (8, 0), (9, 0)], 
         #  [(0, 6), (0, 7), (0, 8), (0, 9)],
