@@ -29,6 +29,10 @@ class SubProblem:
         self.option = option
 
     def route_cutters(self, cutters, starts, goals1, goals2, width, height, jump_distances):        
+        self.num_nets = 3 # start to component, component to goal
+        io_tiles = [node for node, _ in starts + goals1 + goals2]
+        self.general_initialization(width, height, io_tiles, jump_distances)
+
         self.cutter_list = cutters
         self.starts = starts
         self.goals1 = goals1
@@ -39,14 +43,6 @@ class SubProblem:
         self.goal2_amount = 4
         self.cutter_sink_amount = 1
         self.cutter_source_amount = 1
-
-        self.num_nets = 3 # start to component, component to goal
-
-        io_tiles = [] 
-        io_tiles += [node for node, _ in self.starts]
-        io_tiles += [node for node, _ in self.goals1]
-        io_tiles += [node for node, _ in self.goals2]
-        self.general_initialization(width, height, io_tiles, jump_distances)
 
         # add start and goal
         self.add_start_edge_constraints(starts)
@@ -626,7 +622,7 @@ if __name__ == "__main__":
     cutter_list.append(((9, 7), (1, 0), (0, -1)))
     cutter_list.append(((9, 9), (1, 0), (0, 1)))
     # cutter_used.append(((9, 13), (1, 0), (0, -1)))
-    
+
     cutter_list.append(((11, 3), (-1, 0), (0, 1)))
     cutter_list.append(((11, 7), (-1, 0), (0, -1)))
     cutter_list.append(((11, 9), (-1, 0), (0, 1)))
