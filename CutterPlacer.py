@@ -6,7 +6,7 @@ from typing import Dict, Tuple, List
 from matplotlib.lines import Line2D
 from matplotlib.legend_handler import HandlerTuple
 
-from subproblem import SubProblem
+from Solver import SubProblem
 
 DIRECTIONS = [(0, 1), (0, -1), (1, 0), (-1, 0)]
 JUMP_COST = 2
