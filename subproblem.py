@@ -148,16 +148,17 @@ class SubProblem:
         num_nets = 3
         self.initialize_board(width, height, jump_distances, num_nets)
 
-        # add components
-        self.add_starts(starts, 0)
-        self.add_goals(goals1, 1)
-        self.add_goals(goals2, 2)
-        # border tiles excluding io tiles
+        # compute border
         border = [(x, 0) for x in range(width)] + [(x, height-1) for x in range(width)] + [(0, y) for y in range(height)] + [(width-1, y) for y in range(height)]
         io_tiles = [node for node, _ in starts + goals1 + goals2]
         for tile in io_tiles:
             border.remove(tile)
+
+        # add components
         self.add_borders(border)
+        self.add_starts(starts, 0)
+        self.add_goals(goals1, 1)
+        self.add_goals(goals2, 2)
         self.add_cutters(cutters)
 
         # add connecting nets
