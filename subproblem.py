@@ -5,44 +5,50 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.legend_handler import HandlerTuple
 
-
+# constants
 STEP_COST = 1
 JUMP_COST = 2
+EDGE_PRIORITY = 50
+FLOW_PRIORITY = 25
+
+# flow 
+FLOW_CAP = 4
+IO_AMOUNT = 4
+CUTTER_AMOUNT = 1
+
+# pad types
+PAD_TYPE = int
 STARTING_PAD = 0
 LANDING_PAD = 1
+
+# directions
 DIRECTIONS = [(1, 0), (0, 1), (-1, 0), (0, -1)] # right, up, left, down
 
-PAD_TYPE = int
+# options
+MIPFOCOUS_TYPE = int
+MIPFOCUS_BALANCED = 0
+MIPFOCUS_FEASIBILITY = 1
+MIPFOCUS_OPTIMALITY = 2
+MIPFOCUS_BOUND = 3
+NO_TIME_LIMIT = -1
+
+# solver settings
+PRESOLVE = 2
+HEURISTICS = 0.5
+
+# types
 Node = Tuple[int, int] # (x, y)
 Direction = Tuple[int, int] # (dx, dy)
 Edge = Tuple[Node, Node, Direction] # start, end, direciton
 
 class SubProblem:
-    def __init__(self, timelimit = -1, option = 1):
-        # some const settings
-        self.flow_cap = 4
-        self.edge_priority = 50
-        self.flow_priority = 25
+    def __init__(self):
+        pass
 
-        # solver settings
-        self.timelimit = timelimit
-        self.option = option
-
-    def route_cutters(self, cutters, starts, goals1, goals2, width, height, jump_distances):        
+    def route_cutters(self, width, height, cutters, starts, goals1, goals2, jump_distances, timelimit, option: MIPFOCOUS_TYPE):
         self.num_nets = 3 # start to component, component to goal
         io_tiles = [node for node, _ in starts + goals1 + goals2]
-        self.general_initialization(width, height, io_tiles, jump_distances)
-
-        self.cutter_list = cutters
-        self.starts = starts
-        self.goals1 = goals1
-        self.goals2 = goals2
-
-        self.start_amount = 4
-        self.goal1_amount = 4
-        self.goal2_amount = 4
-        self.cutter_sink_amount = 1
-        self.cutter_source_amount = 1
+        self.initialize_board(width, height, io_tiles, jump_distances)
 
         # add start and goal
         self.add_start_edge_constraints(starts)
@@ -54,7 +60,7 @@ class SubProblem:
         self.add_cutter_net(cutters, starts, goals1, goals2)
 
         # solve
-        self.solve()
+        self.solve(timelimit, option)
 
         # get solution
         if self.model.Status == GRB.INFEASIBLE:
@@ -65,19 +71,12 @@ class SubProblem:
                 is_edge_used[i] = {edge: self.model.getVarByName(f"edge_{i}_{edge}").X for edge in self.all_edges}
                 self.is_edge_used[i] = is_edge_used[i]
             
-            self.plot(is_edge_used, self.cutter_list)
+            self.plot(is_edge_used, cutters)
             return True, self.model.ObjVal, is_edge_used
 
-    def general_initialization(self, width, height, io_tiles, jump_distances):
+    def initialize_board(self, width, height, io_tiles, jump_distances):
         # add model
         self.model = Model("subproblem")
-
-        # model parameters
-        if self.timelimit != -1:
-            self.model.Params.TimeLimit = self.timelimit
-        self.model.Params.MIPFocus = 1
-        self.model.Params.Presolve = 2
-        # self.model.Params.OutputFlag = 0  # silent
 
         # blocked tile is the border of the map
         self.WIDTH = width
@@ -137,12 +136,12 @@ class SubProblem:
         for i in range(self.num_nets):
             for edge in self.all_edges:
                 # edge flow value
-                self.edge_flow_value[i][edge] = self.model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=self.flow_cap)
-                self.edge_flow_value[i][edge].setAttr("BranchPriority", self.flow_priority)
+                self.edge_flow_value[i][edge] = self.model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=FLOW_CAP)
+                self.edge_flow_value[i][edge].setAttr("BranchPriority", FLOW_PRIORITY)
 
                 # is edge used
                 self.is_edge_used[i][edge] = self.model.addVar(name=f"edge_{i}_{edge}", vtype=GRB.BINARY)
-                self.is_edge_used[i][edge].setAttr("BranchPriority", self.edge_priority)
+                self.is_edge_used[i][edge].setAttr("BranchPriority", EDGE_PRIORITY)
 
                 # in flow and out flow values
                 self.node_in_flow_value_expr[i][edge[1]].addTerms(1, self.edge_flow_value[i][edge])
@@ -194,8 +193,8 @@ class SubProblem:
         # max flow at each node
         for i in range(self.num_nets):
             for node in self.all_nodes:
-                self.model.addConstr(self.node_in_flow_value_expr[i][node] <= self.flow_cap)
-                self.model.addConstr(self.node_out_flow_value_expr[i][node] <= self.flow_cap)
+                self.model.addConstr(self.node_in_flow_value_expr[i][node] <= FLOW_CAP)
+                self.model.addConstr(self.node_out_flow_value_expr[i][node] <= FLOW_CAP)
 
     def add_belt_pad_net_overlap_constraints(self):
         # between belts / pads in different nets
@@ -259,18 +258,18 @@ class SubProblem:
             s1 += [primary_source]
             s2 += [secondary_source]
 
-        s0_amount = [self.start_amount] * len(s0)
-        k0_amount = [self.cutter_sink_amount] * len(k0)
-        s1_amount = [self.cutter_source_amount] * len(s1)
-        k1_amount = [self.goal1_amount] * len(k1)
-        s2_amount = [self.cutter_source_amount] * len(s2)
-        k2_amount = [self.goal2_amount] * len(k2)
+        s0_amount = [IO_AMOUNT] * len(s0)
+        k0_amount = [CUTTER_AMOUNT] * len(k0)
+        s1_amount = [CUTTER_AMOUNT] * len(s1)
+        k1_amount = [IO_AMOUNT] * len(k1)
+        s2_amount = [CUTTER_AMOUNT] * len(s2)
+        k2_amount = [IO_AMOUNT] * len(k2)
 
         self.net_sources: Dict[int, List[Node]] = defaultdict(list)
         self.net_sinks: Dict[int, List[Node]] = defaultdict(list)
-        self.net_sources[0] = [node for node, _ in self.starts]
-        self.net_sinks[1] = [node for node, _ in self.goals1]
-        self.net_sinks[2] = [node for node, _ in self.goals2]
+        self.net_sources[0] = [node for node, _ in starts]
+        self.net_sinks[1] = [node for node, _ in goals1]
+        self.net_sinks[2] = [node for node, _ in goals2]
 
         self.add_net(0, s0, s0_amount, k0, k0_amount)
         self.add_net(1, s1, s1_amount, k1, k1_amount)
@@ -401,19 +400,12 @@ class SubProblem:
             for edge in self.node_related_landing_pad_edges[node]:
                 self.model.addConstr(self.is_edge_used[i][edge] == 0)
 
-    def solve(self):
-        if self.timelimit != -1:
-            self.model.setParam('TimeLimit', self.timelimit)
-        self.model.setParam('MIPFocus', self.option)
-        self.model.setParam('Presolve', 2)
-        self.model.setParam('Heuristics', 0.5)
-        self.model.update()
+    def solve(self, timelimit, option):
+        if timelimit != -1:
+            self.model.Params.TimeLimit = timelimit
+        self.model.Params.MIPFocus = option
+        self.model.Params.Presolve = PRESOLVE
         self.model.optimize()
-        
-        # # Copy and apply feasibility relaxation
-        # relaxed_model = self.model.copy()
-        # relaxed_model.feasRelaxS(0, False, False, True)
-        # relaxed_model.optimize()
 
     def plot(self, sub_problem_is_edge_used, used_components):
         plt.figure(figsize=(12, 6))
@@ -592,6 +584,9 @@ if __name__ == "__main__":
     width = 16
     height = 16
     jump_distances = [1, 2, 3, 4]
+    time_limit = NO_TIME_LIMIT
+    option = MIPFOCUS_BALANCED
+
     starts: List[Tuple[Node, Direction]] = []
     starts.append(((7, 0), (0, 1)))
     starts.append(((8, 0), (0, 1)))
@@ -629,4 +624,4 @@ if __name__ == "__main__":
     # cutter_used.append(((11, 13), (-1, 0), (0, -1)))
     
     router = SubProblem()
-    router.route_cutters(cutter_list, starts, goals1, goals2, width, height, jump_distances)
+    router.route_cutters(width, height, cutter_list, starts, goals1, goals2, jump_distances, time_limit, option)
