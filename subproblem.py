@@ -58,19 +58,11 @@ class SubProblem:
         self.add_cutter_net(cutters, starts, goals1, goals2)
 
         # solve
-        self.solve(timelimit, option)
+        used_edge = self.solve(timelimit, option)
 
-        # get solution
-        if self.model.Status == GRB.INFEASIBLE:
-            return False, None, None
-        else:
-            is_edge_used = {}
-            for i in range(self.num_nets):
-                is_edge_used[i] = {edge: self.model.getVarByName(f"edge_{i}_{edge}").X for edge in self.all_edges}
-                self.is_edge_used[i] = is_edge_used[i]
-            
-            self.plot(is_edge_used, cutters)
-            return True, self.model.ObjVal, is_edge_used
+        # draw solution
+        if used_edge is not None:
+            self.draw(cutters, used_edge)
 
     def initialize_board(self, width, height, io_tiles, jump_distances, num_nets):
         # add model
@@ -360,6 +352,13 @@ class SubProblem:
         # solve
         self.model.optimize()
 
+        # return solution
+        if self.model.SolCount > 0:
+            used_edge = {i: [edge for edge in self.all_edges if self.is_edge_used[i][edge].X > 0.5] for i in range(self.num_nets)}
+            return used_edge
+        else:
+            return None
+
     def add_objective(self):
         step_cost_list = []
         jump_cost_list = []
@@ -372,7 +371,7 @@ class SubProblem:
             
         self.model.setObjective(quicksum(step_cost_list + jump_cost_list))
 
-    def plot(self, sub_problem_is_edge_used, used_components):
+    def draw(self, cutters, used_edge):
         plt.figure(figsize=(12, 6))
         ax = plt.gca()
         ax.set_xlim(0, self.WIDTH)
@@ -394,8 +393,8 @@ class SubProblem:
         for i in range(self.num_nets):
             color = colors[i % len(colors)]
 
-            used_step_edges = [e for e in self.step_edges if sub_problem_is_edge_used[i][e] == 1]
-            used_jump_edges = [e for e in self.jump_edges if sub_problem_is_edge_used[i][e] == 1]
+            used_step_edges = [edge for edge in self.step_edges if edge in used_edge[i]]
+            used_jump_edges = [edge for edge in self.jump_edges if edge in used_edge[i]]
 
             # Plot start and goal
             for start in self.net_sources[i]:
@@ -442,8 +441,8 @@ class SubProblem:
                 ax.scatter(u2x + offset, u2y + offset, c=color, marker=marker, s=80, edgecolors='black', zorder = 2)
         
         # draw components
-        for component in used_components:
-            (x, y), (dx, dy), (dx2, dy2) = component        # two‑cell component
+        for cutter in cutters:
+            (x, y), (dx, dy), (dx2, dy2) = cutter        # two‑cell component
             nx, ny = x + dx, y + dy
             x2, y2 = x + dx2, y + dy2                       # second node
             nx2, ny2 = x2 + dx, y2 + dy
