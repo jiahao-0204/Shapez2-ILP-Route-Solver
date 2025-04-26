@@ -12,51 +12,53 @@ class CutterComponent(Component):
         super().__init__()
         self.cutter = cutter
 
-    def draw(self, ax: plt.Axes):
-        # extract cutter information
-        (x, y), (dx, dy), (dx2, dy2) = self.cutter
-        x2, y2 = x + dx2, y + dy2
-        nx, ny = x + dx, y + dy
-        nx2, ny2 = x2 + dx, y2 + dy
+        # node and direction
+        self.node = cutter[0]
+        self.direction = cutter[1]
+        self.secondary_direction = cutter[2]
+        self.secondary_node = (self.node[0] + self.secondary_direction[0], self.node[1] + self.secondary_direction[1])
+        self.primary_source = (self.node[0] + self.direction[0], self.node[1] + self.direction[1])
+        self.secondary_source = (self.secondary_node[0] + self.direction[0], self.secondary_node[1] + self.direction[1])
+        self.input_node = (self.node[0] - self.direction[0], self.node[1] - self.direction[1])
 
+        # x and y
+        self.x, self.y = self.node
+        self.dx, self.dy = self.direction
+        self.x2, self.y2 = self.secondary_node
+        self.dx2, self.dy2 = self.secondary_direction
+        self.nx, self.ny = self.primary_source
+        self.nx2, self.ny2 = self.secondary_source
+
+    def draw(self, ax: plt.Axes):
         # compute cutter dimensions
         margin = 0.2
-        ll_x = min(x, x2) + margin
-        ll_y = min(y, y2) + margin
-        width  = abs(x2 - x) + 1 - 2 * margin       # +1 because each node is 1×1
-        height = abs(y2 - y) + 1 - 2 * margin
+        ll_x = min(self.x, self.x2) + margin
+        ll_y = min(self.y, self.y2) + margin
+        width  = abs(self.x2 - self.x) + 1 - 2 * margin       # +1 because each node is 1×1
+        height = abs(self.y2 - self.y) + 1 - 2 * margin
 
         # draw rectangle
         rect = plt.Rectangle((ll_x, ll_y), width, height, facecolor='grey', edgecolor='black', linewidth=1.2, zorder=1)
         ax.add_patch(rect)
 
         # draw triangles
-        d = (dx, dy)
-        if d == (0, 1):
+        if self.direction == (0, 1):
             marker = '^'
-        elif d == (0, -1):
+        elif self.direction == (0, -1):
             marker = 'v'
-        elif d == (1, 0):
+        elif self.direction == (1, 0):
             marker = '>'
-        elif d == (-1, 0):
+        elif self.direction == (-1, 0):
             marker = '<'
-        ax.scatter(x + OFFSET, y + OFFSET, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
-        ax.scatter(x2 + OFFSET, y2 + OFFSET, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
+        ax.scatter(self.x + OFFSET, self.y + OFFSET, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
+        ax.scatter(self.x2 + OFFSET, self.y2 + OFFSET, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
 
         # draw lines
-        ax.plot([x + OFFSET, nx + OFFSET], [y + OFFSET, ny + OFFSET], c='black', zorder=0)
-        ax.plot([x2 + OFFSET, nx2 + OFFSET], [y2 + OFFSET, ny2 + OFFSET], c='black', zorder=0)
+        ax.plot([self.x + OFFSET, self.nx + OFFSET], [self.y + OFFSET, self.ny + OFFSET], c='black', zorder=0)
+        ax.plot([self.x2 + OFFSET, self.nx2 + OFFSET], [self.y2 + OFFSET, self.ny2 + OFFSET], c='black', zorder=0)
 
     def add_constraints(self, router: "Router"):
-        primary_component, direction, secondary_direction = self.cutter
-        input_node = (primary_component[0] - direction[0], primary_component[1] - direction[1])
-        router.add_sink_node_constraints(primary_component, input_node, direction)
-        
-        secondary_component = (primary_component[0] + secondary_direction[0], primary_component[1] + secondary_direction[1])
-        router.add_null_node_constraints(secondary_component)
-        
-        primary_source = (primary_component[0] + direction[0], primary_component[1] + direction[1])
-        router.add_source_node_constraints(primary_source, direction)
-        
-        secondary_source = (secondary_component[0] + direction[0], secondary_component[1] + direction[1])
-        router.add_source_node_constraints(secondary_source, direction)    
+        router.add_sink_node_constraints(self.node, self.input_node, self.direction)
+        router.add_null_node_constraints(self.secondary_node)
+        router.add_source_node_constraints(self.primary_source, self.direction)
+        router.add_source_node_constraints(self.secondary_source, self.direction)

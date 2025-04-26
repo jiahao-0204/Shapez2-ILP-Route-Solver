@@ -9,19 +9,23 @@ if TYPE_CHECKING:
 class StartComponent(Component):
     def __init__(self, node: Node, direction: Direction, color: str):
         super().__init__()
-        self.node = node
-        self.direction = direction
+
+        # color
         self.color = color
 
-    def draw(self, ax: plt.Axes):
-        x = self.node[0]
-        y = self.node[1]
-        nx = x + self.direction[0]
-        ny = y + self.direction[1]
+        # node and direction
+        self.node = node
+        self.source_node = (self.node[0] + direction[0], self.node[1] + direction[1])
+        self.direction = direction
 
-        ax.scatter(x + OFFSET, y + OFFSET, c=self.color, marker='s', s=120, edgecolors='black', zorder=0)
-        ax.scatter(x + OFFSET, y + OFFSET, c=self.color, marker='o', s=50, edgecolors='black', zorder=2)
-        ax.plot([x + OFFSET, nx + OFFSET], [y + OFFSET, ny + OFFSET], c='black', zorder=1)
+        # x and y
+        self.x, self.y = self.node
+        self.nx, self.ny = self.source_node
+
+    def draw(self, ax: plt.Axes):
+        ax.scatter(self.x + OFFSET, self.y + OFFSET, c=self.color, marker='s', s=120, edgecolors='black', zorder=0)
+        ax.scatter(self.x + OFFSET, self.y + OFFSET, c=self.color, marker='o', s=50, edgecolors='black', zorder=2)
+        ax.plot([self.x + OFFSET, self.nx + OFFSET], [self.y + OFFSET, self.ny + OFFSET], c='black', zorder=1)
 
     def add_constraints(self, router: "Router"):
         # null node

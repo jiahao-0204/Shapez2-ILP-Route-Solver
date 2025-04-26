@@ -9,12 +9,16 @@ if TYPE_CHECKING:
 class BorderComponent(Component):
     def __init__(self, node: Node):
         super().__init__()
+
+        # node
         self.node = node
 
+        # x and y
+        self.x = node[0]
+        self.y = node[1]
+
     def draw(self, ax: plt.Axes):
-        x = self.node[0]
-        y = self.node[1]
-        ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='lightgrey', linewidth=2))
+        ax.add_patch(plt.Rectangle((self.x, self.y), 1, 1, facecolor='lightgrey', linewidth=2))
 
     def add_constraints(self, router: "Router"):
         router.add_null_node_constraints(self.node)

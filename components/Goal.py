@@ -9,16 +9,18 @@ if TYPE_CHECKING:
 class GoalComponent(Component):
     def __init__(self, node: Node, direction: Direction, color: str):
         super().__init__()
-        self.node = node
-        self.direction = direction
+
+        # color
         self.color = color
 
-        self.x = node[0]
-        self.y = node[1]
-        self.ix = self.x - direction[0]
-        self.iy = self.y - direction[1]
+        # node and direction
+        self.node = node
+        self.direction = direction
+        self.input_node = (self.node[0] - self.direction[0], self.node[1] - self.direction[1])
 
-        self.input_node = (self.ix, self.iy)
+        # x and y
+        self.x, self.y = self.node
+        self.ix, self.iy = self.input_node
 
     def draw(self, ax: plt.Axes):
         ax.scatter(self.x + OFFSET, self.y + OFFSET, c=self.color, marker='s', s=120, edgecolors='black', zorder=0)
