@@ -92,6 +92,45 @@ class BorderTileArtist(Artist):
         y = self.node[1]
         ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='lightgrey', linewidth=2))
 
+class CutterComponentArtist(Artist):
+    def __init__(self, cutter: Tuple[Node, Direction, Direction]):
+        super().__init__()
+        self.cutter = cutter
+
+    def draw(self, ax: plt.Axes):
+        # extract cutter information
+        (x, y), (dx, dy), (dx2, dy2) = self.cutter
+        x2, y2 = x + dx2, y + dy2
+        nx, ny = x + dx, y + dy
+        nx2, ny2 = x2 + dx, y2 + dy
+
+        # compute cutter dimensions
+        margin = 0.2
+        ll_x = min(x, x2) + margin
+        ll_y = min(y, y2) + margin
+        width  = abs(x2 - x) + 1 - 2 * margin       # +1 because each node is 1×1
+        height = abs(y2 - y) + 1 - 2 * margin
+
+        # draw rectangle
+        rect = plt.Rectangle((ll_x, ll_y), width, height, facecolor='grey', edgecolor='black', linewidth=1.2, zorder=1)
+        ax.add_patch(rect)
+
+        # draw triangles
+        d = (dx, dy)
+        if d == (0, 1):
+            marker = '^'
+        elif d == (0, -1):
+            marker = 'v'
+        elif d == (1, 0):
+            marker = '>'
+        elif d == (-1, 0):
+            marker = '<'
+        ax.scatter(x + OFFSET, y + OFFSET, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
+        ax.scatter(x2 + OFFSET, y2 + OFFSET, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
+
+        # draw lines
+        ax.plot([x + OFFSET, nx + OFFSET], [y + OFFSET, ny + OFFSET], c='black', zorder=0)
+        ax.plot([x2 + OFFSET, nx2 + OFFSET], [y2 + OFFSET, ny2 + OFFSET], c='black', zorder=0)
 
 
 
@@ -284,6 +323,7 @@ class SubProblem:
             self.artists_list.append(BorderTileArtist(node))
 
     def add_cutters(self, cutters):
+        # add edge constraints
         for cutter in cutters:
             primary_component, direction, secondary_direction = cutter
             self.add_sink_node_constraints(primary_component, direction)
@@ -297,6 +337,10 @@ class SubProblem:
             secondary_source = (secondary_component[0] + direction[0], secondary_component[1] + direction[1])
             self.add_source_node_constraints(secondary_source, direction)
     
+        # add drawing
+        for cutter in cutters:
+            self.artists_list.append(CutterComponentArtist(cutter))
+
     def add_source_node_constraints(self, node:Node, direction:Direction):
         for i in range(self.num_nets):
             # inflow: except in opposite direction
@@ -511,34 +555,6 @@ class SubProblem:
                 ax.scatter(ux + OFFSET, uy + OFFSET, c=color, marker=marker, s=80, edgecolors='black', zorder = 2)
                 ax.scatter(u2x + OFFSET, u2y + OFFSET, c=color, marker=marker, s=80, edgecolors='black', zorder = 2)
         
-        # draw components
-        for cutter in cutters:
-            (x, y), (dx, dy), (dx2, dy2) = cutter        # two‑cell component
-            nx, ny = x + dx, y + dy
-            x2, y2 = x + dx2, y + dy2                       # second node
-            nx2, ny2 = x2 + dx, y2 + dy
-
-            margin = 0.2
-            ll_x = min(x, x2) + margin
-            ll_y = min(y, y2) + margin
-            width  = abs(x2 - x) + 1 - 2 * margin       # +1 because each node is 1×1
-            height = abs(y2 - y) + 1 - 2 * margin
-
-            rect = plt.Rectangle((ll_x, ll_y), width, height, facecolor='grey', edgecolor='black', linewidth=1.2, zorder=1)
-            ax.add_patch(rect)
-            d = (dx, dy)
-            if d == (0, 1):
-                marker = '^'
-            elif d == (0, -1):
-                marker = 'v'
-            elif d == (1, 0):
-                marker = '>'
-            elif d == (-1, 0):
-                marker = '<'
-            ax.scatter(x + OFFSET, y + OFFSET, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
-            ax.scatter(x2 + OFFSET, y2 + OFFSET, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
-            ax.plot([x + OFFSET, nx + OFFSET], [y + OFFSET, ny + OFFSET], c='black', zorder=0)
-            ax.plot([x2 + OFFSET, nx2 + OFFSET], [y2 + OFFSET, ny2 + OFFSET], c='black', zorder=0)
 
         plt.title("Shapez2: Routing using Integer Linear Programming (ILP) -- Jiahao")
 
