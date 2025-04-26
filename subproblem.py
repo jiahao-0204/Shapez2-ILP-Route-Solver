@@ -46,18 +46,18 @@ class SubProblem:
         pass
 
     def route_cutters(self, width, height, cutters, starts, goals1, goals2, jump_distances, timelimit, option: MIPFOCOUS_TYPE):
-        # general settings
+        # add board
         num_nets = 3
         self.initialize_board(width, height, jump_distances, num_nets)
 
-        # cutter settings
+        # add components
         self.add_start_edge_constraints(starts)
         self.add_goal_edge_constraints(goals1 + goals2)
-
         io_tiles = [node for node, _ in starts + goals1 + goals2]
         self.add_border_edge_constraints(io_tiles)
-
         self.add_cutter_edge_constraints(cutters)
+
+        # add connecting nets
         self.add_cutter_net(cutters, starts, goals1, goals2)
 
         # solve
