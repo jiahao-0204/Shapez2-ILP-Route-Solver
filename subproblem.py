@@ -46,16 +46,14 @@ class SubProblem:
         pass
 
     def route_cutters(self, width, height, cutters, starts, goals1, goals2, jump_distances, timelimit, option: MIPFOCOUS_TYPE):
-        self.num_nets = 3 # start to component, component to goal
+        # general settings
+        num_nets = 3
         io_tiles = [node for node, _ in starts + goals1 + goals2]
-        self.initialize_board(width, height, io_tiles, jump_distances)
+        self.initialize_board(width, height, io_tiles, jump_distances, num_nets)
 
-        # add start and goal
+        # cutter settings
         self.add_start_edge_constraints(starts)
-        self.add_goal_edge_constraints(goals1)
-        self.add_goal_edge_constraints(goals2)
-
-        # add cutter
+        self.add_goal_edge_constraints(goals1 + goals2)
         self.add_cutter_edge_constraints(cutters)
         self.add_cutter_net(cutters, starts, goals1, goals2)
 
@@ -74,45 +72,44 @@ class SubProblem:
             self.plot(is_edge_used, cutters)
             return True, self.model.ObjVal, is_edge_used
 
-    def initialize_board(self, width, height, io_tiles, jump_distances):
+    def initialize_board(self, width, height, io_tiles, jump_distances, num_nets):
         # add model
         self.model = Model("subproblem")
 
-        # blocked tile is the border of the map
+        # board
         self.WIDTH = width
         self.HEIGHT = height
-        self.blocked_tiles = [(x, 0) for x in range(self.WIDTH)] + [(x, self.HEIGHT-1) for x in range(self.WIDTH)] + [(0, y) for y in range(self.HEIGHT)] + [(self.WIDTH-1, y) for y in range(self.HEIGHT)]
+        self.border = [(x, 0) for x in range(self.WIDTH)] + [(x, self.HEIGHT-1) for x in range(self.WIDTH)] + [(0, y) for y in range(self.HEIGHT)] + [(self.WIDTH-1, y) for y in range(self.HEIGHT)]
         for tile in io_tiles:
-            self.blocked_tiles.remove(tile)
+            self.border.remove(tile)
+        self.all_nodes: List[Node] = [(x, y) for x in range(self.WIDTH) for y in range(self.HEIGHT) if (x, y) not in self.border]
+        self.num_nets = num_nets
 
-        self.jump_distances = jump_distances
-
-        # all nodes
-        self.all_nodes: List[Node] = []
-        for x in range(self.WIDTH):
-            for y in range(self.HEIGHT):
-                if (x, y) not in self.blocked_tiles:
-                    self.all_nodes.append((x, y))
-
+        # common variables across all nets
         self.all_edges: List[Edge] = []
         self.step_edges: List[Edge] = []
         self.jump_edges: List[Edge] = []
         self.node_related_belt_edges: Dict[Node, List[Edge]] = defaultdict(list)
         self.node_related_starting_pad_edges: Dict[Node, List[Edge]] = defaultdict(list)
         self.node_related_landing_pad_edges: Dict[Node, List[Edge]] = defaultdict(list)
+        self.node_in_flow_edges: Dict[Node, List[Edge]] = defaultdict(list)
+        self.node_out_flow_edges: Dict[Node, List[Edge]] = defaultdict(list)
         for node in self.all_nodes:
-            x, y = node
             for dx, dy in DIRECTIONS:
+                x, y = node
 
-                # Step edge
+                # step edges
                 nx, ny = x + dx, y + dy
                 if (nx, ny) in self.all_nodes:
                     edge = ((x, y), (nx, ny), (dx, dy))
                     self.all_edges.append(edge)
                     self.step_edges.append(edge)
                     self.node_related_belt_edges[node].append(edge)
+                    self.node_out_flow_edges[node].append(edge)
+                    self.node_in_flow_edges[(nx, ny)].append(edge)
                 
-                for jump_distance in self.jump_distances:
+                # jump edges
+                for jump_distance in jump_distances:
                     nx, ny = x + dx * (jump_distance + 2), y + dy * (jump_distance + 2)
                     jx, jy = x + dx * (jump_distance + 1), y + dy * (jump_distance + 1)
                     pad_node = (jx, jy)
@@ -122,17 +119,15 @@ class SubProblem:
                         self.jump_edges.append(edge)
                         self.node_related_starting_pad_edges[node].append(edge)
                         self.node_related_landing_pad_edges[pad_node].append(edge)
+                        self.node_out_flow_edges[node].append(edge)
+                        self.node_in_flow_edges[(nx, ny)].append(edge)
 
-        # model variables
-        self.is_edge_used: Dict[int, Dict[Edge, Var]] = defaultdict(lambda: defaultdict(Var))
+        # net specific variables
         self.edge_flow_value: Dict[int, Dict[Edge, Var]] = defaultdict(lambda: defaultdict(Var))
-        self.node_in_flow_edges: Dict[int, Dict[Node, List[Edge]]] = defaultdict(lambda: defaultdict(list))
-        self.node_out_flow_edges: Dict[int, Dict[Node, List[Edge]]] = defaultdict(lambda: defaultdict(list))
+        self.is_edge_used: Dict[int, Dict[Edge, Var]] = defaultdict(lambda: defaultdict(Var))
         self.node_in_flow_value_expr: Dict[int, Dict[Node, LinExpr]] = defaultdict(lambda: defaultdict(LinExpr))
         self.node_out_flow_value_expr: Dict[int, Dict[Node, LinExpr]] = defaultdict(lambda: defaultdict(LinExpr))
         self.is_node_used_by_belt: Dict[int, Dict[Node, Var]] = defaultdict(lambda: defaultdict(Var))
-
-        # edge and flow
         for i in range(self.num_nets):
             for edge in self.all_edges:
                 # edge flow value
@@ -142,52 +137,24 @@ class SubProblem:
                 # is edge used
                 self.is_edge_used[i][edge] = self.model.addVar(name=f"edge_{i}_{edge}", vtype=GRB.BINARY)
                 self.is_edge_used[i][edge].setAttr("BranchPriority", EDGE_PRIORITY)
+                self.model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[i][edge] >= 1)
+                self.model.addGenConstrIndicator(self.is_edge_used[i][edge], False, self.edge_flow_value[i][edge] == 0)
 
                 # in flow and out flow values
                 self.node_in_flow_value_expr[i][edge[1]].addTerms(1, self.edge_flow_value[i][edge])
                 self.node_out_flow_value_expr[i][edge[0]].addTerms(1, self.edge_flow_value[i][edge])
-
-                # node in and out flow edges
-                self.node_in_flow_edges[i][edge[1]].append(edge)
-                self.node_out_flow_edges[i][edge[0]].append(edge)
-        self.compute_is_edge_used()
-        self.compute_is_node_used_by_belt()
-        self.add_flow_max_value_constraints()
-        self.add_belt_pad_net_overlap_constraints()
-        self.add_pad_direction_constraints()
-        
-        # objective
-        self.add_objective()
-
-
-    def add_objective(self):
-        step_cost_list = []
-        jump_cost_list = []
-
-        for i in range(self.num_nets):
-            step_cost_list_i = [self.is_edge_used[i][edge] * STEP_COST for edge in self.step_edges]
-            jump_cost_list_i = [self.is_edge_used[i][edge] * JUMP_COST for edge in self.jump_edges]
-            step_cost_list += step_cost_list_i
-            jump_cost_list += jump_cost_list_i
-            
-        self.model.setObjective(quicksum(step_cost_list + jump_cost_list))
-
-    def compute_is_node_used_by_belt(self):
-        # compute is node used by belt edge
         for i in range(self.num_nets):
             for node in self.all_nodes:
+                # is node used by belt
                 node_belt_edges_bool_list = [self.is_edge_used[i][edge] for edge in self.node_related_belt_edges[node]]
                 self.is_node_used_by_belt[i][node] = self.model.addVar(name=f"node_{i}_{node}", vtype=GRB.BINARY)
 
                 self.model.addGenConstrOr(self.is_node_used_by_belt[i][node], node_belt_edges_bool_list)
-
-    def compute_is_edge_used(self):
-        # compute is edge used
-        for i in range(self.num_nets):
-            for edge in self.all_edges:
-                # constraint
-                self.model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[i][edge] >= 1)
-                self.model.addGenConstrIndicator(self.is_edge_used[i][edge], False, self.edge_flow_value[i][edge] == 0)
+        
+        # constraints
+        self.add_flow_max_value_constraints()
+        self.add_belt_pad_net_overlap_constraints()
+        self.add_pad_direction_constraints()
 
     def add_flow_max_value_constraints(self):
         # max flow at each node
@@ -291,48 +258,28 @@ class SubProblem:
                 self.model.addConstr(in_flow - out_flow == 0)
 
     def add_cutter_edge_constraints(self, cutters):
-        # split into lists
-        primary_components: List[Tuple[Node, Direction]] = []
-        secondary_components: List[Tuple[Node, Direction]] = []
-        primary_sources: List[Tuple[Node, Direction]] = []
-        secondary_sources: List[Tuple[Node, Direction]] = []
         for cutter in cutters:
             primary_component, direction, secondary_direction = cutter
-            secondary_component = (primary_component[0] + secondary_direction[0], primary_component[1] + secondary_direction[1])
-            primary_source = (primary_component[0] + direction[0], primary_component[1] + direction[1])
-            secondary_source = (secondary_component[0] + direction[0], secondary_component[1] + direction[1])
-            input_location = (primary_component[0] - direction[0], primary_component[1] - direction[1])
+            self.add_sink_node_constraints(primary_component, direction)
             
-            primary_components.append((primary_component, direction))
-            secondary_components.append((secondary_component, secondary_direction))
-            primary_sources.append((primary_source, direction))
-            secondary_sources.append((secondary_source, direction))
-
-        # primary component nodes
-        for node, direction in primary_components:
-            self.add_sink_node_constraints(node, direction)
-                
-        # secondary component nodes
-        for node, direction in secondary_components:
-            self.add_null_node_constraints(node)
-                
-        # primary source nodes
-        for node, direction in primary_sources:
-            self.add_source_node_constraints(node, direction)
-        
-        # secondary source nodes
-        for node, direction in secondary_sources:
-            self.add_source_node_constraints(node, direction)
+            secondary_component = (primary_component[0] + secondary_direction[0], primary_component[1] + secondary_direction[1])
+            self.add_null_node_constraints(secondary_component)
+            
+            primary_source = (primary_component[0] + direction[0], primary_component[1] + direction[1])
+            self.add_source_node_constraints(primary_source, direction)
+            
+            secondary_source = (secondary_component[0] + direction[0], secondary_component[1] + direction[1])
+            self.add_source_node_constraints(secondary_source, direction)
     
     def add_source_node_constraints(self, node:Node, direction:Direction):
         for i in range(self.num_nets):
             # inflow: except in opposite direction
-            for edge in self.node_in_flow_edges[i][node]:
+            for edge in self.node_in_flow_edges[node]:
                 if edge[2] == (-direction[0], -direction[1]):
                     self.model.addConstr(self.is_edge_used[i][edge] == 0)
 
             # outflow: except in opposite direction
-            for edge in self.node_out_flow_edges[i][node]:
+            for edge in self.node_out_flow_edges[node]:
                 if edge[2] == (-direction[0], -direction[1]):
                     self.model.addConstr(self.is_edge_used[i][edge] == 0)
 
@@ -348,12 +295,12 @@ class SubProblem:
     def add_sink_node_constraints(self, node:Node, direction:Direction):
         for i in range(self.num_nets):
             # in flow: only in direction
-            for edge in self.node_in_flow_edges[i][node]:
+            for edge in self.node_in_flow_edges[node]:
                 if edge[2] != direction:
                     self.model.addConstr(self.is_edge_used[i][edge] == 0)
 
             # out flow: no
-            for edge in self.node_out_flow_edges[i][node]:
+            for edge in self.node_out_flow_edges[node]:
                 self.model.addConstr(self.is_edge_used[i][edge] == 0)
 
             # start pad: no
@@ -385,11 +332,11 @@ class SubProblem:
     def add_null_node_constraints(self, node:Node):
         for i in range(self.num_nets):
             # in flow: no
-            for edge in self.node_in_flow_edges[i][node]:
+            for edge in self.node_in_flow_edges[node]:
                 self.model.addConstr(self.is_edge_used[i][edge] == 0)
 
             # out flow: no
-            for edge in self.node_out_flow_edges[i][node]:
+            for edge in self.node_out_flow_edges[node]:
                 self.model.addConstr(self.is_edge_used[i][edge] == 0)
 
             # start pad: no
@@ -401,11 +348,29 @@ class SubProblem:
                 self.model.addConstr(self.is_edge_used[i][edge] == 0)
 
     def solve(self, timelimit, option):
+        # objective
+        self.add_objective()
+
+        # settings
         if timelimit != -1:
             self.model.Params.TimeLimit = timelimit
         self.model.Params.MIPFocus = option
         self.model.Params.Presolve = PRESOLVE
+
+        # solve
         self.model.optimize()
+
+    def add_objective(self):
+        step_cost_list = []
+        jump_cost_list = []
+
+        for i in range(self.num_nets):
+            step_cost_list_i = [self.is_edge_used[i][edge] * STEP_COST for edge in self.step_edges]
+            jump_cost_list_i = [self.is_edge_used[i][edge] * JUMP_COST for edge in self.jump_edges]
+            step_cost_list += step_cost_list_i
+            jump_cost_list += jump_cost_list_i
+            
+        self.model.setObjective(quicksum(step_cost_list + jump_cost_list))
 
     def plot(self, sub_problem_is_edge_used, used_components):
         plt.figure(figsize=(12, 6))
@@ -419,8 +384,8 @@ class SubProblem:
 
         offset = 0.5
 
-        # draw blocked tiles
-        for (x, y) in self.blocked_tiles:
+        # draw border tiles
+        for (x, y) in self.border:
             # ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='none', hatch='////'))
             # ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='lightgrey', edgecolor='black', linewidth=2))
             ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='lightgrey', linewidth=2))
@@ -535,8 +500,8 @@ class SubProblem:
 
         offset = 0.5
 
-        # draw blocked tiles
-        for (x, y) in self.blocked_tiles:
+        # draw border tiles
+        for (x, y) in self.border:
             # ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='none', hatch='////'))
             # ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='lightgrey', edgecolor='black', linewidth=2))
             ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='lightgrey', linewidth=2))
