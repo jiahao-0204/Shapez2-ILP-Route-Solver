@@ -6,7 +6,7 @@ from typing import Dict, Tuple, List
 from matplotlib.lines import Line2D
 from matplotlib.legend_handler import HandlerTuple
 
-from Solver import SubProblem
+from Router import Router
 
 DIRECTIONS = [(0, 1), (0, -1), (1, 0), (-1, 0)]
 JUMP_COST = 2
@@ -307,7 +307,7 @@ class DirectionalJumpRouter:
             # self.draw_components(is_component_used)
 
             # solve subproblem
-            subproblem = SubProblem(self.net_sources, self.net_sinks, self.all_nodes, self.all_edges, self.step_edges, self.jump_edges, 
+            subproblem = Router(self.net_sources, self.net_sinks, self.all_nodes, self.all_edges, self.step_edges, self.jump_edges, 
                  self.node_related_components,
                  self.node_related_secondary_components, self.node_related_component_sources,
                  self.node_related_component_secondary_sources, self.node_related_component_sinks, self.node_related_belt_edges,

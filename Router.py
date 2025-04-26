@@ -168,7 +168,7 @@ class CutterComponent(Component):
 
 
 
-class SubProblem:
+class Router:
     def __init__(self):
         self.components: List[Component] = []
         self.colors = ['red', 'green', 'blue', 'orange', 'purple', 'cyan', 'magenta', 'brown', 'gray', 'olive']
@@ -695,5 +695,5 @@ if __name__ == "__main__":
     cutter_list.append(((11, 9), (-1, 0), (0, 1)))
     # cutter_used.append(((11, 13), (-1, 0), (0, -1)))
     
-    router = SubProblem()
+    router = Router()
     router.route_cutters(width, height, cutter_list, starts, goals1, goals2, jump_distances, time_limit, option)
