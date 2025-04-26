@@ -40,10 +40,69 @@ HEURISTICS = 0.5
 Node = Tuple[int, int] # (x, y)
 Direction = Tuple[int, int] # (dx, dy)
 Edge = Tuple[Node, Node, Direction] # start, end, direciton
+OFFSET = 0.5
+
+class Artist:
+    def __init__(self):
+        pass
+
+    def draw(self, ax: plt.Axes):
+        pass
+
+class StartTileArtist(Artist):
+    def __init__(self, node: Node, direction: Direction, color: str):
+        super().__init__()
+        self.node = node
+        self.direction = direction
+        self.color = color
+
+    def draw(self, ax: plt.Axes):
+        x = self.node[0]
+        y = self.node[1]
+        nx = x + self.direction[0]
+        ny = y + self.direction[1]
+
+        ax.scatter(x + OFFSET, y + OFFSET, c=self.color, marker='s', s=120, edgecolors='black', zorder=0)
+        ax.scatter(x + OFFSET, y + OFFSET, c=self.color, marker='o', s=50, edgecolors='black', zorder=2)
+        ax.plot([x + OFFSET, nx + OFFSET], [y + OFFSET, ny + OFFSET], c='black', zorder=1)
+
+class GoalTileArtist(Artist):
+    def __init__(self, node: Node, direction: Direction, color: str):
+        super().__init__()
+        self.node = node
+        self.direction = direction
+        self.color = color
+
+    def draw(self, ax: plt.Axes):
+        x = self.node[0]
+        y = self.node[1]
+        ix = x - self.direction[0]
+        iy = y - self.direction[1]
+
+        ax.scatter(x + OFFSET, y + OFFSET, c=self.color, marker='s', s=120, edgecolors='black', zorder=0)
+        ax.scatter(x + OFFSET, y + OFFSET, c=self.color, marker='o', s=50, edgecolors='black', zorder=2)
+
+class BorderTileArtist(Artist):
+    def __init__(self, node: Node):
+        super().__init__()
+        self.node = node
+
+    def draw(self, ax: plt.Axes):
+        x = self.node[0]
+        y = self.node[1]
+        ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='lightgrey', linewidth=2))
+
+
+
+
+
+
+
 
 class SubProblem:
     def __init__(self):
-        pass
+        self.artists_list: List[Artist] = []
+        self.colors = ['red', 'green', 'blue', 'orange', 'purple', 'cyan', 'magenta', 'brown', 'gray', 'olive']
 
     def route_cutters(self, width, height, cutters, starts, goals1, goals2, jump_distances, timelimit, option: MIPFOCOUS_TYPE):
         # add board
@@ -51,11 +110,16 @@ class SubProblem:
         self.initialize_board(width, height, jump_distances, num_nets)
 
         # add components
-        self.add_start_edge_constraints(starts)
-        self.add_goal_edge_constraints(goals1 + goals2)
+        self.add_starts(starts, 0)
+        self.add_goals(goals1, 1)
+        self.add_goals(goals2, 2)
+        # border tiles excluding io tiles
+        border = [(x, 0) for x in range(width)] + [(x, height-1) for x in range(width)] + [(0, y) for y in range(height)] + [(width-1, y) for y in range(height)]
         io_tiles = [node for node, _ in starts + goals1 + goals2]
-        self.add_border_edge_constraints(io_tiles)
-        self.add_cutter_edge_constraints(cutters)
+        for tile in io_tiles:
+            border.remove(tile)
+        self.add_borders(border)
+        self.add_cutters(cutters)
 
         # add connecting nets
         self.add_cutter_net(cutters, starts, goals1, goals2)
@@ -185,8 +249,8 @@ class SubProblem:
                         continue
                     self.model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
 
-    def add_start_edge_constraints(self, starts: List[Tuple[Node, Direction]]):
-        # add null and source nodes
+    def add_starts(self, starts: List[Tuple[Node, Direction]], net_num):
+        # add edge constraints
         for node, direction in starts:
             # null node
             null_node = node
@@ -195,23 +259,31 @@ class SubProblem:
             # source node
             source_node = (node[0] + direction[0], node[1] + direction[1])
             self.add_source_node_constraints(source_node, direction)
+        
+        # add drawing
+        for node, direction in starts:
+            self.artists_list.append(StartTileArtist(node, direction, self.colors[net_num]))
     
-    def add_goal_edge_constraints(self, goals: List[Tuple[Node, Direction]]):
-        # add as sink node
+    def add_goals(self, goals: List[Tuple[Node, Direction]], net_num):
+        # add edge constraints
         for node, direction in goals:
+            # as sink node
             self.add_sink_node_constraints(node, direction)
 
-    def add_border_edge_constraints(self, io_tiles):
-        # border tiles excluding io tiles
-        self.border = [(x, 0) for x in range(self.WIDTH)] + [(x, self.HEIGHT-1) for x in range(self.WIDTH)] + [(0, y) for y in range(self.HEIGHT)] + [(self.WIDTH-1, y) for y in range(self.HEIGHT)]
-        for tile in io_tiles:
-            self.border.remove(tile)
-        
-        # add as null node
-        for node in self.border:
-            self.add_null_node_constraints(node)
+        # add drawing
+        for node, direction in goals:
+            self.artists_list.append(GoalTileArtist(node, direction, self.colors[net_num]))
 
-    def add_cutter_edge_constraints(self, cutters):
+    def add_borders(self, borders: List[Node]):
+        # add edge constraints
+        for node in borders:
+            self.add_null_node_constraints(node)
+        
+        # add drawing
+        for node in borders:
+            self.artists_list.append(BorderTileArtist(node))
+
+    def add_cutters(self, cutters):
         for cutter in cutters:
             primary_component, direction, secondary_direction = cutter
             self.add_sink_node_constraints(primary_component, direction)
@@ -394,35 +466,21 @@ class SubProblem:
         ax.set_aspect('equal')
         ax.grid(True)
 
-        offset = 0.5
+        # add artists
+        for artist in self.artists_list:
+            artist.draw(ax)
 
-        # draw border tiles
-        for (x, y) in self.border:
-            # ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='none', hatch='////'))
-            # ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='lightgrey', edgecolor='black', linewidth=2))
-            ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='lightgrey', linewidth=2))
-
-        colors = ['red', 'green', 'blue', 'orange', 'purple', 'cyan', 'magenta', 'brown', 'gray', 'olive']    
         for i in range(self.num_nets):
-            color = colors[i % len(colors)]
+            color = self.colors[i % len(self.colors)]
 
             used_step_edges = [edge for edge in self.step_edges if edge in used_edge[i]]
             used_jump_edges = [edge for edge in self.jump_edges if edge in used_edge[i]]
 
-            # Plot start and goal
-            for start in self.net_sources[i]:
-                sx, sy = start
-                plt.scatter(sx + offset, sy + offset, c=color, marker='s', s=120, edgecolors='black', label='Start', zorder = 0)
-            for goal in self.net_sinks[i]:
-                gx, gy = goal
-                plt.scatter(gx + offset, gy + offset, c=color, marker='s', s=120, edgecolors='black', zorder = 0)
-                plt.scatter(gx + offset, gy + offset, c=color, marker='o', s=50, edgecolors='black', zorder = 2)
-
             # plot step circule and line
             for (u, v, d) in used_step_edges:
                 ux, uy = u
-                ax.plot([ux + offset, v[0] + offset], [uy + offset, v[1] + offset], c='black', zorder = 1)
-                ax.scatter(ux + offset, uy + offset, c=color, marker='o', s=50, edgecolors='black', zorder = 2)
+                ax.plot([ux + OFFSET, v[0] + OFFSET], [uy + OFFSET, v[1] + OFFSET], c='black', zorder = 1)
+                ax.scatter(ux + OFFSET, uy + OFFSET, c=color, marker='o', s=50, edgecolors='black', zorder = 2)
 
             for (u, v, d) in used_jump_edges:
                 ux, uy = u
@@ -449,9 +507,9 @@ class SubProblem:
                 elif d == (-1, 0):
                     marker = '<'
 
-                ax.plot([u2x + offset, v[0] + offset], [u2y + offset, v[1] + offset], c='black', zorder = 1)
-                ax.scatter(ux + offset, uy + offset, c=color, marker=marker, s=80, edgecolors='black', zorder = 2)
-                ax.scatter(u2x + offset, u2y + offset, c=color, marker=marker, s=80, edgecolors='black', zorder = 2)
+                ax.plot([u2x + OFFSET, v[0] + OFFSET], [u2y + OFFSET, v[1] + OFFSET], c='black', zorder = 1)
+                ax.scatter(ux + OFFSET, uy + OFFSET, c=color, marker=marker, s=80, edgecolors='black', zorder = 2)
+                ax.scatter(u2x + OFFSET, u2y + OFFSET, c=color, marker=marker, s=80, edgecolors='black', zorder = 2)
         
         # draw components
         for cutter in cutters:
@@ -477,10 +535,10 @@ class SubProblem:
                 marker = '>'
             elif d == (-1, 0):
                 marker = '<'
-            ax.scatter(x + offset, y + offset, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
-            ax.scatter(x2 + offset, y2 + offset, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
-            ax.plot([x + offset, nx + offset], [y + offset, ny + offset], c='black', zorder=0)
-            ax.plot([x2 + offset, nx2 + offset], [y2 + offset, ny2 + offset], c='black', zorder=0)
+            ax.scatter(x + OFFSET, y + OFFSET, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
+            ax.scatter(x2 + OFFSET, y2 + OFFSET, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
+            ax.plot([x + OFFSET, nx + OFFSET], [y + OFFSET, ny + OFFSET], c='black', zorder=0)
+            ax.plot([x2 + OFFSET, nx2 + OFFSET], [y2 + OFFSET, ny2 + OFFSET], c='black', zorder=0)
 
         plt.title("Shapez2: Routing using Integer Linear Programming (ILP) -- Jiahao")
 
@@ -510,7 +568,7 @@ class SubProblem:
         ax.set_aspect('equal')
         ax.grid(True)
 
-        offset = 0.5
+        OFFSET = 0.5
 
         # draw border tiles
         for (x, y) in self.border:
@@ -545,11 +603,11 @@ class SubProblem:
                 marker = '>'
             elif d == (-1, 0):
                 marker = '<'
-            ax.scatter(x + offset, y + offset, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
-            ax.scatter(x2 + offset, y2 + offset, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
-            ax.plot([ix + offset, x + offset], [iy + offset, y + offset], c='black', zorder=0)
-            ax.plot([x + offset, nx + offset], [y + offset, ny + offset], c='black', zorder=0)
-            ax.plot([x2 + offset, nx2 + offset], [y2 + offset, ny2 + offset], c='black', zorder=0)
+            ax.scatter(x + OFFSET, y + OFFSET, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
+            ax.scatter(x2 + OFFSET, y2 + OFFSET, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
+            ax.plot([ix + OFFSET, x + OFFSET], [iy + OFFSET, y + OFFSET], c='black', zorder=0)
+            ax.plot([x + OFFSET, nx + OFFSET], [y + OFFSET, ny + OFFSET], c='black', zorder=0)
+            ax.plot([x2 + OFFSET, nx2 + OFFSET], [y2 + OFFSET, ny2 + OFFSET], c='black', zorder=0)
 
         plt.title("Shapez2: Routing using Integer Linear Programming (ILP) -- Jiahao")
 
