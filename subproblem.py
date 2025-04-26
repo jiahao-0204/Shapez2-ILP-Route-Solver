@@ -167,6 +167,24 @@ class SubProblem:
             # constraint: at most one thing can use a node
             self.model.addConstr(quicksum(list_of_things_using_node) <= 1)
     
+    def add_pad_direction_constraints(self):
+        # for each edge, if the edge is used, then the end node must not have jump edge at different direction
+        for i in range(self.num_nets):
+            for edge in self.all_edges:
+                u, v, direction = edge
+                
+                # no landing pad if edge is used
+                for jump_edge in self.node_related_landing_pad_edges[v]:
+                    self.model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
+
+                # no starting pad at wrong direction if edge is used
+                for jump_edge in self.node_related_starting_pad_edges[v]:
+                    u2, v2, jump_direction = jump_edge
+                    # skip if correct direction
+                    if jump_direction == direction:
+                        continue
+                    self.model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
+
     def add_start_edge_constraints(self, starts: List[Tuple[Node, Direction]]):
         # add null and source nodes
         for node, direction in starts:
@@ -192,75 +210,6 @@ class SubProblem:
         # add as null node
         for node in self.border:
             self.add_null_node_constraints(node)
-
-    def add_pad_direction_constraints(self):
-        # for each edge, if the edge is used, then the end node must not have jump edge at different direction
-        for i in range(self.num_nets):
-            for edge in self.all_edges:
-                u, v, direction = edge
-                
-                # no landing pad if edge is used
-                for jump_edge in self.node_related_landing_pad_edges[v]:
-                    self.model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
-
-                # no starting pad at wrong direction if edge is used
-                for jump_edge in self.node_related_starting_pad_edges[v]:
-                    u2, v2, jump_direction = jump_edge
-                    # skip if correct direction
-                    if jump_direction == direction:
-                        continue
-                    self.model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
-
-    def add_cutter_net(self, cutters, starts, goals1, goals2):
-        # net 0: start -> componenent sink
-        # net 1: component source -> goal
-        # net 2: component secondary source -> goal
-        s0 = [(node[0] + direction[0], node[1] + direction[1]) for node, direction in starts]
-        k0 = []
-        s1 = []
-        k1 = [node for node, _ in goals1]
-        s2 = []
-        k2 = [node for node, _ in goals2]
-
-        for cutter in cutters:
-            sink, direction, secondary_direction = cutter
-            primary_source = (sink[0] + direction[0], sink[1] + direction[1])
-            secondary_source = (primary_source[0] + secondary_direction[0], primary_source[1] + secondary_direction[1])
-            k0 += [sink]
-            s1 += [primary_source]
-            s2 += [secondary_source]
-
-        s0_amount = [IO_AMOUNT] * len(s0)
-        k0_amount = [CUTTER_AMOUNT] * len(k0)
-        s1_amount = [CUTTER_AMOUNT] * len(s1)
-        k1_amount = [IO_AMOUNT] * len(k1)
-        s2_amount = [CUTTER_AMOUNT] * len(s2)
-        k2_amount = [IO_AMOUNT] * len(k2)
-
-        self.net_sources: Dict[int, List[Node]] = defaultdict(list)
-        self.net_sinks: Dict[int, List[Node]] = defaultdict(list)
-        self.net_sources[0] = [node for node, _ in starts]
-        self.net_sinks[1] = [node for node, _ in goals1]
-        self.net_sinks[2] = [node for node, _ in goals2]
-
-        self.add_net(0, s0, s0_amount, k0, k0_amount)
-        self.add_net(1, s1, s1_amount, k1, k1_amount)
-        self.add_net(2, s2, s2_amount, k2, k2_amount)
-
-    # within one net, flow can split and merge
-    def add_net(self, i, sources, source_amounts, sinks, sink_amounts):
-        for node in self.all_nodes:
-            in_flow = self.node_in_flow_value_expr[i][node]
-            out_flow = self.node_out_flow_value_expr[i][node]
-
-            if node in sources:
-                source_count = sources.count(node)
-                self.model.addConstr(out_flow - in_flow == source_amounts[sources.index(node)] * source_count)
-            elif node in sinks:
-                sink_count = sinks.count(node)
-                self.model.addConstr(in_flow - out_flow == sink_amounts[sinks.index(node)] * sink_count)
-            else:
-                self.model.addConstr(in_flow - out_flow == 0)
 
     def add_cutter_edge_constraints(self, cutters):
         for cutter in cutters:
@@ -352,6 +301,57 @@ class SubProblem:
             for edge in self.node_related_landing_pad_edges[node]:
                 self.model.addConstr(self.is_edge_used[i][edge] == 0)
 
+    def add_cutter_net(self, cutters, starts, goals1, goals2):
+        # net 0: start -> componenent sink
+        # net 1: component source -> goal
+        # net 2: component secondary source -> goal
+        s0 = [(node[0] + direction[0], node[1] + direction[1]) for node, direction in starts]
+        k0 = []
+        s1 = []
+        k1 = [node for node, _ in goals1]
+        s2 = []
+        k2 = [node for node, _ in goals2]
+
+        for cutter in cutters:
+            sink, direction, secondary_direction = cutter
+            primary_source = (sink[0] + direction[0], sink[1] + direction[1])
+            secondary_source = (primary_source[0] + secondary_direction[0], primary_source[1] + secondary_direction[1])
+            k0 += [sink]
+            s1 += [primary_source]
+            s2 += [secondary_source]
+
+        s0_amount = [IO_AMOUNT] * len(s0)
+        k0_amount = [CUTTER_AMOUNT] * len(k0)
+        s1_amount = [CUTTER_AMOUNT] * len(s1)
+        k1_amount = [IO_AMOUNT] * len(k1)
+        s2_amount = [CUTTER_AMOUNT] * len(s2)
+        k2_amount = [IO_AMOUNT] * len(k2)
+
+        self.net_sources: Dict[int, List[Node]] = defaultdict(list)
+        self.net_sinks: Dict[int, List[Node]] = defaultdict(list)
+        self.net_sources[0] = [node for node, _ in starts]
+        self.net_sinks[1] = [node for node, _ in goals1]
+        self.net_sinks[2] = [node for node, _ in goals2]
+
+        self.add_net(0, s0, s0_amount, k0, k0_amount)
+        self.add_net(1, s1, s1_amount, k1, k1_amount)
+        self.add_net(2, s2, s2_amount, k2, k2_amount)
+
+    # within one net, flow can split and merge
+    def add_net(self, i, sources, source_amounts, sinks, sink_amounts):
+        for node in self.all_nodes:
+            in_flow = self.node_in_flow_value_expr[i][node]
+            out_flow = self.node_out_flow_value_expr[i][node]
+
+            if node in sources:
+                source_count = sources.count(node)
+                self.model.addConstr(out_flow - in_flow == source_amounts[sources.index(node)] * source_count)
+            elif node in sinks:
+                sink_count = sinks.count(node)
+                self.model.addConstr(in_flow - out_flow == sink_amounts[sinks.index(node)] * sink_count)
+            else:
+                self.model.addConstr(in_flow - out_flow == 0)
+ 
     def solve(self, timelimit, option):
         # objective
         self.add_objective()
