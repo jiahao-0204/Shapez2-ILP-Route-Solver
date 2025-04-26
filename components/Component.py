@@ -6,6 +6,7 @@ if TYPE_CHECKING:
 
 class Component:
     def __init__(self):
+        self.node = None
         pass
 
     def draw(self, ax: plt.Axes):
@@ -13,3 +14,9 @@ class Component:
 
     def add_constraints(self, router: "Router"):
         pass
+
+    def get_io_for_net(self):
+        pass
+
+    def register_color(self, color: str):
+        self.color = color

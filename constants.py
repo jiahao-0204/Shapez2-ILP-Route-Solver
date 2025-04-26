@@ -36,4 +36,5 @@ HEURISTICS = 0.5
 Node = Tuple[int, int] # (x, y)
 Direction = Tuple[int, int] # (dx, dy)
 Edge = Tuple[Node, Node, Direction] # start, end, direciton
+Amount = int
 OFFSET = 0.5

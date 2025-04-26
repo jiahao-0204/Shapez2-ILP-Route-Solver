@@ -1,5 +1,5 @@
 from Components.Component import Component
-from constants import OFFSET, Node, Direction
+from constants import OFFSET, Node, Direction, Amount
 import matplotlib.pyplot as plt
 from typing import Tuple
 from typing import TYPE_CHECKING
@@ -8,12 +8,14 @@ if TYPE_CHECKING:
     from Router import Router
 
 class CutterComponent(Component):
-    def __init__(self, cutter: Tuple[Node, Direction, Direction]):
+    def __init__(self, node: Node, direction: Direction, secondary_direction: Direction, amount: Amount):
         super().__init__()
-        self.cutter = cutter
-
+        
         # node and direction
-        self.node, self.direction, self.secondary_direction = cutter
+        self.node = node
+        self.direction = direction
+        self.secondary_direction = secondary_direction
+        self.amount = amount
         self.secondary_node = (self.node[0] + self.secondary_direction[0], self.node[1] + self.secondary_direction[1])
         self.primary_source = (self.node[0] + self.direction[0], self.node[1] + self.direction[1])
         self.secondary_source = (self.secondary_node[0] + self.direction[0], self.secondary_node[1] + self.direction[1])
@@ -60,3 +62,6 @@ class CutterComponent(Component):
         router.add_null_node_constraints(self.secondary_node)
         router.add_source_node_constraints(self.primary_source, self.direction)
         router.add_source_node_constraints(self.secondary_source, self.direction)
+
+    def get_io_for_net(self):
+        return (self, self.node, self.amount), (self, self.primary_source, self.amount), (self, self.secondary_source, self.amount)

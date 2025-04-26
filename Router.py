@@ -24,28 +24,35 @@ class Router:
 
         # compute border
         borders = [(x, 0) for x in range(width)] + [(x, height-1) for x in range(width)] + [(0, y) for y in range(height)] + [(width-1, y) for y in range(height)]
-        io_tiles = [node for node, _ in starts + goals1 + goals2]
+        io_tiles = [component.node for component in starts + goals1 + goals2]
         for tile in io_tiles:
             borders.remove(tile)
 
         # add components
-        for border in borders:
-            self.components.append(BorderComponent(border))
-        for start in starts:
-            self.components.append(StartComponent(start, self.colors[0]))
-        for goal in goals1:
-            self.components.append(GoalComponent(goal, self.colors[1]))
-        for goal in goals2:
-            self.components.append(GoalComponent(goal, self.colors[2]))
-        for cutter in cutters:
-            self.components.append(CutterComponent(cutter))
+        self.components += cutters
+        self.components += starts
+        self.components += goals1
+        self.components += goals2
+        self.components += [BorderComponent(node) for node in borders]
 
         # add constraints from components
         for component in self.components:
             component.add_constraints(self)
 
+        # get node and amount
+        io_starts = [start.get_io_for_net() for start in starts]
+        io_goals1 = [goal.get_io_for_net() for goal in goals1]
+        io_goals2 = [goal.get_io_for_net() for goal in goals2]
+        io_cutter_input = [cutter.get_io_for_net()[0] for cutter in cutters]
+        io_cutter_output1 = [cutter.get_io_for_net()[1] for cutter in cutters]
+        io_cutter_output2 = [cutter.get_io_for_net()[2] for cutter in cutters]
+
         # add nets
-        self.add_cutter_net(cutters, starts, goals1, goals2)
+        self.add_nets([
+            (io_starts, io_cutter_input), 
+            (io_cutter_output1, io_goals1), 
+            (io_cutter_output2, io_goals2)
+            ])
 
         # solve
         used_edge = self.solve(timelimit, option)
@@ -281,41 +288,62 @@ class Router:
             for edge in self.node_related_landing_pad_edges[node]:
                 self.model.addConstr(self.is_edge_used[i][edge] == 0)
 
-    def add_cutter_net(self, cutters, starts, goals1, goals2):
-        # net 0: start -> componenent sink
-        # net 1: component source -> goal
-        # net 2: component secondary source -> goal
-        s0 = [(node[0] + direction[0], node[1] + direction[1]) for node, direction in starts]
-        k0 = []
-        s1 = []
-        k1 = [node for node, _ in goals1]
-        s2 = []
-        k2 = [node for node, _ in goals2]
+    def add_nets(self, net_list: List[Tuple[List[Tuple[Component, Node, Amount]], List[Tuple[Component, Node, Amount]]]]):
+        for i in range(len(net_list)):
+            # color
+            color = self.colors[i % len(self.colors)]
 
-        for cutter in cutters:
-            sink, direction, secondary_direction = cutter
-            primary_source = (sink[0] + direction[0], sink[1] + direction[1])
-            secondary_source = (primary_source[0] + secondary_direction[0], primary_source[1] + secondary_direction[1])
-            k0 += [sink]
-            s1 += [primary_source]
-            s2 += [secondary_source]
+            # get net sources and sinks
+            sources, sinks = net_list[i]
+            source_components = [source[0] for source in sources]
+            source_nodes = [source[1] for source in sources]
+            source_amounts = [source[2] for source in sources]
+            sink_components = [sink[0] for sink in sinks]
+            sink_nodes = [sink[1] for sink in sinks]
+            sink_amounts = [sink[2] for sink in sinks]
 
-        s0_amount = [IO_AMOUNT] * len(s0)
-        k0_amount = [CUTTER_AMOUNT] * len(k0)
-        s1_amount = [CUTTER_AMOUNT] * len(s1)
-        k1_amount = [IO_AMOUNT] * len(k1)
-        s2_amount = [CUTTER_AMOUNT] * len(s2)
-        k2_amount = [IO_AMOUNT] * len(k2)
+            # register color for components
+            for component in source_components + sink_components:
+                component.register_color(color)
 
-        self.net_sources: Dict[int, List[Node]] = defaultdict(list)
-        self.net_sinks: Dict[int, List[Node]] = defaultdict(list)
-        self.net_sources[0] = [node for node, _ in starts]
-        self.net_sinks[1] = [node for node, _ in goals1]
-        self.net_sinks[2] = [node for node, _ in goals2]
+            # add net
+            self.add_net(i, source_nodes, source_amounts, sink_nodes, sink_amounts)
 
-        self.add_net(0, s0, s0_amount, k0, k0_amount)
-        self.add_net(1, s1, s1_amount, k1, k1_amount)
-        self.add_net(2, s2, s2_amount, k2, k2_amount)
+    # def add_cutter_net(self, cutters, starts, goals1, goals2):
+    #     # net 0: start -> componenent sink
+    #     # net 1: component source -> goal
+    #     # net 2: component secondary source -> goal
+    #     s0 = [(node[0] + direction[0], node[1] + direction[1]) for node, direction in starts]
+    #     k0 = []
+    #     s1 = []
+    #     k1 = [node for node, _ in goals1]
+    #     s2 = []
+    #     k2 = [node for node, _ in goals2]
+
+    #     for cutter in cutters:
+    #         sink, direction, secondary_direction = cutter
+    #         primary_source = (sink[0] + direction[0], sink[1] + direction[1])
+    #         secondary_source = (primary_source[0] + secondary_direction[0], primary_source[1] + secondary_direction[1])
+    #         k0 += [sink]
+    #         s1 += [primary_source]
+    #         s2 += [secondary_source]
+
+    #     s0_amount = [IO_AMOUNT] * len(s0)
+    #     k0_amount = [CUTTER_AMOUNT] * len(k0)
+    #     s1_amount = [CUTTER_AMOUNT] * len(s1)
+    #     k1_amount = [IO_AMOUNT] * len(k1)
+    #     s2_amount = [CUTTER_AMOUNT] * len(s2)
+    #     k2_amount = [IO_AMOUNT] * len(k2)
+
+    #     self.net_sources: Dict[int, List[Node]] = defaultdict(list)
+    #     self.net_sinks: Dict[int, List[Node]] = defaultdict(list)
+    #     self.net_sources[0] = [node for node, _ in starts]
+    #     self.net_sinks[1] = [node for node, _ in goals1]
+    #     self.net_sinks[2] = [node for node, _ in goals2]
+
+    #     self.add_net(0, s0, s0_amount, k0, k0_amount)
+    #     self.add_net(1, s1, s1_amount, k1, k1_amount)
+    #     self.add_net(2, s2, s2_amount, k2, k2_amount)
 
     # within one net, flow can split and merge
     def add_net(self, i, sources, source_amounts, sinks, sink_amounts):

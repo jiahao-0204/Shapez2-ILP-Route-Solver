@@ -1,5 +1,5 @@
 from Components.Component import Component
-from constants import OFFSET, Node, Direction
+from constants import OFFSET, Node, Direction, Amount
 import matplotlib.pyplot as plt
 from typing import Tuple
 from typing import TYPE_CHECKING
@@ -8,14 +8,13 @@ if TYPE_CHECKING:
     from Router import Router
 
 class GoalComponent(Component):
-    def __init__(self, goal: Tuple[Node, Direction], color: str):
+    def __init__(self, node: Node, direction: Direction, amount: Amount):
         super().__init__()
 
-        # color
-        self.color = color
-
         # node and direction
-        self.node, self.direction = goal
+        self.node = node
+        self.direction = direction
+        self.amount = amount
         self.input_node = (self.node[0] - self.direction[0], self.node[1] - self.direction[1])
 
         # x and y
@@ -29,3 +28,6 @@ class GoalComponent(Component):
     def add_constraints(self, router: "Router"):
         # as sink node
         router.add_sink_node_constraints(self.node, self.input_node, self.direction)
+
+    def get_io_for_net(self):
+        return (self, self.node, self.amount)
