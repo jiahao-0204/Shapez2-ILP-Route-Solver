@@ -2,6 +2,10 @@ from Components.Component import Component
 from constants import OFFSET, Node, Direction
 import matplotlib.pyplot as plt
 from typing import Tuple
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from Router import Router
 
 class CutterComponent(Component):
     def __init__(self, cutter: Tuple[Node, Direction, Direction]):
@@ -43,15 +47,16 @@ class CutterComponent(Component):
         ax.plot([x + OFFSET, nx + OFFSET], [y + OFFSET, ny + OFFSET], c='black', zorder=0)
         ax.plot([x2 + OFFSET, nx2 + OFFSET], [y2 + OFFSET, ny2 + OFFSET], c='black', zorder=0)
 
-    def add_constraints(self, solver):
+    def add_constraints(self, router: "Router"):
         primary_component, direction, secondary_direction = self.cutter
-        solver.add_sink_node_constraints(primary_component, direction)
+        input_node = (primary_component[0] - direction[0], primary_component[1] - direction[1])
+        router.add_sink_node_constraints(primary_component, input_node, direction)
         
         secondary_component = (primary_component[0] + secondary_direction[0], primary_component[1] + secondary_direction[1])
-        solver.add_null_node_constraints(secondary_component)
+        router.add_null_node_constraints(secondary_component)
         
         primary_source = (primary_component[0] + direction[0], primary_component[1] + direction[1])
-        solver.add_source_node_constraints(primary_source, direction)
+        router.add_source_node_constraints(primary_source, direction)
         
         secondary_source = (secondary_component[0] + direction[0], secondary_component[1] + direction[1])
-        solver.add_source_node_constraints(secondary_source, direction)    
+        router.add_source_node_constraints(secondary_source, direction)    

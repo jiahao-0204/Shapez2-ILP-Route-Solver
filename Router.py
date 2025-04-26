@@ -226,8 +226,10 @@ class Router:
             for edge in self.node_related_landing_pad_edges[node]:
                 self.model.addConstr(self.is_edge_used[i][edge] == 0)
 
-    def add_sink_node_constraints(self, node:Node, direction:Direction):
+    def add_sink_node_constraints(self, node:Node, input_node:Node, direction:Direction):
         for i in range(self.num_nets):
+            # ------ for sink node ------
+
             # in flow: only in direction
             for edge in self.node_in_flow_edges[node]:
                 if edge[2] != direction:
@@ -245,9 +247,7 @@ class Router:
             for edge in self.node_related_landing_pad_edges[node]:
                 self.model.addConstr(self.is_edge_used[i][edge] == 0)
             
-            # ------ for input location ------
-            input_node = (node[0] - direction[0], node[1] - direction[1])
-            
+            # ------ for input node ------            
             # in flow: except from node direction (but is covered in the above)
             pass
 
