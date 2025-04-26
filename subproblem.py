@@ -48,12 +48,15 @@ class SubProblem:
     def route_cutters(self, width, height, cutters, starts, goals1, goals2, jump_distances, timelimit, option: MIPFOCOUS_TYPE):
         # general settings
         num_nets = 3
-        io_tiles = [node for node, _ in starts + goals1 + goals2]
-        self.initialize_board(width, height, io_tiles, jump_distances, num_nets)
+        self.initialize_board(width, height, jump_distances, num_nets)
 
         # cutter settings
         self.add_start_edge_constraints(starts)
         self.add_goal_edge_constraints(goals1 + goals2)
+
+        io_tiles = [node for node, _ in starts + goals1 + goals2]
+        self.add_border_edge_constraints(io_tiles)
+
         self.add_cutter_edge_constraints(cutters)
         self.add_cutter_net(cutters, starts, goals1, goals2)
 
@@ -64,17 +67,14 @@ class SubProblem:
         if used_edge is not None:
             self.draw(cutters, used_edge)
 
-    def initialize_board(self, width, height, io_tiles, jump_distances, num_nets):
+    def initialize_board(self, width, height, jump_distances, num_nets):
         # add model
         self.model = Model("subproblem")
 
         # board
         self.WIDTH = width
         self.HEIGHT = height
-        self.border = [(x, 0) for x in range(self.WIDTH)] + [(x, self.HEIGHT-1) for x in range(self.WIDTH)] + [(0, y) for y in range(self.HEIGHT)] + [(self.WIDTH-1, y) for y in range(self.HEIGHT)]
-        for tile in io_tiles:
-            self.border.remove(tile)
-        self.all_nodes: List[Node] = [(x, y) for x in range(self.WIDTH) for y in range(self.HEIGHT) if (x, y) not in self.border]
+        self.all_nodes: List[Node] = [(x, y) for x in range(self.WIDTH) for y in range(self.HEIGHT)]
         self.num_nets = num_nets
 
         # common variables across all nets
@@ -126,7 +126,7 @@ class SubProblem:
                 self.edge_flow_value[i][edge] = self.model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=FLOW_CAP)
                 self.edge_flow_value[i][edge].setAttr("BranchPriority", FLOW_PRIORITY)
 
-                # is edge used
+                # is edge used (dynamic variable)
                 self.is_edge_used[i][edge] = self.model.addVar(name=f"edge_{i}_{edge}", vtype=GRB.BINARY)
                 self.is_edge_used[i][edge].setAttr("BranchPriority", EDGE_PRIORITY)
                 self.model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[i][edge] >= 1)
@@ -137,7 +137,7 @@ class SubProblem:
                 self.node_out_flow_value_expr[i][edge[0]].addTerms(1, self.edge_flow_value[i][edge])
         for i in range(self.num_nets):
             for node in self.all_nodes:
-                # is node used by belt
+                # is node used by belt (dynamic variable)
                 node_belt_edges_bool_list = [self.is_edge_used[i][edge] for edge in self.node_related_belt_edges[node]]
                 self.is_node_used_by_belt[i][node] = self.model.addVar(name=f"node_{i}_{node}", vtype=GRB.BINARY)
 
@@ -168,17 +168,30 @@ class SubProblem:
             self.model.addConstr(quicksum(list_of_things_using_node) <= 1)
     
     def add_start_edge_constraints(self, starts: List[Tuple[Node, Direction]]):
+        # add null and source nodes
         for node, direction in starts:
             # null node
             null_node = node
             self.add_null_node_constraints(null_node)
+
             # source node
             source_node = (node[0] + direction[0], node[1] + direction[1])
             self.add_source_node_constraints(source_node, direction)
     
     def add_goal_edge_constraints(self, goals: List[Tuple[Node, Direction]]):
+        # add as sink node
         for node, direction in goals:
             self.add_sink_node_constraints(node, direction)
+
+    def add_border_edge_constraints(self, io_tiles):
+        # border tiles excluding io tiles
+        self.border = [(x, 0) for x in range(self.WIDTH)] + [(x, self.HEIGHT-1) for x in range(self.WIDTH)] + [(0, y) for y in range(self.HEIGHT)] + [(self.WIDTH-1, y) for y in range(self.HEIGHT)]
+        for tile in io_tiles:
+            self.border.remove(tile)
+        
+        # add as null node
+        for node in self.border:
+            self.add_null_node_constraints(node)
 
     def add_pad_direction_constraints(self):
         # for each edge, if the edge is used, then the end node must not have jump edge at different direction
@@ -550,6 +563,7 @@ if __name__ == "__main__":
     jump_distances = [1, 2, 3, 4]
     time_limit = NO_TIME_LIMIT
     option = MIPFOCUS_BALANCED
+    # option = MIPFOCUS_BOUND
 
     starts: List[Tuple[Node, Direction]] = []
     starts.append(((7, 0), (0, 1)))
