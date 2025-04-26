@@ -42,14 +42,17 @@ Direction = Tuple[int, int] # (dx, dy)
 Edge = Tuple[Node, Node, Direction] # start, end, direciton
 OFFSET = 0.5
 
-class Artist:
+class Component:
     def __init__(self):
         pass
 
     def draw(self, ax: plt.Axes):
         pass
 
-class StartTileArtist(Artist):
+    def add_constraints(self, solver):
+        pass
+
+class StartComponent(Component):
     def __init__(self, node: Node, direction: Direction, color: str):
         super().__init__()
         self.node = node
@@ -66,7 +69,16 @@ class StartTileArtist(Artist):
         ax.scatter(x + OFFSET, y + OFFSET, c=self.color, marker='o', s=50, edgecolors='black', zorder=2)
         ax.plot([x + OFFSET, nx + OFFSET], [y + OFFSET, ny + OFFSET], c='black', zorder=1)
 
-class GoalTileArtist(Artist):
+    def add_constraints(self, solver):
+        # null node
+        null_node = self.node
+        solver.add_null_node_constraints(null_node)
+
+        # source node
+        source_node = (self.node[0] + self.direction[0], self.node[1] + self.direction[1])
+        solver.add_source_node_constraints(source_node, self.direction)
+
+class GoalComponent(Component):
     def __init__(self, node: Node, direction: Direction, color: str):
         super().__init__()
         self.node = node
@@ -82,7 +94,11 @@ class GoalTileArtist(Artist):
         ax.scatter(x + OFFSET, y + OFFSET, c=self.color, marker='s', s=120, edgecolors='black', zorder=0)
         ax.scatter(x + OFFSET, y + OFFSET, c=self.color, marker='o', s=50, edgecolors='black', zorder=2)
 
-class BorderTileArtist(Artist):
+    def add_constraints(self, solver):
+        # as sink node
+        solver.add_sink_node_constraints(self.node, self.direction)
+
+class BorderComponent(Component):
     def __init__(self, node: Node):
         super().__init__()
         self.node = node
@@ -92,7 +108,10 @@ class BorderTileArtist(Artist):
         y = self.node[1]
         ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='lightgrey', linewidth=2))
 
-class CutterComponentArtist(Artist):
+    def add_constraints(self, solver):
+        solver.add_null_node_constraints(self.node)
+
+class CutterComponent(Component):
     def __init__(self, cutter: Tuple[Node, Direction, Direction]):
         super().__init__()
         self.cutter = cutter
@@ -132,7 +151,18 @@ class CutterComponentArtist(Artist):
         ax.plot([x + OFFSET, nx + OFFSET], [y + OFFSET, ny + OFFSET], c='black', zorder=0)
         ax.plot([x2 + OFFSET, nx2 + OFFSET], [y2 + OFFSET, ny2 + OFFSET], c='black', zorder=0)
 
-
+    def add_constraints(self, solver):
+        primary_component, direction, secondary_direction = self.cutter
+        solver.add_sink_node_constraints(primary_component, direction)
+        
+        secondary_component = (primary_component[0] + secondary_direction[0], primary_component[1] + secondary_direction[1])
+        solver.add_null_node_constraints(secondary_component)
+        
+        primary_source = (primary_component[0] + direction[0], primary_component[1] + direction[1])
+        solver.add_source_node_constraints(primary_source, direction)
+        
+        secondary_source = (secondary_component[0] + direction[0], secondary_component[1] + direction[1])
+        solver.add_source_node_constraints(secondary_source, direction)    
 
 
 
@@ -140,7 +170,7 @@ class CutterComponentArtist(Artist):
 
 class SubProblem:
     def __init__(self):
-        self.artists_list: List[Artist] = []
+        self.components: List[Component] = []
         self.colors = ['red', 'green', 'blue', 'orange', 'purple', 'cyan', 'magenta', 'brown', 'gray', 'olive']
 
     def route_cutters(self, width, height, cutters, starts, goals1, goals2, jump_distances, timelimit, option: MIPFOCOUS_TYPE):
@@ -182,14 +212,17 @@ class SubProblem:
         self.num_nets = num_nets
 
         # common variables across all nets
-        self.all_edges: List[Edge] = []
-        self.step_edges: List[Edge] = []
-        self.jump_edges: List[Edge] = []
-        self.node_related_belt_edges: Dict[Node, List[Edge]] = defaultdict(list)
-        self.node_related_starting_pad_edges: Dict[Node, List[Edge]] = defaultdict(list)
-        self.node_related_landing_pad_edges: Dict[Node, List[Edge]] = defaultdict(list)
+        self.all_edges: List[Edge] = [] # for all loops
+        self.step_edges: List[Edge] = [] # for cost
+        self.jump_edges: List[Edge] = [] # for cost
+        self.node_related_belt_edges: Dict[Node, List[Edge]] = defaultdict(list) # for is_node_used_by_belt
+        
+        # for adding constraints
         self.node_in_flow_edges: Dict[Node, List[Edge]] = defaultdict(list)
         self.node_out_flow_edges: Dict[Node, List[Edge]] = defaultdict(list)
+        self.node_related_starting_pad_edges: Dict[Node, List[Edge]] = defaultdict(list)
+        self.node_related_landing_pad_edges: Dict[Node, List[Edge]] = defaultdict(list)
+
         for node in self.all_nodes:
             for dx, dy in DIRECTIONS:
                 x, y = node
@@ -292,55 +325,41 @@ class SubProblem:
     def add_starts(self, starts: List[Tuple[Node, Direction]], net_num):
         # add edge constraints
         for node, direction in starts:
-            # null node
-            null_node = node
-            self.add_null_node_constraints(null_node)
+            start_object = StartComponent(node, direction, self.colors[net_num])
 
-            # source node
-            source_node = (node[0] + direction[0], node[1] + direction[1])
-            self.add_source_node_constraints(source_node, direction)
-        
-        # add drawing
-        for node, direction in starts:
-            self.artists_list.append(StartTileArtist(node, direction, self.colors[net_num]))
+            # add constraints
+            start_object.add_constraints(self)
+
+            # add drawing
+            self.components.append(start_object)
     
     def add_goals(self, goals: List[Tuple[Node, Direction]], net_num):
         # add edge constraints
         for node, direction in goals:
-            # as sink node
-            self.add_sink_node_constraints(node, direction)
+            goal_component = GoalComponent(node, direction, self.colors[net_num])
 
-        # add drawing
-        for node, direction in goals:
-            self.artists_list.append(GoalTileArtist(node, direction, self.colors[net_num]))
+            self.components.append(goal_component)
+
+            # add constraints
+            goal_component.add_constraints(self)            
 
     def add_borders(self, borders: List[Node]):
         # add edge constraints
         for node in borders:
-            self.add_null_node_constraints(node)
+            border_component = BorderComponent(node)
         
-        # add drawing
-        for node in borders:
-            self.artists_list.append(BorderTileArtist(node))
+            self.components.append(BorderComponent(node))
+
+            border_component.add_constraints(self)
 
     def add_cutters(self, cutters):
         # add edge constraints
         for cutter in cutters:
-            primary_component, direction, secondary_direction = cutter
-            self.add_sink_node_constraints(primary_component, direction)
-            
-            secondary_component = (primary_component[0] + secondary_direction[0], primary_component[1] + secondary_direction[1])
-            self.add_null_node_constraints(secondary_component)
-            
-            primary_source = (primary_component[0] + direction[0], primary_component[1] + direction[1])
-            self.add_source_node_constraints(primary_source, direction)
-            
-            secondary_source = (secondary_component[0] + direction[0], secondary_component[1] + direction[1])
-            self.add_source_node_constraints(secondary_source, direction)
-    
-        # add drawing
-        for cutter in cutters:
-            self.artists_list.append(CutterComponentArtist(cutter))
+            cutter_component = CutterComponent(cutter)
+
+            self.components.append(CutterComponent(cutter))
+
+            cutter_component.add_constraints(self)
 
     def add_source_node_constraints(self, node:Node, direction:Direction):
         for i in range(self.num_nets):
@@ -512,7 +531,7 @@ class SubProblem:
         ax.grid(True)
 
         # add artists
-        for artist in self.artists_list:
+        for artist in self.components:
             artist.draw(ax)
 
         for i in range(self.num_nets):
