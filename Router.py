@@ -23,19 +23,28 @@ class Router:
         self.initialize_board(width, height, jump_distances, num_nets)
 
         # compute border
-        border = [(x, 0) for x in range(width)] + [(x, height-1) for x in range(width)] + [(0, y) for y in range(height)] + [(width-1, y) for y in range(height)]
+        borders = [(x, 0) for x in range(width)] + [(x, height-1) for x in range(width)] + [(0, y) for y in range(height)] + [(width-1, y) for y in range(height)]
         io_tiles = [node for node, _ in starts + goals1 + goals2]
         for tile in io_tiles:
-            border.remove(tile)
+            borders.remove(tile)
 
         # add components
-        self.add_borders(border)
-        self.add_starts(starts, 0)
-        self.add_goals(goals1, 1)
-        self.add_goals(goals2, 2)
-        self.add_cutters(cutters)
+        for border in borders:
+            self.components.append(BorderComponent(border))
+        for start in starts:
+            self.components.append(StartComponent(start, self.colors[0]))
+        for goal in goals1:
+            self.components.append(GoalComponent(goal, self.colors[1]))
+        for goal in goals2:
+            self.components.append(GoalComponent(goal, self.colors[2]))
+        for cutter in cutters:
+            self.components.append(CutterComponent(cutter))
 
-        # add connecting nets
+        # add constraints from components
+        for component in self.components:
+            component.add_constraints(self)
+
+        # add nets
         self.add_cutter_net(cutters, starts, goals1, goals2)
 
         # solve
@@ -186,15 +195,6 @@ class Router:
 
             # add constraints
             goal_component.add_constraints(self)            
-
-    def add_borders(self, borders: List[Node]):
-        # add edge constraints
-        for node in borders:
-            border_component = BorderComponent(node)
-        
-            self.components.append(BorderComponent(node))
-
-            border_component.add_constraints(self)
 
     def add_cutters(self, cutters):
         # add edge constraints

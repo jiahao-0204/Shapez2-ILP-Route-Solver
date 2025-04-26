@@ -1,22 +1,22 @@
 from Components.Component import Component
 from constants import OFFSET, Node, Direction
 import matplotlib.pyplot as plt
+from typing import Tuple
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from Router import Router
 
 class StartComponent(Component):
-    def __init__(self, node: Node, direction: Direction, color: str):
+    def __init__(self, start: Tuple[Node, Direction], color: str):
         super().__init__()
 
         # color
         self.color = color
 
         # node and direction
-        self.node = node
-        self.source_node = (self.node[0] + direction[0], self.node[1] + direction[1])
-        self.direction = direction
+        self.node, self.direction = start
+        self.source_node = (self.node[0] + self.direction[0], self.node[1] + self.direction[1])
 
         # x and y
         self.x, self.y = self.node

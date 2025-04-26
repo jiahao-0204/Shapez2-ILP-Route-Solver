@@ -13,9 +13,7 @@ class CutterComponent(Component):
         self.cutter = cutter
 
         # node and direction
-        self.node = cutter[0]
-        self.direction = cutter[1]
-        self.secondary_direction = cutter[2]
+        self.node, self.direction, self.secondary_direction = cutter
         self.secondary_node = (self.node[0] + self.secondary_direction[0], self.node[1] + self.secondary_direction[1])
         self.primary_source = (self.node[0] + self.direction[0], self.node[1] + self.direction[1])
         self.secondary_source = (self.secondary_node[0] + self.direction[0], self.secondary_node[1] + self.direction[1])
