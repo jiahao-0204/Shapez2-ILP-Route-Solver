@@ -1,4 +1,4 @@
-from Components.Component import Component
+from components.Component import Component
 from constants import Node
 import matplotlib.pyplot as plt
 from typing import TYPE_CHECKING

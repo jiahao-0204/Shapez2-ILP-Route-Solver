@@ -1,4 +1,4 @@
-from Components.Component import Component
+from components.Component import Component
 from constants import OFFSET, Node, Direction, Amount
 import matplotlib.pyplot as plt
 from typing import Tuple

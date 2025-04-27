@@ -1,6 +1,6 @@
 from constants import *
-from Components.Component import Component
-from Components.Border import BorderComponent
+from components.Component import Component
+from components.Border import BorderComponent
 
 from gurobipy import Model, GRB, quicksum, Var, LinExpr
 from collections import defaultdict
