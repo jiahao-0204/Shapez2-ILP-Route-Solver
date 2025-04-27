@@ -24,19 +24,19 @@ if __name__ == "__main__":
         StartComponent((29, 0), (0, 1), 4),
     ]
     
-    goals1: List[GoalComponent] = [
-        GoalComponent((6, 15), (0, 1), 4),
-        GoalComponent((7, 15), (0, 1), 4),
-        GoalComponent((8, 15), (0, 1), 4),
-        GoalComponent((9, 15), (0, 1), 4),
-    ]
+    # goals1: List[GoalComponent] = [
+    #     GoalComponent((6, 15), (0, 1), 4),
+    #     GoalComponent((7, 15), (0, 1), 4),
+    #     GoalComponent((8, 15), (0, 1), 4),
+    #     GoalComponent((9, 15), (0, 1), 4),
+    # ]
 
-    goals2: List[GoalComponent] = [
-        GoalComponent((26, 15), (0, 1), 4),
-        GoalComponent((27, 15), (0, 1), 4),
-        GoalComponent((28, 15), (0, 1), 4),
-        GoalComponent((29, 15), (0, 1), 4),
-    ]
+    # goals2: List[GoalComponent] = [
+    #     GoalComponent((26, 15), (0, 1), 4),
+    #     GoalComponent((27, 15), (0, 1), 4),
+    #     GoalComponent((28, 15), (0, 1), 4),
+    #     GoalComponent((29, 15), (0, 1), 4),
+    # ]
 
     swappers: List[SwapperComponent] = [
         SwapperComponent((2, 7), (0, 1), (1, 0), 1),
@@ -59,15 +59,16 @@ if __name__ == "__main__":
     
     # create router
     router = Router()
-    router.initialize_board(width = 36, height = 16, jump_distances = [1, 2, 3, 4], num_nets = 4)
+    # router.initialize_board(width = 36, height = 16, jump_distances = [1, 2, 3, 4], num_nets = 4)
+    router.initialize_board(width = 36, height = 8, jump_distances = [1, 2, 3, 4], num_nets = 4)
     router.add_components(starts1)
     router.add_components(starts2)
-    router.add_components(goals1)
-    router.add_components(goals2)
+    # router.add_components(goals1)
+    # router.add_components(goals2)
     router.add_components(swappers)
     router.generate_and_add_borders()
     router.add_net([c.get_io() for c in starts1], [c.get_io(0) for c in swappers])
     router.add_net([c.get_io() for c in starts2], [c.get_io(1) for c in swappers])
-    router.add_net([c.get_io(2) for c in swappers], [c.get_io() for c in goals1])
-    router.add_net([c.get_io(3) for c in swappers], [c.get_io() for c in goals2])
+    # router.add_net([c.get_io(2) for c in swappers], [c.get_io() for c in goals1])
+    # router.add_net([c.get_io(3) for c in swappers], [c.get_io() for c in goals2])
     router.solve(timelimit = NO_TIME_LIMIT, option = MIPFOCUS_FEASIBILITY, live_draw=True)
