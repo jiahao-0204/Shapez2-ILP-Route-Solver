@@ -9,18 +9,22 @@ class Component:
     def __init__(self):
         self.io_color = {}
         pass
+    
+    def register_color(self, node: Node, color: str):
+        self.io_color[node] = color
 
     def draw(self, ax: plt.Axes):
+        # define the drawing logic for the component
         pass
 
     def add_constraints(self, router: "Router"):
+        # define the io constraints for the component
         pass
 
     def get_io(self, ith: int = 0):
+        # get the input and output nodes for the component, for use in router net definition
         pass
-
-    def register_color(self, node: Node, color: str):
-        self.io_color[node] = color
     
     def get_nodes(self):
+        # get the actual occupied nodes for the component, for use in router border generation
         pass
