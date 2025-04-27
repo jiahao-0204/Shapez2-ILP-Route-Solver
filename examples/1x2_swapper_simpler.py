@@ -1,3 +1,6 @@
+# Copyright (c) 2025 Jiahao
+# Licensed under the MIT License. See LICENSE file in the project root for full license information.
+
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))

@@ -129,6 +129,6 @@ model.addConst(any_belt_used + jump_N + jump_S + jump_E + jump_W <= 1)
 
 ## License
 
-This project is released under the MIT License.
+This project is licensed under the MIT License — see the [LICENSE](./LICENSE) file for details.
 
 Happy Routing!

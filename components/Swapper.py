@@ -1,3 +1,6 @@
+# Copyright (c) 2025 Jiahao
+# Licensed under the MIT License. See LICENSE file in the project root for full license information.
+
 from components.Component import Component
 from constants import OFFSET, Node, Direction, Amount
 import matplotlib.pyplot as plt

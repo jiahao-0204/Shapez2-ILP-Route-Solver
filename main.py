@@ -1,3 +1,6 @@
+# Copyright (c) 2025 Jiahao
+# Licensed under the MIT License. See LICENSE file in the project root for full license information.
+
 from components.Start import StartComponent
 from components.Goal import GoalComponent
 from components.Cutter import CutterComponent

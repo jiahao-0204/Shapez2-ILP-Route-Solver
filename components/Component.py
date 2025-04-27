@@ -1,3 +1,6 @@
+# Copyright (c) 2025 Jiahao
+# Licensed under the MIT License. See LICENSE file in the project root for full license information.
+
 import matplotlib.pyplot as plt
 from typing import TYPE_CHECKING
 from constants import Node
