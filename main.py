@@ -25,7 +25,7 @@ if __name__ == "__main__":
         GoalComponent((9, 15), (0, 1), 4),
     ]
     
-    cutter_list: List[Tuple[Node, Direction, Direction]] = [
+    cutter_list: List[CutterComponent] = [
         CutterComponent((4, 3), (1, 0), (0, 1), 1),
         CutterComponent((4, 7), (1, 0), (0, -1), 1),
         CutterComponent((4, 9), (1, 0), (0, 1), 1),
