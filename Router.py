@@ -1,9 +1,10 @@
 from constants import *
 from Components.Component import Component
+from Components.Border import BorderComponent
 
 from gurobipy import Model, GRB, quicksum, Var, LinExpr
 from collections import defaultdict
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Set
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.legend_handler import HandlerTuple
@@ -135,11 +136,33 @@ class Router:
                         continue
                     self.model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
 
+    def generate_and_add_borders(self) -> None:
+        # collect all border nodes
+        top_border = [(x, 0) for x in range(self.WIDTH)]
+        bottom_border = [(x, self.HEIGHT - 1) for x in range(self.WIDTH)]
+        left_border = [(0, y) for y in range(self.HEIGHT)]
+        right_border = [(self.WIDTH - 1, y) for y in range(self.HEIGHT)]
+
+        # combine and convert to set for faster operations
+        border_nodes: Set[Node] = set(top_border + bottom_border + left_border + right_border)
+
+        # collect existing IO nodes
+        io_nodes = {component.node for component in self.components}
+
+        # exclude IO nodes from borders
+        border_nodes.difference_update(io_nodes)
+
+        # create BorderComponent instances
+        borders: List[BorderComponent] = [BorderComponent(node) for node in border_nodes]
+
+        # add them
+        self.add_components(borders)
+
     def add_components(self, components: List[Component]):
         for component in components:
             self.components.append(component)
             component.add_constraints(self)
-            
+
     def add_source_node_constraints(self, node:Node, direction:Direction):
         for i in range(self.num_nets):
             # inflow: except in opposite direction

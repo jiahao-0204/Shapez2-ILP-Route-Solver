@@ -46,24 +46,15 @@ if __name__ == "__main__":
         CutterComponent((11, 9), (-1, 0), (0, 1), 1),
         CutterComponent((11, 13), (-1, 0), (0, -1), 1),
     ]
-
-    width = 16
-    height = 16
-
-    border_nodes = [(x, 0) for x in range(width)] + [(x, height-1) for x in range(width)] + [(0, y) for y in range(height)] + [(width-1, y) for y in range(height)]
-    io_tiles = [component.node for component in starts + goals1 + goals2]
-    for tile in io_tiles:
-        border_nodes.remove(tile)
-    borders: List[BorderComponent] = [BorderComponent(node) for node in border_nodes]
     
     # create router
     router = Router()
-    router.initialize_board(width = width, height = width, jump_distances = [1, 2, 3, 4], num_nets = 3)
+    router.initialize_board(width = 16, height = 16, jump_distances = [1, 2, 3, 4], num_nets = 3)
     router.add_components(starts)
     router.add_components(goals1)
     router.add_components(goals2)
-    router.add_components(borders)
     router.add_components(cutters)
+    router.generate_and_add_borders()
     router.add_net([c.get_io() for c in starts], [c.get_io(0) for c in cutters])
     router.add_net([c.get_io(1) for c in cutters], [c.get_io() for c in goals1])
     router.add_net([c.get_io(2) for c in cutters], [c.get_io() for c in goals2])
