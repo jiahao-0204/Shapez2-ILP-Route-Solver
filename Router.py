@@ -15,6 +15,7 @@ class Router:
         self.colors = ['red', 'green', 'blue', 'orange', 'purple', 'cyan', 'magenta', 'brown', 'gray', 'olive']
         self.current_net_count = 0
         self.ax = None
+        self.terminate_requested = False
 
     def initialize_board(self, width, height, jump_distances, num_nets):
         # add model
@@ -292,10 +293,10 @@ class Router:
         self.non_blocking_draw()
         self.model.optimize(self.draw_solution_callback)
 
-        # draw if have solution
-        if self.model.SolCount > 0:
-            used_edge = {i: [edge for edge in self.all_edges if self.is_edge_used[i][edge].X > 0.5] for i in range(self.num_nets)}
-            self.draw(used_edge)
+        # # draw if have solution
+        # if self.model.SolCount > 0:
+        #     used_edge = {i: [edge for edge in self.all_edges if self.is_edge_used[i][edge].X > 0.5] for i in range(self.num_nets)}
+        #     self.draw(used_edge)
 
     def add_objective(self):
         step_cost_list = []
@@ -310,13 +311,13 @@ class Router:
         self.model.setObjective(quicksum(step_cost_list + jump_cost_list))
 
     def draw_solution_callback(self, model, where):
-        try:
-            if where == GRB.Callback.MIPSOL:
-                used_edge = {i: [edge for edge in self.all_edges if model.cbGetSolution(self.is_edge_used[i][edge]) > 0.5] for i in range(self.num_nets)}
-                self.non_blocking_draw(used_edge)
-        except KeyboardInterrupt:
-            print("KeyboardInterrupt detected inside callback. Stopping model.")
+        if self.terminate_requested:
             model.terminate()
+            return
+
+        if where == GRB.Callback.MIPSOL:
+            used_edge = {i: [edge for edge in self.all_edges if model.cbGetSolution(self.is_edge_used[i][edge]) > 0.5] for i in range(self.num_nets)}
+            self.non_blocking_draw(used_edge)
 
     def add_legend(self, ax):
         """Add a custom legend to the plot."""
@@ -379,10 +380,14 @@ class Router:
         # show
         plt.show()
     
+    def on_close(self, event):
+        self.terminate_requested = True
+
     def non_blocking_draw(self, used_edge = None):
         # set up axes
         if self.ax is None:
-            plt.figure(figsize=(12, 6))
+            self.fig = plt.figure(figsize=(12, 6))
+            self.fig.canvas.mpl_connect('close_event', self.on_close)
             self.ax = plt.gca()
             plt.show(block=False)
         self.ax.clear()
