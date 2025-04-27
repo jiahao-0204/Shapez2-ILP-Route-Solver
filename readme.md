@@ -1,6 +1,7 @@
 # Shapez2-MIP-Router
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-
+[![Python](https://img.shields.io/badge/Python-3.12%2B-blue.svg)](https://www.python.org/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/jiahao-0204/Shapez2-MIP-Router/pulls)
 
 **Shapez2-MIP-Router** automatically computes optimal routing paths on a board, given a set of components and connection requirements.
 
