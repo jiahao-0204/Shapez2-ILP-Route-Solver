@@ -17,11 +17,6 @@ class Router:
         self.components: List[Component] = []
         self.colors = ['red', 'green', 'blue', 'orange', 'purple', 'cyan', 'magenta', 'brown', 'gray', 'olive']
 
-    def add_components(self, components: List[Component]):
-        for component in components:
-            self.components.append(component)
-            component.add_constraints(self)
-
     def initialize_board(self, width, height, jump_distances, num_nets):
         # add model
         self.model = Model("subproblem")
@@ -143,36 +138,11 @@ class Router:
                         continue
                     self.model.addConstr(self.is_edge_used[i][edge] + self.is_edge_used[i][jump_edge] <= 1) # only one can be true
 
-    def add_starts(self, starts: List[Tuple[Node, Direction]], net_num):
-        # add edge constraints
-        for node, direction in starts:
-            start_object = StartComponent(node, direction, self.colors[net_num])
-
-            # add constraints
-            start_object.add_constraints(self)
-
-            # add drawing
-            self.components.append(start_object)
-    
-    def add_goals(self, goals: List[Tuple[Node, Direction]], net_num):
-        # add edge constraints
-        for node, direction in goals:
-            goal_component = GoalComponent(node, direction, self.colors[net_num])
-
-            self.components.append(goal_component)
-
-            # add constraints
-            goal_component.add_constraints(self)            
-
-    def add_cutters(self, cutters):
-        # add edge constraints
-        for cutter in cutters:
-            cutter_component = CutterComponent(cutter)
-
-            self.components.append(CutterComponent(cutter))
-
-            cutter_component.add_constraints(self)
-
+    def add_components(self, components: List[Component]):
+        for component in components:
+            self.components.append(component)
+            component.add_constraints(self)
+            
     def add_source_node_constraints(self, node:Node, direction:Direction):
         for i in range(self.num_nets):
             # inflow: except in opposite direction
@@ -270,42 +240,6 @@ class Router:
             # add net
             self.add_net(i, source_nodes, source_amounts, sink_nodes, sink_amounts)
 
-    # def add_cutter_net(self, cutters, starts, goals1, goals2):
-    #     # net 0: start -> componenent sink
-    #     # net 1: component source -> goal
-    #     # net 2: component secondary source -> goal
-    #     s0 = [(node[0] + direction[0], node[1] + direction[1]) for node, direction in starts]
-    #     k0 = []
-    #     s1 = []
-    #     k1 = [node for node, _ in goals1]
-    #     s2 = []
-    #     k2 = [node for node, _ in goals2]
-
-    #     for cutter in cutters:
-    #         sink, direction, secondary_direction = cutter
-    #         primary_source = (sink[0] + direction[0], sink[1] + direction[1])
-    #         secondary_source = (primary_source[0] + secondary_direction[0], primary_source[1] + secondary_direction[1])
-    #         k0 += [sink]
-    #         s1 += [primary_source]
-    #         s2 += [secondary_source]
-
-    #     s0_amount = [IO_AMOUNT] * len(s0)
-    #     k0_amount = [CUTTER_AMOUNT] * len(k0)
-    #     s1_amount = [CUTTER_AMOUNT] * len(s1)
-    #     k1_amount = [IO_AMOUNT] * len(k1)
-    #     s2_amount = [CUTTER_AMOUNT] * len(s2)
-    #     k2_amount = [IO_AMOUNT] * len(k2)
-
-    #     self.net_sources: Dict[int, List[Node]] = defaultdict(list)
-    #     self.net_sinks: Dict[int, List[Node]] = defaultdict(list)
-    #     self.net_sources[0] = [node for node, _ in starts]
-    #     self.net_sinks[1] = [node for node, _ in goals1]
-    #     self.net_sinks[2] = [node for node, _ in goals2]
-
-    #     self.add_net(0, s0, s0_amount, k0, k0_amount)
-    #     self.add_net(1, s1, s1_amount, k1, k1_amount)
-    #     self.add_net(2, s2, s2_amount, k2, k2_amount)
-
     # within one net, flow can split and merge
     def add_net(self, i, sources, source_amounts, sinks, sink_amounts):
         for node in self.all_nodes:
@@ -334,12 +268,10 @@ class Router:
         # solve
         self.model.optimize()
 
-        # return solution
+        # draw if have solution
         if self.model.SolCount > 0:
             used_edge = {i: [edge for edge in self.all_edges if self.is_edge_used[i][edge].X > 0.5] for i in range(self.num_nets)}
             self.draw(used_edge)
-        else:
-            return None
 
     def add_objective(self):
         step_cost_list = []
@@ -425,11 +357,9 @@ class Router:
         # show
         plt.show()
 
-    def draw_components(self, cutter_list):
-        # ax = self.ax
+    def draw_board(self):
         plt.figure(figsize=(12, 6))
         ax = plt.gca()
-        ax.clear()
         ax.set_xlim(0, self.WIDTH)
         ax.set_ylim(0, self.HEIGHT)
         ax.set_xticks(range(self.WIDTH))
@@ -437,48 +367,22 @@ class Router:
         ax.set_aspect('equal')
         ax.grid(True)
 
-        OFFSET = 0.5
-
-        # draw border tiles
-        for (x, y) in self.border:
-            # ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='none', hatch='////'))
-            # ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='lightgrey', edgecolor='black', linewidth=2))
-            ax.add_patch(plt.Rectangle((x, y), 1, 1, facecolor='lightgrey', linewidth=2))
-
-        # draw components
-        used_components = cutter_list
-        for component in used_components:
-            (x, y), (dx, dy), (dx2, dy2) = component        # two‑cell component
-            nx, ny = x + dx, y + dy
-            x2, y2 = x + dx2, y + dy2                       # second node
-            nx2, ny2 = x2 + dx, y2 + dy
-
-            ix, iy = x - dx, y - dy
-
-            margin = 0.2
-            ll_x = min(x, x2) + margin
-            ll_y = min(y, y2) + margin
-            width  = abs(x2 - x) + 1 - 2 * margin       # +1 because each node is 1×1
-            height = abs(y2 - y) + 1 - 2 * margin
-
-            rect = plt.Rectangle((ll_x, ll_y), width, height, facecolor='grey', edgecolor='black', linewidth=1.2, zorder=1)
-            ax.add_patch(rect)
-            d = (dx, dy)
-            if d == (0, 1):
-                marker = '^'
-            elif d == (0, -1):
-                marker = 'v'
-            elif d == (1, 0):
-                marker = '>'
-            elif d == (-1, 0):
-                marker = '<'
-            ax.scatter(x + OFFSET, y + OFFSET, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
-            ax.scatter(x2 + OFFSET, y2 + OFFSET, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
-            ax.plot([ix + OFFSET, x + OFFSET], [iy + OFFSET, y + OFFSET], c='black', zorder=0)
-            ax.plot([x + OFFSET, nx + OFFSET], [y + OFFSET, ny + OFFSET], c='black', zorder=0)
-            ax.plot([x2 + OFFSET, nx2 + OFFSET], [y2 + OFFSET, ny2 + OFFSET], c='black', zorder=0)
+        # add artists
+        for artist in self.components:
+            artist.draw(ax)
 
         plt.title("Shapez2: Routing using Integer Linear Programming (ILP) -- Jiahao")
 
-        # plt.draw()
+        # custom legend
+        handle_start = Line2D([], [], marker='s', color='grey', markersize=9, markeredgecolor='black', linestyle='None', label='Start/Goal')
+        handle_jump_pad = Line2D([], [], marker='^', color='grey', markersize=8, markeredgecolor='black', linestyle='None', label='Jump Pad')
+        handle_belt = Line2D([], [], marker='o', color='grey', markersize=7, markeredgecolor='black', linestyle='None', label='Belt')
+        # handle_component_square = Line2D([], [], marker='s', color='grey', markersize=14, markeredgecolor='black', linestyle='None')
+        # handle_component_circle = Line2D([], [], marker='o', color='grey', markersize=13, markeredgecolor='black', linestyle='None')
+        # handle_component = (handle_component_square, handle_component_circle)
+        legend_handles = [handle_start, handle_jump_pad, handle_belt]
+        legend_labels  = ['Start/Goal', 'Jump Pad', 'Belt']
+        ax.legend(legend_handles, legend_labels, handler_map={tuple: HandlerTuple(ndivide=1)}, loc='upper right')
+
+        # show
         plt.show()
