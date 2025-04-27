@@ -301,7 +301,8 @@ class Router:
             
         self.model.setObjective(quicksum(step_cost_list + jump_cost_list))
 
-    def draw(self, used_edge):
+    def setup_ax(self):
+        """Prepare the matplotlib axis."""
         plt.figure(figsize=(12, 6))
         ax = plt.gca()
         ax.set_xlim(0, self.WIDTH)
@@ -310,95 +311,63 @@ class Router:
         ax.set_yticks(range(self.HEIGHT))
         ax.set_aspect('equal')
         ax.grid(True)
+        return ax
 
-        # add artists
-        for artist in self.components:
-            artist.draw(ax)
+    def add_legend(self, ax):
+        """Add a custom legend to the plot."""
+        handle_start = Line2D([], [], marker='s', color='grey', markersize=9, markeredgecolor='black', linestyle='None')
+        handle_jump_pad = Line2D([], [], marker='^', color='grey', markersize=8, markeredgecolor='black', linestyle='None')
+        handle_belt = Line2D([], [], marker='o', color='grey', markersize=7, markeredgecolor='black', linestyle='None')
+        legend_handles = [handle_start, handle_jump_pad, handle_belt]
+        legend_labels = ['Start/Goal', 'Jump Pad', 'Belt']
+        ax.legend(legend_handles, legend_labels, handler_map={tuple: HandlerTuple(ndivide=1)}, loc='upper right')
 
+    def draw_edges(self, ax, used_edge):
+        """Draw all step and jump edges."""
         for i in range(self.num_nets):
             color = self.colors[i % len(self.colors)]
 
             used_step_edges = [edge for edge in self.step_edges if edge in used_edge[i]]
             used_jump_edges = [edge for edge in self.jump_edges if edge in used_edge[i]]
 
-            # plot step circule and line
             for (u, v, d) in used_step_edges:
                 ux, uy = u
-                ax.plot([ux + OFFSET, v[0] + OFFSET], [uy + OFFSET, v[1] + OFFSET], c='black', zorder = 1)
-                ax.scatter(ux + OFFSET, uy + OFFSET, c=color, marker='o', s=50, edgecolors='black', zorder = 2)
+                ax.plot([ux + OFFSET, v[0] + OFFSET], [uy + OFFSET, v[1] + OFFSET], c='black', zorder=1)
+                ax.scatter(ux + OFFSET, uy + OFFSET, c=color, marker='o', s=50, edgecolors='black', zorder=2)
 
             for (u, v, d) in used_jump_edges:
                 ux, uy = u
-                u2x, u2y = u
-                jump_distance = max(abs(v[0] - u[0]), abs(v[1] - u[1])) - 2
-                u2x += d[0] * (jump_distance + 1)
-                u2y += d[1] * (jump_distance + 1)
+                u2x, u2y = ux + d[0] * (max(abs(v[0] - ux), abs(v[1] - uy)) - 1), uy + d[1] * (max(abs(v[0] - ux), abs(v[1] - uy)) - 1)
 
-                # if d == (0, 1):
-                #     marker = '2'
-                # elif d == (0, -1):
-                #     marker = '1'
-                # elif d == (1, 0):
-                #     marker = '4'
-                # elif d == (-1, 0):
-                #     marker = '3'
+                marker = {'(0, 1)': '^', '(0, -1)': 'v', '(1, 0)': '>', '(-1, 0)': '<'}.get(str(d), 'o')
 
-                if d == (0, 1):
-                    marker = '^'
-                elif d == (0, -1):
-                    marker = 'v'
-                elif d == (1, 0):
-                    marker = '>'
-                elif d == (-1, 0):
-                    marker = '<'
+                ax.plot([u2x + OFFSET, v[0] + OFFSET], [u2y + OFFSET, v[1] + OFFSET], c='black', zorder=1)
+                ax.scatter(ux + OFFSET, uy + OFFSET, c=color, marker=marker, s=80, edgecolors='black', zorder=2)
+                ax.scatter(u2x + OFFSET, u2y + OFFSET, c=color, marker=marker, s=80, edgecolors='black', zorder=2)
 
-                ax.plot([u2x + OFFSET, v[0] + OFFSET], [u2y + OFFSET, v[1] + OFFSET], c='black', zorder = 1)
-                ax.scatter(ux + OFFSET, uy + OFFSET, c=color, marker=marker, s=80, edgecolors='black', zorder = 2)
-                ax.scatter(u2x + OFFSET, u2y + OFFSET, c=color, marker=marker, s=80, edgecolors='black', zorder = 2)
-        
+    def draw(self, used_edge):
+        ax = self.setup_ax()
 
-        plt.title("Shapez2: Routing using Integer Linear Programming (ILP) -- Jiahao")
-
-        # custom legend
-        handle_start = Line2D([], [], marker='s', color='grey', markersize=9, markeredgecolor='black', linestyle='None', label='Start/Goal')
-        handle_jump_pad = Line2D([], [], marker='^', color='grey', markersize=8, markeredgecolor='black', linestyle='None', label='Jump Pad')
-        handle_belt = Line2D([], [], marker='o', color='grey', markersize=7, markeredgecolor='black', linestyle='None', label='Belt')
-        # handle_component_square = Line2D([], [], marker='s', color='grey', markersize=14, markeredgecolor='black', linestyle='None')
-        # handle_component_circle = Line2D([], [], marker='o', color='grey', markersize=13, markeredgecolor='black', linestyle='None')
-        # handle_component = (handle_component_square, handle_component_circle)
-        legend_handles = [handle_start, handle_jump_pad, handle_belt]
-        legend_labels  = ['Start/Goal', 'Jump Pad', 'Belt']
-        ax.legend(legend_handles, legend_labels, handler_map={tuple: HandlerTuple(ndivide=1)}, loc='upper right')
-
-        # show
-        plt.show()
-
-    def draw_board(self):
-        plt.figure(figsize=(12, 6))
-        ax = plt.gca()
-        ax.set_xlim(0, self.WIDTH)
-        ax.set_ylim(0, self.HEIGHT)
-        ax.set_xticks(range(self.WIDTH))
-        ax.set_yticks(range(self.HEIGHT))
-        ax.set_aspect('equal')
-        ax.grid(True)
-
-        # add artists
+        # draw components
         for artist in self.components:
             artist.draw(ax)
 
+        # draw edges
+        self.draw_edges(ax, used_edge)
+
+        # finalize
         plt.title("Shapez2: Routing using Integer Linear Programming (ILP) -- Jiahao")
+        self.add_legend(ax)
+        plt.show()
 
-        # custom legend
-        handle_start = Line2D([], [], marker='s', color='grey', markersize=9, markeredgecolor='black', linestyle='None', label='Start/Goal')
-        handle_jump_pad = Line2D([], [], marker='^', color='grey', markersize=8, markeredgecolor='black', linestyle='None', label='Jump Pad')
-        handle_belt = Line2D([], [], marker='o', color='grey', markersize=7, markeredgecolor='black', linestyle='None', label='Belt')
-        # handle_component_square = Line2D([], [], marker='s', color='grey', markersize=14, markeredgecolor='black', linestyle='None')
-        # handle_component_circle = Line2D([], [], marker='o', color='grey', markersize=13, markeredgecolor='black', linestyle='None')
-        # handle_component = (handle_component_square, handle_component_circle)
-        legend_handles = [handle_start, handle_jump_pad, handle_belt]
-        legend_labels  = ['Start/Goal', 'Jump Pad', 'Belt']
-        ax.legend(legend_handles, legend_labels, handler_map={tuple: HandlerTuple(ndivide=1)}, loc='upper right')
+    def draw_board(self):
+        ax = self.setup_ax()
 
-        # show
+        # draw components only
+        for artist in self.components:
+            artist.draw(ax)
+
+        # finalize
+        plt.title("Shapez2: Routing using Integer Linear Programming (ILP) -- Jiahao")
+        self.add_legend(ax)
         plt.show()
