@@ -17,49 +17,10 @@ class Router:
         self.components: List[Component] = []
         self.colors = ['red', 'green', 'blue', 'orange', 'purple', 'cyan', 'magenta', 'brown', 'gray', 'olive']
 
-    def route_cutters(self, width, height, cutters, starts, goals1, goals2, jump_distances, timelimit, option: MIPFOCOUS_TYPE):
-        # add board
-        num_nets = 3
-        self.initialize_board(width, height, jump_distances, num_nets)
-
-        # compute border
-        borders = [(x, 0) for x in range(width)] + [(x, height-1) for x in range(width)] + [(0, y) for y in range(height)] + [(width-1, y) for y in range(height)]
-        io_tiles = [component.node for component in starts + goals1 + goals2]
-        for tile in io_tiles:
-            borders.remove(tile)
-
-        # add components
-        self.components += cutters
-        self.components += starts
-        self.components += goals1
-        self.components += goals2
-        self.components += [BorderComponent(node) for node in borders]
-
-        # add constraints from components
-        for component in self.components:
+    def add_components(self, components: List[Component]):
+        for component in components:
+            self.components.append(component)
             component.add_constraints(self)
-
-        # get node and amount
-        io_starts = [start.get_io_for_net() for start in starts]
-        io_goals1 = [goal.get_io_for_net() for goal in goals1]
-        io_goals2 = [goal.get_io_for_net() for goal in goals2]
-        io_cutter_input = [cutter.get_io_for_net()[0] for cutter in cutters]
-        io_cutter_output1 = [cutter.get_io_for_net()[1] for cutter in cutters]
-        io_cutter_output2 = [cutter.get_io_for_net()[2] for cutter in cutters]
-
-        # add nets
-        self.add_nets([
-            (io_starts, io_cutter_input), 
-            (io_cutter_output1, io_goals1), 
-            (io_cutter_output2, io_goals2)
-            ])
-
-        # solve
-        used_edge = self.solve(timelimit, option)
-
-        # draw solution
-        if used_edge is not None:
-            self.draw(cutters, used_edge)
 
     def initialize_board(self, width, height, jump_distances, num_nets):
         # add model
@@ -376,7 +337,7 @@ class Router:
         # return solution
         if self.model.SolCount > 0:
             used_edge = {i: [edge for edge in self.all_edges if self.is_edge_used[i][edge].X > 0.5] for i in range(self.num_nets)}
-            return used_edge
+            self.draw(used_edge)
         else:
             return None
 
@@ -392,7 +353,7 @@ class Router:
             
         self.model.setObjective(quicksum(step_cost_list + jump_cost_list))
 
-    def draw(self, cutters, used_edge):
+    def draw(self, used_edge):
         plt.figure(figsize=(12, 6))
         ax = plt.gca()
         ax.set_xlim(0, self.WIDTH)
