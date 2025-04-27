@@ -1,7 +1,6 @@
 from Components.Start import StartComponent
 from Components.Goal import GoalComponent
 from Components.Cutter import CutterComponent
-from Components.Border import BorderComponent
 from Router import Router
 from constants import *
 from typing import List
