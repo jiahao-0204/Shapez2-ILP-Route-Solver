@@ -248,6 +248,10 @@ class Router:
         sink_nodes = [sink[1] for sink in net_sinks]
         sink_amounts = [sink[2] for sink in net_sinks]
 
+        # check if total source and sink amounts are equal
+        if sum(source_amounts) != sum(sink_amounts):
+            raise ValueError("Total source amounts must equal total sink amounts for a net.")
+
         # current net count
         i = self.current_net_count
         self.current_net_count += 1
