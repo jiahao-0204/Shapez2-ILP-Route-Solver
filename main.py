@@ -8,40 +8,43 @@ from typing import List, Tuple
 
 if __name__ == "__main__":
     starts: List[StartComponent] = [
+        StartComponent((6, 0), (0, 1), 4),
         StartComponent((7, 0), (0, 1), 4),
         StartComponent((8, 0), (0, 1), 4),
         StartComponent((9, 0), (0, 1), 4),
     ]
     
     goals1: List[GoalComponent] = [
+        GoalComponent((0, 6), (-1, 0), 4),
         GoalComponent((0, 7), (-1, 0), 4),
         GoalComponent((0, 8), (-1, 0), 4),
         GoalComponent((0, 9), (-1, 0), 4),
     ]
 
     goals2: List[GoalComponent] = [
-        GoalComponent((7, 15), (0, 1), 4),
-        GoalComponent((8, 15), (0, 1), 4),
-        GoalComponent((9, 15), (0, 1), 4),
+        GoalComponent((15, 6), (1, 0), 4),
+        GoalComponent((15, 7), (1, 0), 4),
+        GoalComponent((15, 8), (1, 0), 4),
+        GoalComponent((15, 9), (1, 0), 4),
     ]
     
     cutter_list: List[CutterComponent] = [
         CutterComponent((4, 3), (1, 0), (0, 1), 1),
         CutterComponent((4, 7), (1, 0), (0, -1), 1),
         CutterComponent((4, 9), (1, 0), (0, 1), 1),
-        # CutterComponent((4, 13), (1, 0), (0, -1), 1),
+        CutterComponent((4, 13), (1, 0), (0, -1), 1),
         CutterComponent((6, 3), (-1, 0), (0, 1), 1),
         CutterComponent((6, 7), (-1, 0), (0, -1), 1),
         CutterComponent((6, 9), (-1, 0), (0, 1), 1),
-        # CutterComponent((6, 13), (-1, 0), (0, -1), 1),
+        CutterComponent((6, 13), (-1, 0), (0, -1), 1),
         CutterComponent((9, 3), (1, 0), (0, 1), 1),
         CutterComponent((9, 7), (1, 0), (0, -1), 1),
         CutterComponent((9, 9), (1, 0), (0, 1), 1),
-        # CutterComponent((9, 13), (1, 0), (0, -1), 1),
+        CutterComponent((9, 13), (1, 0), (0, -1), 1),
         CutterComponent((11, 3), (-1, 0), (0, 1), 1),
         CutterComponent((11, 7), (-1, 0), (0, -1), 1),
         CutterComponent((11, 9), (-1, 0), (0, 1), 1),
-        # CutterComponent((11, 13), (-1, 0), (0, -1), 1),
+        CutterComponent((11, 13), (-1, 0), (0, -1), 1),
     ]
 
     width = 16
