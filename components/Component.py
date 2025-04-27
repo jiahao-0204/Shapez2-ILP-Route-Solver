@@ -15,7 +15,7 @@ class Component:
     def add_constraints(self, router: "Router"):
         pass
 
-    def get_io_for_net(self):
+    def get_io(self, ith: int = 0):
         pass
 
     def register_color(self, color: str):

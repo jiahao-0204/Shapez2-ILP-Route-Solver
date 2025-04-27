@@ -63,5 +63,12 @@ class CutterComponent(Component):
         router.add_source_node_constraints(self.primary_source, self.direction)
         router.add_source_node_constraints(self.secondary_source, self.direction)
 
-    def get_io_for_net(self):
-        return (self, self.node, self.amount), (self, self.primary_source, self.amount), (self, self.secondary_source, self.amount)
+    def get_io(self, ith):
+        if ith == 0:
+            return (self, self.node, self.amount)
+        elif ith == 1:
+            return (self, self.primary_source, self.amount)
+        elif ith == 2:
+            return (self, self.secondary_source, self.amount)
+        else:
+            raise ValueError("Invalid index for get_io")

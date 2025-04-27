@@ -4,7 +4,7 @@ from Components.Cutter import CutterComponent
 from Components.Border import BorderComponent
 from Router import Router
 from constants import *
-from typing import List, Tuple
+from typing import List
 
 if __name__ == "__main__":
     starts: List[StartComponent] = [
@@ -28,7 +28,7 @@ if __name__ == "__main__":
         GoalComponent((15, 9), (1, 0), 4),
     ]
     
-    cutter_list: List[CutterComponent] = [
+    cutters: List[CutterComponent] = [
         CutterComponent((4, 3), (1, 0), (0, 1), 1),
         CutterComponent((4, 7), (1, 0), (0, -1), 1),
         CutterComponent((4, 9), (1, 0), (0, 1), 1),
@@ -56,14 +56,6 @@ if __name__ == "__main__":
         border_nodes.remove(tile)
     borders: List[BorderComponent] = [BorderComponent(node) for node in border_nodes]
     
-    # get node and amount
-    io_starts = [start.get_io_for_net() for start in starts]
-    io_goals1 = [goal.get_io_for_net() for goal in goals1]
-    io_goals2 = [goal.get_io_for_net() for goal in goals2]
-    io_cutter_input = [cutter.get_io_for_net()[0] for cutter in cutter_list]
-    io_cutter_output1 = [cutter.get_io_for_net()[1] for cutter in cutter_list]
-    io_cutter_output2 = [cutter.get_io_for_net()[2] for cutter in cutter_list]
-
     # create router
     router = Router()
     router.initialize_board(width = width, height = width, jump_distances = [1, 2, 3, 4], num_nets = 3)
@@ -71,8 +63,8 @@ if __name__ == "__main__":
     router.add_components(goals1)
     router.add_components(goals2)
     router.add_components(borders)
-    router.add_components(cutter_list)
-    router.add_net(io_starts, io_cutter_input)
-    router.add_net(io_cutter_output1, io_goals1)
-    router.add_net(io_cutter_output2, io_goals2)
+    router.add_components(cutters)
+    router.add_net([c.get_io() for c in starts], [c.get_io(0) for c in cutters])
+    router.add_net([c.get_io(1) for c in cutters], [c.get_io() for c in goals1])
+    router.add_net([c.get_io(2) for c in cutters], [c.get_io() for c in goals2])
     router.solve(timelimit = NO_TIME_LIMIT, option = MIPFOCUS_FEASIBILITY)

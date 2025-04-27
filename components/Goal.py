@@ -29,5 +29,5 @@ class GoalComponent(Component):
         # as sink node
         router.add_sink_node_constraints(self.node, self.input_node, self.direction)
 
-    def get_io_for_net(self):
+    def get_io(self, ith: int = 0):
         return (self, self.node, self.amount)

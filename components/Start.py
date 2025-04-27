@@ -35,5 +35,5 @@ class StartComponent(Component):
         source_node = (self.node[0] + self.direction[0], self.node[1] + self.direction[1])
         router.add_source_node_constraints(source_node, self.direction)
 
-    def get_io_for_net(self):
+    def get_io(self, ith: int = 0):
         return (self, self.source_node, self.amount)
