@@ -279,7 +279,7 @@ class Router:
             else:
                 self.model.addConstr(in_flow - out_flow == 0)
 
-    def solve(self, timelimit, option):
+    def solve(self, timelimit, option, live_draw = False):
         # objective
         self.add_objective()
 
@@ -289,14 +289,17 @@ class Router:
         self.model.Params.MIPFocus = option
         self.model.Params.Presolve = PRESOLVE
 
-        # solve     
-        self.non_blocking_draw()
-        self.model.optimize(self.draw_solution_callback)
-
-        # # draw if have solution
-        # if self.model.SolCount > 0:
-        #     used_edge = {i: [edge for edge in self.all_edges if self.is_edge_used[i][edge].X > 0.5] for i in range(self.num_nets)}
-        #     self.draw(used_edge)
+        # solve   
+        if live_draw:  
+            self.non_blocking_draw()
+            self.model.optimize(self.draw_solution_callback)
+        else:
+            self.model.optimize()
+        
+        # draw if have solution
+        if self.model.SolCount > 0:
+            used_edge = {i: [edge for edge in self.all_edges if self.is_edge_used[i][edge].X > 0.5] for i in range(self.num_nets)}
+            self.draw(used_edge)
 
     def add_objective(self):
         step_cost_list = []

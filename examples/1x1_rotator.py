@@ -44,4 +44,4 @@ if __name__ == "__main__":
     router.generate_and_add_borders()
     router.add_net([c.get_io() for c in starts], [c.get_io(0) for c in rotators])
     router.add_net([c.get_io(1) for c in rotators], [c.get_io() for c in goals])
-    router.solve(timelimit = NO_TIME_LIMIT, option = MIPFOCUS_FEASIBILITY)
+    router.solve(timelimit = NO_TIME_LIMIT, option = MIPFOCUS_FEASIBILITY, live_draw=True)
