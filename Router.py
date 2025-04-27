@@ -147,7 +147,9 @@ class Router:
         border_nodes: Set[Node] = set(top_border + bottom_border + left_border + right_border)
 
         # collect existing IO nodes
-        io_nodes = {component.node for component in self.components}
+        io_nodes = set()
+        for component in self.components:
+            io_nodes.update(component.get_nodes())  # get IO nodes from components
 
         # exclude IO nodes from borders
         border_nodes.difference_update(io_nodes)

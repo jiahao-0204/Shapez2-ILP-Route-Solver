@@ -31,3 +31,6 @@ class GoalComponent(Component):
 
     def get_io(self, ith: int = 0):
         return (self, self.node, self.amount)
+
+    def get_nodes(self):
+        return [self.node]

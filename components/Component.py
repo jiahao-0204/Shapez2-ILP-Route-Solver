@@ -6,7 +6,6 @@ if TYPE_CHECKING:
 
 class Component:
     def __init__(self):
-        self.node = None
         pass
 
     def draw(self, ax: plt.Axes):
@@ -20,3 +19,6 @@ class Component:
 
     def register_color(self, color: str):
         self.color = color
+    
+    def get_nodes(self):
+        pass

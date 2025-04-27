@@ -72,3 +72,6 @@ class CutterComponent(Component):
             return (self, self.secondary_source, self.amount)
         else:
             raise ValueError("Invalid index for get_io")
+    
+    def get_nodes(self):
+        return [self.node, self.secondary_node]

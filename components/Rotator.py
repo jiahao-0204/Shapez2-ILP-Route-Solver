@@ -59,3 +59,6 @@ class RotatorComponent(Component):
             return (self, self.source_node, self.amount)
         else:
             raise ValueError("Invalid index for get_io")
+    
+    def get_nodes(self):
+        return [self.node]

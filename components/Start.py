@@ -37,3 +37,6 @@ class StartComponent(Component):
 
     def get_io(self, ith: int = 0):
         return (self, self.source_node, self.amount)
+
+    def get_nodes(self):
+        return [self.node]

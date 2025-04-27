@@ -22,3 +22,6 @@ class BorderComponent(Component):
 
     def add_constraints(self, router: "Router"):
         router.add_null_node_constraints(self.node)
+    
+    def get_nodes(self):
+        return [self.node]
