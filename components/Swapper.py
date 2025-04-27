@@ -50,8 +50,8 @@ class SwapperComponent(Component):
             marker = '>'
         elif self.direction == (-1, 0):
             marker = '<'
-        ax.scatter(self.x + OFFSET, self.y + OFFSET, c='black', marker=marker, s=80, edgecolors='black', zorder = 2)
-        ax.scatter(self.x2 + OFFSET, self.y2 + OFFSET, c='grey', marker=marker, s=80, edgecolors='black', zorder = 2)
+        ax.scatter(self.x + OFFSET, self.y + OFFSET, c=self.io_color[self.node1], marker=marker, s=80, edgecolors='black', zorder = 2)
+        ax.scatter(self.x2 + OFFSET, self.y2 + OFFSET, c=self.io_color[self.node2], marker=marker, s=80, edgecolors='black', zorder = 2)
 
         # draw lines
         ax.plot([self.x + OFFSET, self.nx + OFFSET], [self.y + OFFSET, self.ny + OFFSET], c='black', zorder=0)

@@ -262,8 +262,8 @@ class Router:
 
         # register net color
         color = self.colors[i % len(self.colors)]
-        for component in source_compoents + sink_components:
-            component.register_color(color)
+        for component, node in zip(source_compoents + sink_components, source_nodes + sink_nodes):
+            component.register_color(node, color)
 
         # add flow constraints for net (within one net, flow can split and merge)
         for node in self.all_nodes:

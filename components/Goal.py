@@ -22,8 +22,8 @@ class GoalComponent(Component):
         self.ix, self.iy = self.input_node
 
     def draw(self, ax: plt.Axes):
-        ax.scatter(self.x + OFFSET, self.y + OFFSET, c=self.color, marker='s', s=120, edgecolors='black', zorder=0)
-        ax.scatter(self.x + OFFSET, self.y + OFFSET, c=self.color, marker='o', s=50, edgecolors='black', zorder=2)
+        ax.scatter(self.x + OFFSET, self.y + OFFSET, c=self.io_color[self.node], marker='s', s=120, edgecolors='black', zorder=0)
+        ax.scatter(self.x + OFFSET, self.y + OFFSET, c=self.io_color[self.node], marker='o', s=50, edgecolors='black', zorder=2)
 
     def add_constraints(self, router: "Router"):
         # as sink node
