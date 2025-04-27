@@ -70,5 +70,5 @@ if __name__ == "__main__":
     router.add_net([c.get_io() for c in starts2], [c.get_io(1) for c in swappers])
     router.add_net([c.get_io(2) for c in swappers], [c.get_io() for c in goals1])
     router.add_net([c.get_io(3) for c in swappers], [c.get_io() for c in goals2])
-    router.draw_board()
+    router.draw()
     router.solve(timelimit = NO_TIME_LIMIT, option = MIPFOCUS_FEASIBILITY)

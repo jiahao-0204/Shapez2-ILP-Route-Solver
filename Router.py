@@ -14,6 +14,7 @@ class Router:
         self.components: List[Component] = []
         self.colors = ['red', 'green', 'blue', 'orange', 'purple', 'cyan', 'magenta', 'brown', 'gray', 'olive']
         self.current_net_count = 0
+        self.ax = None
 
     def initialize_board(self, width, height, jump_distances, num_nets):
         # add model
@@ -287,8 +288,9 @@ class Router:
         self.model.Params.MIPFocus = option
         self.model.Params.Presolve = PRESOLVE
 
-        # solve
-        self.model.optimize()
+        # solve     
+        self.non_blocking_draw()
+        self.model.optimize(self.draw_solution_callback)
 
         # draw if have solution
         if self.model.SolCount > 0:
@@ -307,17 +309,14 @@ class Router:
             
         self.model.setObjective(quicksum(step_cost_list + jump_cost_list))
 
-    def setup_ax(self):
-        """Prepare the matplotlib axis."""
-        plt.figure(figsize=(12, 6))
-        ax = plt.gca()
-        ax.set_xlim(0, self.WIDTH)
-        ax.set_ylim(0, self.HEIGHT)
-        ax.set_xticks(range(self.WIDTH))
-        ax.set_yticks(range(self.HEIGHT))
-        ax.set_aspect('equal')
-        ax.grid(True)
-        return ax
+    def draw_solution_callback(self, model, where):
+        try:
+            if where == GRB.Callback.MIPSOL:
+                used_edge = {i: [edge for edge in self.all_edges if model.cbGetSolution(self.is_edge_used[i][edge]) > 0.5] for i in range(self.num_nets)}
+                self.non_blocking_draw(used_edge)
+        except KeyboardInterrupt:
+            print("KeyboardInterrupt detected inside callback. Stopping model.")
+            model.terminate()
 
     def add_legend(self, ax):
         """Add a custom legend to the plot."""
@@ -329,6 +328,10 @@ class Router:
         ax.legend(legend_handles, legend_labels, handler_map={tuple: HandlerTuple(ndivide=1)}, loc='upper right')
 
     def draw_edges(self, ax, used_edge):
+        # skip if no edges
+        if not used_edge:
+            return
+
         """Draw all step and jump edges."""
         for i in range(self.num_nets):
             color = self.colors[i % len(self.colors)]
@@ -351,8 +354,16 @@ class Router:
                 ax.scatter(ux + OFFSET, uy + OFFSET, c=color, marker=marker, s=80, edgecolors='black', zorder=2)
                 ax.scatter(u2x + OFFSET, u2y + OFFSET, c=color, marker=marker, s=80, edgecolors='black', zorder=2)
 
-    def draw(self, used_edge):
-        ax = self.setup_ax()
+    def draw(self, used_edge = None):
+        # set up axes
+        plt.figure(figsize=(12, 6))
+        ax = plt.gca()
+        ax.set_xlim(0, self.WIDTH)
+        ax.set_ylim(0, self.HEIGHT)
+        ax.set_xticks(range(self.WIDTH))
+        ax.set_yticks(range(self.HEIGHT))
+        ax.set_aspect('equal')
+        ax.grid(True)
 
         # draw components
         for artist in self.components:
@@ -364,16 +375,35 @@ class Router:
         # finalize
         plt.title("Shapez2: Routing using Integer Linear Programming (ILP) -- Jiahao")
         self.add_legend(ax)
+
+        # show
         plt.show()
+    
+    def non_blocking_draw(self, used_edge = None):
+        # set up axes
+        if self.ax is None:
+            plt.figure(figsize=(12, 6))
+            self.ax = plt.gca()
+            plt.show(block=False)
+        self.ax.clear()
+        self.ax.set_xlim(0, self.WIDTH)
+        self.ax.set_ylim(0, self.HEIGHT)
+        self.ax.set_xticks(range(self.WIDTH))
+        self.ax.set_yticks(range(self.HEIGHT))
+        self.ax.set_aspect('equal')
+        self.ax.grid(True)
 
-    def draw_board(self):
-        ax = self.setup_ax()
-
-        # draw components only
+        # draw components
         for artist in self.components:
-            artist.draw(ax)
+            artist.draw(self.ax)
+
+        # draw edges
+        self.draw_edges(self.ax, used_edge)
 
         # finalize
         plt.title("Shapez2: Routing using Integer Linear Programming (ILP) -- Jiahao")
-        self.add_legend(ax)
-        plt.show()
+        self.add_legend(self.ax)
+
+        # non blocking show
+        plt.draw()
+        plt.pause(0.1)
