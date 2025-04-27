@@ -377,7 +377,7 @@ class Router:
         self.draw_edges(ax, used_edge)
 
         # finalize
-        plt.title("Shapez2: Routing using Integer Linear Programming (ILP) -- Jiahao")
+        plt.title("Shapez2: Routing using Mixed Integer Linear Programming (MIP)")
         self.add_legend(ax)
 
         # show
@@ -409,7 +409,7 @@ class Router:
         self.draw_edges(self.ax, used_edge)
 
         # finalize
-        plt.title("Shapez2: Routing using Integer Linear Programming (ILP) -- Jiahao")
+        plt.title("Shapez2: Routing using Mixed Integer Linear Programming (MIP)")
         self.add_legend(self.ax)
 
         # non blocking show
