@@ -69,9 +69,7 @@ if __name__ == "__main__":
     router.add_components(goals2)
     router.add_components(borders)
     router.add_components(cutter_list)
-    router.add_nets([
-        (io_starts, io_cutter_input), 
-        (io_cutter_output1, io_goals1), 
-        (io_cutter_output2, io_goals2)
-    ])
+    router.add_net(io_starts, io_cutter_input)
+    router.add_net(io_cutter_output1, io_goals1)
+    router.add_net(io_cutter_output2, io_goals2)
     router.solve(timelimit = NO_TIME_LIMIT, option = MIPFOCUS_FEASIBILITY)

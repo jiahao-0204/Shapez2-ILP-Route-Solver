@@ -12,6 +12,7 @@ class Router:
     def __init__(self):
         self.components: List[Component] = []
         self.colors = ['red', 'green', 'blue', 'orange', 'purple', 'cyan', 'magenta', 'brown', 'gray', 'olive']
+        self.current_net_count = 0
 
     def initialize_board(self, width, height, jump_distances, num_nets):
         # add model
@@ -215,42 +216,38 @@ class Router:
             for edge in self.node_related_landing_pad_edges[node]:
                 self.model.addConstr(self.is_edge_used[i][edge] == 0)
 
-    def add_nets(self, net_list: List[Tuple[List[Tuple[Component, Node, Amount]], List[Tuple[Component, Node, Amount]]]]):
-        for i in range(len(net_list)):
-            # color
-            color = self.colors[i % len(self.colors)]
+    def add_net(self, net_sources: List[Tuple[Component, Node, Amount]], net_sinks: List[Tuple[Component, Node, Amount]]):
+        # get net sources and sinks
+        source_compoents = [source[0] for source in net_sources]
+        source_nodes = [source[1] for source in net_sources]
+        source_amounts = [source[2] for source in net_sources]
+        sink_components = [sink[0] for sink in net_sinks]
+        sink_nodes = [sink[1] for sink in net_sinks]
+        sink_amounts = [sink[2] for sink in net_sinks]
 
-            # get net sources and sinks
-            sources, sinks = net_list[i]
-            source_components = [source[0] for source in sources]
-            source_nodes = [source[1] for source in sources]
-            source_amounts = [source[2] for source in sources]
-            sink_components = [sink[0] for sink in sinks]
-            sink_nodes = [sink[1] for sink in sinks]
-            sink_amounts = [sink[2] for sink in sinks]
+        # current net count
+        i = self.current_net_count
+        self.current_net_count += 1
 
-            # register color for components
-            for component in source_components + sink_components:
-                component.register_color(color)
+        # register net color
+        color = self.colors[i % len(self.colors)]
+        for component in source_compoents + sink_components:
+            component.register_color(color)
 
-            # add net
-            self.add_net(i, source_nodes, source_amounts, sink_nodes, sink_amounts)
-
-    # within one net, flow can split and merge
-    def add_net(self, i, sources, source_amounts, sinks, sink_amounts):
+        # add flow constraints for net (within one net, flow can split and merge)
         for node in self.all_nodes:
             in_flow = self.node_in_flow_value_expr[i][node]
             out_flow = self.node_out_flow_value_expr[i][node]
 
-            if node in sources:
-                source_count = sources.count(node)
-                self.model.addConstr(out_flow - in_flow == source_amounts[sources.index(node)] * source_count)
-            elif node in sinks:
-                sink_count = sinks.count(node)
-                self.model.addConstr(in_flow - out_flow == sink_amounts[sinks.index(node)] * sink_count)
+            if node in source_nodes:
+                source_count = source_nodes.count(node)
+                self.model.addConstr(out_flow - in_flow == source_amounts[source_nodes.index(node)] * source_count)
+            elif node in sink_nodes:
+                sink_count = sink_nodes.count(node)
+                self.model.addConstr(in_flow - out_flow == sink_amounts[sink_nodes.index(node)] * sink_count)
             else:
                 self.model.addConstr(in_flow - out_flow == 0)
- 
+
     def solve(self, timelimit, option):
         # objective
         self.add_objective()
