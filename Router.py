@@ -1,9 +1,5 @@
 from constants import *
 from Components.Component import Component
-from Components.Start import StartComponent
-from Components.Border import BorderComponent
-from Components.Goal import GoalComponent
-from Components.Cutter import CutterComponent
 
 from gurobipy import Model, GRB, quicksum, Var, LinExpr
 from collections import defaultdict
