@@ -64,4 +64,5 @@ if __name__ == "__main__":
     router.add_net([c.get_io() for c in starts], [c.get_io(0) for c in cutters])
     router.add_net([c.get_io(1) for c in cutters], [c.get_io() for c in goals1])
     router.add_net([c.get_io(2) for c in cutters], [c.get_io() for c in goals2])
+    router.add_net_for_not_used_nodes()
     router.solve(timelimit = NO_TIME_LIMIT, option = MIPFOCUS_FEASIBILITY, live_draw=True)

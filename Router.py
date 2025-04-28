@@ -19,6 +19,7 @@ class Router:
         self.current_net_count = 0
         self.ax = None
         self.terminate_requested = False
+        self.flow_constrainted_node: Set[Node] = set()
 
     def initialize_board(self, width, height, jump_distances, num_nets):
         # add model
@@ -71,26 +72,36 @@ class Router:
                         self.node_in_flow_edges[(nx, ny)].append(edge)
 
         # net specific variables
-        self.edge_flow_value: Dict[int, Dict[Edge, Var]] = defaultdict(lambda: defaultdict(Var))
         self.is_edge_used: Dict[int, Dict[Edge, Var]] = defaultdict(lambda: defaultdict(Var))
-        self.node_in_flow_value_expr: Dict[int, Dict[Node, LinExpr]] = defaultdict(lambda: defaultdict(LinExpr))
-        self.node_out_flow_value_expr: Dict[int, Dict[Node, LinExpr]] = defaultdict(lambda: defaultdict(LinExpr))
         self.is_node_used_by_belt: Dict[int, Dict[Node, Var]] = defaultdict(lambda: defaultdict(Var))
         for i in range(self.num_nets):
             for edge in self.all_edges:
-                # edge flow value
-                self.edge_flow_value[i][edge] = self.model.addVar(name = f"edge_flow_value_{i}_{edge}", vtype=GRB.INTEGER, lb=0, ub=FLOW_CAP)
-                self.edge_flow_value[i][edge].setAttr("BranchPriority", FLOW_PRIORITY)
-
                 # is edge used (dynamic variable)
                 self.is_edge_used[i][edge] = self.model.addVar(name=f"edge_{i}_{edge}", vtype=GRB.BINARY)
                 self.is_edge_used[i][edge].setAttr("BranchPriority", EDGE_PRIORITY)
-                self.model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[i][edge] >= 1)
-                self.model.addGenConstrIndicator(self.is_edge_used[i][edge], False, self.edge_flow_value[i][edge] == 0)
+        
+        # edge flow value and is_edge_used indicator
+        self.edge_flow_value: Dict[Edge, Var] = defaultdict(Var)
+        self.node_in_flow_value_expr: Dict[Node, LinExpr] = defaultdict(LinExpr)
+        self.node_out_flow_value_expr: Dict[Node, LinExpr] = defaultdict(LinExpr)
+        for edge in self.all_edges:
+            # edge flow value
+            self.edge_flow_value[edge] = self.model.addVar(name = f"edge_flow_value_{edge}", vtype=GRB.INTEGER, lb=0, ub=FLOW_CAP)
+            self.edge_flow_value[edge].setAttr("BranchPriority", FLOW_PRIORITY)
+            
+            # in flow and out flow values
+            self.node_in_flow_value_expr[edge[1]].addTerms(1, self.edge_flow_value[edge])
+            self.node_out_flow_value_expr[edge[0]].addTerms(1, self.edge_flow_value[edge])
 
-                # in flow and out flow values
-                self.node_in_flow_value_expr[i][edge[1]].addTerms(1, self.edge_flow_value[i][edge])
-                self.node_out_flow_value_expr[i][edge[0]].addTerms(1, self.edge_flow_value[i][edge])
+            # if edge is used by any net, flow value must be >= 1
+            for i in range(self.num_nets):
+                self.model.addGenConstrIndicator(self.is_edge_used[i][edge], True, self.edge_flow_value[edge] >= 1)
+            
+            # if edge is not used by any net, flow value must be 0
+            edge_used_by_any_net = self.model.addVar(name=f"edge_used_by_any_net_{edge}", vtype=GRB.BINARY)
+            self.model.addGenConstrOr(edge_used_by_any_net, [self.is_edge_used[i][edge] for i in range(self.num_nets)])
+            self.model.addGenConstrIndicator(edge_used_by_any_net, False, self.edge_flow_value[edge] == 0)
+
         for i in range(self.num_nets):
             for node in self.all_nodes:
                 # is node used by belt (dynamic variable)
@@ -106,10 +117,9 @@ class Router:
 
     def add_flow_max_value_constraints(self):
         # max flow at each node
-        for i in range(self.num_nets):
-            for node in self.all_nodes:
-                self.model.addConstr(self.node_in_flow_value_expr[i][node] <= FLOW_CAP)
-                self.model.addConstr(self.node_out_flow_value_expr[i][node] <= FLOW_CAP)
+        for node in self.all_nodes:
+            self.model.addConstr(self.node_in_flow_value_expr[node] <= FLOW_CAP)
+            self.model.addConstr(self.node_out_flow_value_expr[node] <= FLOW_CAP)
 
     def add_belt_pad_net_overlap_constraints(self):
         # between belts / pads in different nets
@@ -270,16 +280,28 @@ class Router:
 
         # add flow constraints for net (within one net, flow can split and merge)
         for node in self.all_nodes:
-            in_flow = self.node_in_flow_value_expr[i][node]
-            out_flow = self.node_out_flow_value_expr[i][node]
+            in_flow = self.node_in_flow_value_expr[node]
+            out_flow = self.node_out_flow_value_expr[node]
 
             if node in source_nodes:
                 source_count = source_nodes.count(node)
                 self.model.addConstr(out_flow - in_flow == source_amounts[source_nodes.index(node)] * source_count)
+                self.flow_constrainted_node.add(node)
             elif node in sink_nodes:
                 sink_count = sink_nodes.count(node)
                 self.model.addConstr(in_flow - out_flow == sink_amounts[sink_nodes.index(node)] * sink_count)
+                self.flow_constrainted_node.add(node)
             else:
+                # do nothing
+                # then after all nets are added, set in_flow == out_flow for not used nodes
+                pass
+
+    def add_net_for_not_used_nodes(self):
+        for node in self.all_nodes:
+            if node not in self.flow_constrainted_node:
+                in_flow = self.node_in_flow_value_expr[node]
+                out_flow = self.node_out_flow_value_expr[node]
+
                 self.model.addConstr(in_flow - out_flow == 0)
 
     def solve(self, timelimit, option, live_draw = False):
