@@ -96,6 +96,12 @@ class Router:
             # if the edge is not used, all of the flow value must be 0
             for i in range(self.num_nets):
                 self.model.addGenConstrIndicator(self.is_edge_used[edge], False, self.edge_flow_value[i][edge] == 0)
+            
+            # optional for tightening
+            self.model.addConstr(quicksum(self.edge_flow_value[i][edge] for i in range(self.num_nets)) >= self.is_edge_used[edge])
+            self.model.addConstr(quicksum(self.edge_flow_value[i][edge] for i in range(self.num_nets)) <= FLOW_CAP * self.is_edge_used[edge])
+            for i in range(self.num_nets):
+                self.model.addConstr(self.edge_flow_value[i][edge] <= FLOW_CAP * self.is_edge_used[edge])
 
         self.is_node_used_by_belt: Dict[Node, Var] = defaultdict(Var)
         for node in self.all_nodes:
