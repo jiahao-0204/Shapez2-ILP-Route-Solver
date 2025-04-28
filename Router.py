@@ -90,9 +90,8 @@ class Router:
             self.is_edge_used[edge] = self.model.addVar(name=f"edge_{edge}", vtype=GRB.BINARY)
             self.is_edge_used[edge].setAttr("BranchPriority", EDGE_PRIORITY)
 
-            # todo
             # # if an edge is used, one of the flow value must be >= 1
-            # self.model.addGenConstrIndicator(self.is_edge_used[edge], True, self.edge_flow_value[i][edge] >= 1)
+            self.model.addGenConstrIndicator(self.is_edge_used[edge], True, quicksum(self.edge_flow_value[i][edge] for i in range(self.num_nets)) >= 1)
 
             # if the edge is not used, all of the flow value must be 0
             for i in range(self.num_nets):
