@@ -63,7 +63,7 @@ if __name__ == "__main__":
     # create router
     router = Router()
     # router.initialize_board(width = 36, height = 16, jump_distances = [1, 2, 3, 4], num_nets = 4)
-    router.initialize_board(width = 36, height = 8, jump_distances = [1, 2, 3, 4], num_nets = 4)
+    router.initialize_board(width = 36, height = 8, jump_distances = [1, 2, 3, 4], num_nets = 2)
     router.add_components(starts1)
     router.add_components(starts2)
     # router.add_components(goals1)

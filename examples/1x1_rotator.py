@@ -29,8 +29,8 @@ if __name__ == "__main__":
     
     rotators: List[RotatorComponent] = [
         RotatorComponent((1, 7), (0, 1), 2),
-        RotatorComponent((1, 9), (0, 1), 2),
-        # RotatorComponent((6, 7), (0, 1), 2),
+        # RotatorComponent((1, 9), (0, 1), 2),
+        RotatorComponent((6, 7), (0, 1), 2),
         # RotatorComponent((7, 7), (0, 1), 2),
         # RotatorComponent((8, 7), (0, 1), 2),
         # RotatorComponent((9, 7), (0, 1), 2),
@@ -45,6 +45,7 @@ if __name__ == "__main__":
     router.add_components(goals)
     router.add_components(rotators)
     router.generate_and_add_borders()
+    # router.add_net([c.get_io() for c in starts], [c.get_io() for c in goals])
     router.add_net([c.get_io() for c in starts], [c.get_io(0) for c in rotators])
     router.add_net([c.get_io(1) for c in rotators], [c.get_io() for c in goals])
     router.add_net_for_not_used_nodes()

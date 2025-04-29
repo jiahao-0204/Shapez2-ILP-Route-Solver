@@ -42,8 +42,11 @@ class Router:
         self.node_out_flow_edges: Dict[Node, List[Edge]] = defaultdict(list)
         self.node_related_starting_pad_edges: Dict[Node, List[Edge]] = defaultdict(list)
         self.node_related_landing_pad_edges: Dict[Node, List[Edge]] = defaultdict(list)
+        self.node_used_by_net: Dict[Node, Var] = defaultdict(Var)
 
         for node in self.all_nodes:
+            self.node_used_by_net[node] = self.model.addVar(name=f"node_{node}", vtype=GRB.INTEGER, lb=0, ub=self.num_nets-1)
+
             for dx, dy in DIRECTIONS:
                 x, y = node
 
@@ -70,11 +73,6 @@ class Router:
                         self.node_related_landing_pad_edges[pad_node].append(edge)
                         self.node_out_flow_edges[node].append(edge)
                         self.node_in_flow_edges[(nx, ny)].append(edge)
-
-        # i only need one set of is_edge_used
-
-        # then i encode net requirement by using is_used_by_net : integer variable
-        # in which, if an edge is used, then the start and end node must have the same is_used_by_net value
 
         # net specific variables
         self.is_edge_used: Dict[Edge, Var] = defaultdict(Var)
@@ -114,6 +112,7 @@ class Router:
         self.add_flow_max_value_constraints()
         self.add_belt_pad_net_overlap_constraints()
         self.add_pad_direction_constraints()
+        self.add_net_overlap_constraints()
 
     def add_flow_max_value_constraints(self):
         # max flow at each node
@@ -148,6 +147,26 @@ class Router:
                 if jump_direction == direction:
                     continue
                 self.model.addConstr(self.is_edge_used[edge] + self.is_edge_used[jump_edge] <= 1) # only one can be true
+
+    def add_net_overlap_constraints(self):
+        # i only need one set of is_edge_used
+
+        # then i encode net requirement by using is_used_by_net : integer variable
+        # for each edge, if the edge is used, then the start and end node must have the same is_used_by_net value
+        for edge in self.step_edges:
+            u, v, _ = edge
+
+            # if edge is used, then start and end node must have the same is_used_by_net value
+            self.model.addGenConstrIndicator(self.is_edge_used[edge], True, self.node_used_by_net[u] == self.node_used_by_net[v])
+        
+        for edge in self.jump_edges:
+            u, v, direction = edge
+            pad = (v[0] - direction[0], v[1] - direction[1])
+
+            # if edge is used, then start and end node must have the same is_used_by_net value
+            self.model.addGenConstrIndicator(self.is_edge_used[edge], True, self.node_used_by_net[u] == self.node_used_by_net[v])
+            self.model.addGenConstrIndicator(self.is_edge_used[edge], True, self.node_used_by_net[u] == self.node_used_by_net[pad])
+            self.model.addGenConstrIndicator(self.is_edge_used[edge], True, self.node_used_by_net[pad] == self.node_used_by_net[v])
 
     def generate_and_add_borders(self) -> None:
         # collect all border nodes
@@ -282,10 +301,14 @@ class Router:
                 source_count = source_nodes.count(node)
                 self.model.addConstr(out_flow - in_flow == source_amounts[source_nodes.index(node)] * source_count)
                 self.flow_constrainted_node.add(node)
+                self.model.addConstr(self.node_used_by_net[node] == i)
+
             elif node in sink_nodes:
                 sink_count = sink_nodes.count(node)
                 self.model.addConstr(in_flow - out_flow == sink_amounts[sink_nodes.index(node)] * sink_count)
                 self.flow_constrainted_node.add(node)
+                self.model.addConstr(self.node_used_by_net[node] == i)
+
             else:
                 # do nothing
                 # then after all nets are added, set in_flow == out_flow for not used nodes
